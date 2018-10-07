@@ -144,8 +144,6 @@ class Evaluator(plotting.EvPlotting):
         group_levels = self.model.constrs_cols_neq + ['func']
         dfg = self.df_lam_plot.groupby(level=group_levels)['lambd']
 
-        lam_plot = dfg.get_group(list(dfg.groups.keys())[2])
-
         df_exp_0 = dfg.apply(self.get_expanded_row).reset_index()
 
         col_names = {'level_%d'%(len(self.model.constrs_neq) + 1):
