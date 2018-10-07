@@ -222,9 +222,9 @@ class Model:
                     select_cstr = select_cstr[0]
                     cols_mut_excl_0.append((cstr, select_cstr, is_exclusive))
 
-        cols_mut_excl_0 += [('active_lambda_phs_pos_p_day', 'active_lambda_phs_pos_p_evening', False),
-                          ('active_lambda_phs_pos_p_day', 'active_lambda_phs_pos_e_None', False),
-                          ('active_lambda_phs_pos_p_evening', 'active_lambda_phs_pos_e_None', False)]
+        cols_mut_excl_0 += [('lambda_phs_pos_p_day', 'lambda_phs_pos_p_evening', False),
+                          ('lambda_phs_pos_p_day', 'lambda_phs_pos_e_None', False),
+                          ('lambda_phs_pos_p_evening', 'lambda_phs_pos_e_None', False)]
 
         # make sure all cols are present
         cols_mut_excl = []
@@ -454,45 +454,87 @@ class Model:
                matter which component power is used. Then the solution can
                be discarded without loss of generality. All cases will still
                be captured by other constraint combinations.
+
+        Returns:
+            * Series mask with values: 0 -> no variables in solutions; 1 ->
+                single variable in solution: set to zero; > 1 -> mixed
+                interdependency: drop solution; NaN: empty solution set
+
         '''
 
         check_vars_left = lambda x: any(var in x.result.free_symbols
                                         for var in x.variabs_multips)
         mask_lindep = self.df_comb.apply(check_vars_left, axis=1)
 
-        # get
+        # get residual variables
+        if __name__ == '__main__':
+            x = self.df_comb.iloc[0]
 
-        get_residual_vars = lambda x: tuple(var for var in x.variabs_multips
-                                            if var in x.result.free_symbols)
-        res_vars = self.df_comb.apply(get_residual_vars, axis=1)
+        # mask with non-empty solutions
+        not_empty = lambda x: not isinstance(x, sp.sets.EmptySet)
+        mask_valid = self.df_comb.result.apply(not_empty)
 
-        # combine (variables and multiplier -> component) dictionaries
+        # for each individual solution, get residual variables/multipliers
+        get_residual_vars = \
+            lambda x: tuple([var for var in res.free_symbols
+                                 if var in x.variabs_multips]
+                            for nres, res in enumerate(list(x.result)[0]))
+
+        res_vars = self.df_comb[['result', 'variabs_multips']].copy()
+        res_vars.loc[mask_valid, 'res_vars'] = \
+                self.df_comb.loc[mask_valid].apply(get_residual_vars, axis=1)
+
+        if __name__ == '__main__':
+            x = res_vars.iloc[1]
+
+        # add solution variable itself to all non-empty lists
+        add_solution_var = \
+            lambda x: tuple(x.res_vars[nres_vars]
+                                + [x.variabs_multips[nres_vars]]
+                            if res_vars else []
+                            for nres_vars, res_vars in enumerate(x.res_vars))
+
+        res_vars.loc[mask_valid, 'res_vars'] = \
+                res_vars.loc[mask_valid].apply(add_solution_var, axis=1)
+
+        # get component corresponding to variable
         comp_dict_varmtp = self.multips.copy()
         comp_dict_varmtp.update(self.variabs)
 
-        # get
-        get_comps = lambda x: len(list(set(comp_dict_varmtp[varmtp] for varmtp in x)))
-        res_comps = res_vars.apply(get_comps)
+        get_comps = lambda x: tuple((list(set([comp_dict_varmtp[var]
+                                              for var in res_vars])))
+                                    for res_vars in x.res_vars
+                                    if res_vars)
+        res_vars.loc[mask_valid, 'res_comps'] = res_vars.loc[mask_valid].apply(get_comps, axis=1)
 
-#        res_comps.max()
+        # maximum unique component number
+        get_max_nunq = lambda x: max(len(set(comp_list))
+                                     for comp_list in x.res_comps) if x.res_comps else 0
+        res_vars.loc[mask_valid, 'mask_res_unq'] = res_vars.loc[mask_valid].apply(get_max_nunq, axis=1)
 
-        self.get_variabs_params()
-
-        return mask_lindep
+        return res_vars.mask_res_unq
 
 
     def filter_invalid_solutions(self):
 
         mask_empty = self.get_mask_empty_solution()
-#        mask_lindep = self.get_mask_linear_dependencies()
 
         print('The following constraint combinations have empty solutions:\n',
               self.df_comb.loc[mask_empty, self.constrs_cols_neq])
 
         self.df_comb = self.df_comb.loc[-mask_empty]
 
+
+        mask_lindep = self.get_mask_linear_dependencies()
+
         print('The following constraint combinations '
-              'cause linear dependencies of variables:')
+              'have mixed residual interdependencies of variables '
+              'and are removed:\n',
+              self.df_comb.loc[mask_lindep, self.constrs_cols_neq])
+
+        self.df_comb = pd.concat([self.df_comb, mask_lindep], axis=1)
+        self.df_comb = self.df_comb.loc[-(mask_lindep > 1)]
+
 
         self.df_comb['result'] = \
                 self.df_comb.apply(self.fix_linear_dependencies, axis=1)
@@ -508,26 +550,30 @@ class Model:
         if __name__ == '__main__':
             x = self.df_comb.iloc[1]
 
-        list_res = list(x.result)[0]
-        list_var = x.variabs_multips
+        if x.mask_res_unq == 0:
+            list_res_new = list(list(x.result)[0])
 
+        elif x.mask_res_unq == 1:
 
-        collect = {}
+            list_res = list(x.result)[0]
+            list_var = x.variabs_multips
 
-        list_res_new = [res for res in list_res]
+            collect = {}
 
-        for nres, res in enumerate(list_res):
+            list_res_new = [res for res in list_res]
 
-            free_symbs = [var for var in list_var if var in res.free_symbols]
+            for nres, res in enumerate(list_res):
 
-            if free_symbs:
-                list_res_new[nres] = sp.numbers.Zero()
-                collect[list_var[nres]] = ', '.join(map(str, free_symbs))
+                free_symbs = [var for var in list_var if var in res.free_symbols]
 
-        if collect:
-            print('%s'%x[self.constrs_cols_neq])
-            for res, var in collect.items():
-                print('     Solution for %s contained variabs %s.'%(res, var))
+                if free_symbs:
+                    list_res_new[nres] = sp.numbers.Zero()
+                    collect[list_var[nres]] = ', '.join(map(str, free_symbs))
+
+            if collect:
+                print('%s'%x[self.constrs_cols_neq])
+                for res, var in collect.items():
+                    print('     Solution for %s contained variabs %s.'%(res, var))
 
         return [list_res_new]
 
