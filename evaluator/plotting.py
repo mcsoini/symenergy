@@ -8,6 +8,7 @@ Part of symenergy. Copyright 2018 authors listed in AUTHORS.
 
 import numpy as np
 import pyAndy.core.plotpage as pltpg
+import matplotlib.pyplot as plt
 
 class EvPlotting():
     '''
@@ -20,11 +21,16 @@ class EvPlotting():
                            series=['const_comb'], values=['lambd'],
                        aggfunc=np.mean, harmonize=True)
         page_kw = dict(left=0.05, right=0.99, bottom=0.050, top=0.8)
-        plot_kw = dict(kind_def='LinePlot', stacked=False, on_values=True,
-                       sharex=True, sharey=False, linewidth=4, marker=None,
-                       xlabel=self.select_x.name, legend='')
 
         do = pltpg.PlotPageData.from_df(df=self.df_exp, **data_kw)
+
+        cmap = plt.get_cmap('tab20c')
+        colormap={col[-1]: cmap(ncol) for ncol, col in enumerate(do.data.columns)}
+
+        plot_kw = dict(kind_def='LinePlot', stacked=False, on_values=True,
+                       sharex=True, sharey=False, linewidth=4, marker=None,
+                       xlabel=self.select_x.name, legend='',
+                       colormap=colormap)
         plt0 = pltpg.PlotTiled(do, **plot_kw, **page_kw)
 
         #do_tc = do.copy()
