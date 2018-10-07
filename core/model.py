@@ -111,7 +111,7 @@ class Model:
         Defines a dictionary cstr_load {slot: supply constraint}
         '''
 
-        self.cstr_supply = []
+        self.cstr_supply = {}
 
         for slot in self.slots.values():
 
@@ -121,7 +121,7 @@ class Model:
             cstr_supply.expr = \
                     self.get_supply_constraint_expr(cstr_supply)
 
-            self.cstr_supply.append(cstr_supply)
+            self.cstr_supply[cstr_supply] = slot
 
         print(self.cstr_supply)
 
@@ -162,18 +162,18 @@ class Model:
         Note: Doesn't include supply constraints, which are a model attribute.
         '''
 
-        self.constrs = []
+        self.constrs = {}
         for comp in self.comps.values():
             for key, attr in comp.__dict__.items():
                 if key.startswith('cstr_'):
                     for slot, cstr in attr.items():
-                        self.constrs.append(cstr)
+                        self.constrs[cstr] = comp
 
         # dictionary {column name: constraint object}
-        self.constrs_dict = {cstr.col: cstr for cstr in self.constrs}
+        self.constrs_dict = {cstr.col: cstr for cstr in self.constrs.keys()}
 
         # list of constraint columns
-        self.constrs_cols = [cstr.col for cstr in self.constrs]
+        self.constrs_cols = [cstr.col for cstr in self.constrs.keys()]
 
     def init_constraint_combinations(self):
         '''
@@ -183,7 +183,7 @@ class Model:
         '''
 
         self.constrs_neq = [cstr for cstr in self.constrs
-                                  if not cstr.is_equality_constraint]
+                            if not cstr.is_equality_constraint]
         self.constrs_cols_neq = [cstr.col for cstr
                                  in self.constrs_neq]
 
@@ -265,19 +265,20 @@ class Model:
         This is needed for the definition of the linear equation system.
         '''
 
-        self.params = [par
+        self.params = {par: comp
                        for comp in self.comps.values()
-                       for par in comp.get_params_dict()]
+                       for par in comp.get_params_dict()}
 
         # add time-dependent variables
-        self.variabs = [var
+        self.variabs = {var: comp
                         for comp in self.comps.values()
-                        for var in comp.get_variabs()]
+                        for var in comp.get_variabs()}
 
         # parameter multips
-        self.multips = [cstr.mlt for cstr in self.constrs]
+        self.multips = {cstr.mlt: comp for cstr, comp in self.constrs.items()}
         # supply multips
-        self.multips += [cstr.mlt for cstr in self.cstr_supply]
+        self.multips.update({cstr.mlt: slot
+                             for cstr, slot in self.cstr_supply.items()})
 
     def construct_lagrange(self, row):
 
@@ -319,8 +320,8 @@ class Model:
         '''
 
         lfs = lagrange.free_symbols
-        variabs_slct = [ss for ss in lfs if ss in self.variabs]
-        multips_slct = [ss for ss in lfs if ss in self.multips]
+        variabs_slct = [ss for ss in lfs if ss in self.variabs.keys()]
+        multips_slct = [ss for ss in lfs if ss in self.multips.keys()]
 
         return variabs_slct + multips_slct
 
@@ -438,13 +439,44 @@ class Model:
 
     def get_mask_linear_dependencies(self):
         '''
-        Solutions of problems containing linear dependencies contain
-        variables.
+        Solutions of problems containing linear dependencies.
+
+        In case of linear dependencies SymPy returns solutions containing
+        variables which we are actually solving for. To fix this, we
+        differentiate between two cases:
+            1. All corresponding solutions belong to the same component.
+               Overspecification occurs if the variables of the same component
+               depend on each other but are all zero. E.g. charging,
+               discharging, and stored energy in the case of storage.
+               They are set to zero.
+            2. Linear dependent variables belonging to different components.
+               This occurs if the model is underspecified, e.g. if it doesn't
+               matter which component power is used. Then the solution can
+               be discarded without loss of generality. All cases will still
+               be captured by other constraint combinations.
         '''
 
         check_vars_left = lambda x: any(var in x.result.free_symbols
                                         for var in x.variabs_multips)
         mask_lindep = self.df_comb.apply(check_vars_left, axis=1)
+
+        # get
+
+        get_residual_vars = lambda x: tuple(var for var in x.variabs_multips
+                                            if var in x.result.free_symbols)
+        res_vars = self.df_comb.apply(get_residual_vars, axis=1)
+
+        # combine (variables and multiplier -> component) dictionaries
+        comp_dict_varmtp = self.multips.copy()
+        comp_dict_varmtp.update(self.variabs)
+
+        # get
+        get_comps = lambda x: len(list(set(comp_dict_varmtp[varmtp] for varmtp in x)))
+        res_comps = res_vars.apply(get_comps)
+
+#        res_comps.max()
+
+        self.get_variabs_params()
 
         return mask_lindep
 
@@ -468,6 +500,8 @@ class Model:
 
     def fix_linear_dependencies(self, x):
         '''
+        Linear solutions
+
         All solutions showing linear dependencies are set to zero.
         '''
 
