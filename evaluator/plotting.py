@@ -15,7 +15,7 @@ class EvPlotting():
     Used as mixin class in evaluator.Evaluator.
     '''
     def line_plot(self, all_labels=False):
-
+# %%
         data_kw = dict(ind_axx=[self.select_x.name], ind_pltx=['func_no_slot'],
                        ind_plty=['slot'],
                            series=['const_comb'], values=['lambd'],
@@ -24,7 +24,7 @@ class EvPlotting():
 
         do = pltpg.PlotPageData.from_df(df=self.df_exp, **data_kw)
 
-        cmap = plt.get_cmap('tab20c')
+        cmap = plt.get_cmap('Set3')
         colormap={col[-1]: cmap(ncol) for ncol, col in enumerate(do.data.columns)}
 
         plot_kw = dict(kind_def='LinePlot', stacked=False, on_values=True,
