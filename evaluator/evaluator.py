@@ -47,8 +47,9 @@ class Evaluator(plotting.EvPlotting):
 
         # get dependent variables (variabs and multips)
         if not list_dep_var:
-          list_dep_var = ['tc'] + (list(map(str, self.model.variabs
-                                                 + self.model.multips)))
+
+          list_dep_var = ['tc'] + (list(map(str, list(self.model.variabs.keys())
+                                                 + list(self.model.multips.keys()))))
 
         slct_eq_0 = ('n_p_day' if 'n_p_day' in list_dep_var
                      else list_dep_var[0])
@@ -73,13 +74,13 @@ class Evaluator(plotting.EvPlotting):
 
             self.dfev[slct_eq + '_lam_plot'] = self.dfev[slct_eq + '_expr_plot'].apply(lambda res_plot: sp.lambdify(self.select_x.symb, res_plot, modules=['numpy']))
 
-        df_lam_plot = self.dfev.set_index(list(map(str, self.model.constrs_cols_neq))).copy()[[c for c in self.dfev.columns if isinstance(c, str) and '_lam_plot' in c]]
+        df_lam_plot = self.dfev.set_index(list(map(str, self.model.constrs_cols_neq)) + ['const_comb']).copy()[[c for c in self.dfev.columns if isinstance(c, str) and '_lam_plot' in c]]
 
-        col_names = {'level_%d'%len(self.model.constrs_cols_neq): 'func',
+        col_names = {'level_%d'%(len(self.model.constrs_cols_neq) + 1): 'func',
                      0: 'lambd'}
         df_lam_plot = (df_lam_plot.stack().reset_index()
                                   .rename(columns=col_names))
-        df_lam_plot = df_lam_plot.set_index(self.model.constrs_cols_neq + ['func'])
+        df_lam_plot = df_lam_plot.set_index(self.model.constrs_cols_neq + ['const_comb', 'func'])
 
         self.df_lam_plot = df_lam_plot
 
@@ -141,12 +142,14 @@ class Evaluator(plotting.EvPlotting):
     def expand_data_to_x_vals(self):
 
         # expand all data to selected values
-        group_levels = self.model.constrs_cols_neq + ['func']
+        group_levels = self.model.constrs_cols_neq + ['const_comb', 'func']
         dfg = self.df_lam_plot.groupby(level=group_levels)['lambd']
+
+
 
         df_exp_0 = dfg.apply(self.get_expanded_row).reset_index()
 
-        col_names = {'level_%d'%(len(self.model.constrs_neq) + 1):
+        col_names = {'level_%d'%(len(self.model.constrs_neq) + 2):
                      self.select_x.name}
         df_exp_0 = df_exp_0.rename(columns=col_names)
 
@@ -193,18 +196,19 @@ class Evaluator(plotting.EvPlotting):
 
         self.df_exp['mv_pos'] = mask_valid.copy()
 
-        # filter greater n
-        # TODO: get capacity from component objects; need to add *all* capacities of the model as columns!!!!
-        dict_cap = {comp: getattr(comp, cap)
+        dict_cap = {cap: val
                     for comp in self.model.comps.values()
-                    for cap in comp.MAP_CAPACITY.keys()
-                    if cap in comp.__dict__}
+                    if hasattr(comp, 'get_constrained_variabs') # exclude slots
+                    for cap, val in comp.get_constrained_variabs().items()}
 
         if dict_cap:
-
             msk_cap_cstr = self.df_exp.is_capacity_constrained == 1
-            pp, C = list(dict_cap.items())[0]
-            for pp, C in dict_cap.items():
+
+#            C, pp = list(dict_cap.items())[0]
+            for C, pp in dict_cap.items():
+
+                slct_func = ['%s_lam_plot'%symb.name for symb in pp]
+
                 # things are different depending on whether or not select_x is the corresponding capacity
                 if self.select_x is C:
                     val_cap = self.df_exp.loc[msk_cap_cstr, self.select_x.name]
@@ -220,10 +224,11 @@ class Evaluator(plotting.EvPlotting):
                         self.df_exp = self.df_exp.join(df_C, on=df_C.index.names)
                         val_cap = val_cap + sign * self.df_exp.loc[msk_cap_cstr, '_C_%s'%addret]
 
-    #            val_cap
-
-                constraint_met = (self.df_exp.loc[msk_cap_cstr].lambd
-                                  <= val_cap)
+                mask_slct_func = self.df_exp.func.isin(slct_func)
+                constraint_met = self.df_exp.lambd.copy()
+                constraint_met.loc[:] = True
+                constraint_met.loc[mask_slct_func] = \
+                    self.df_exp.loc[mask_slct_func].lambd <= val_cap
 
                 # delete temporary columns:
                 self.df_exp = self.df_exp[[c for c in self.df_exp.columns
@@ -236,7 +241,7 @@ class Evaluator(plotting.EvPlotting):
         self.df_exp['mask_valid'] = mask_valid.copy()
 
         # consolidate mask by constraint combination and x values
-        index = self.model.constrs_cols_neq + [self.select_x.name]
+        index = self.model.constrs_cols_neq + [self.select_x.name, 'const_comb']
         mask_valid = self.df_exp.pivot_table(index=index,
                                              values='mask_valid',
                                              aggfunc=min)
@@ -244,6 +249,23 @@ class Evaluator(plotting.EvPlotting):
         self.df_exp.drop('mask_valid', axis=1, inplace=True)
 
         return mask_valid
+# %%
+#ev.df_exp.loc[ev.df_exp.const_comb ==
+#      ('act_lb_n_pos_p_day=1, '
+#      'act_lb_n_pos_p_evening=1, '
+#      'act_lb_n_cap_C_day=0, '
+#      'act_lb_n_cap_C_evening=0, '
+#      'act_lb_g_pos_p_day=1, '
+#      'act_lb_g_pos_p_evening=1, '
+#      'act_lb_phs_pos_p_day=0, '
+#      'act_lb_phs_pos_p_evening=0, '
+#      'act_lb_phs_pos_e_None=0, '
+#      'act_lb_phs_cap_C_day=0, '
+#      'act_lb_phs_cap_C_evening=0, '
+#      'act_lb_curt_pos_p_day=0, '
+#      'act_lb_curt_pos_p_evening=1')]
+# %%
+
 
     def enforce_constraints(self):
         '''
