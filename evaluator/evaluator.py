@@ -209,9 +209,11 @@ class Evaluator(plotting.EvPlotting):
 
                 slct_func = ['%s_lam_plot'%symb.name for symb in pp]
 
+                mask_slct_func = self.df_exp.func.isin(slct_func)
+
                 # things are different depending on whether or not select_x is the corresponding capacity
                 if self.select_x is C:
-                    val_cap = self.df_exp.loc[msk_cap_cstr, self.select_x.name]
+                    val_cap = self.df_exp.loc[mask_slct_func].loc[msk_cap_cstr, self.select_x.name]
                 else:
                     val_cap = C.value
 
@@ -224,7 +226,6 @@ class Evaluator(plotting.EvPlotting):
                         self.df_exp = self.df_exp.join(df_C, on=df_C.index.names)
                         val_cap = val_cap + sign * self.df_exp.loc[msk_cap_cstr, '_C_%s'%addret]
 
-                mask_slct_func = self.df_exp.func.isin(slct_func)
                 constraint_met = self.df_exp.lambd.copy()
                 constraint_met.loc[:] = True
                 constraint_met.loc[mask_slct_func] = \
