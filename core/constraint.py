@@ -18,7 +18,7 @@ class Constraint():
         * constraint matches any of the asset.MULTIPS
     '''
 
-    def __init__(self, base_name, slot, multiplier_name='lambda',
+    def __init__(self, base_name, slot, multiplier_name='lb',
                  is_equality_constraint=False):
         '''
         Arguments:
@@ -68,7 +68,7 @@ class Constraint():
         combination DataFrame.
         '''
 
-        self.col = '{mult}_{base}'.format(mult=self.multiplier_name,
+        self.col = 'act_{mult}_{base}'.format(mult=self.multiplier_name,
                                                  base=self.base_name)
 
     def __repr__(self):
