@@ -5,14 +5,16 @@ Contains the main Model class.
 
 Part of symenergy. Copyright 2018 authors listed in AUTHORS.
 """
+import os
 
 import itertools
 import pandas as pd
 import sympy as sp
 import numpy as np
 import multiprocessing
+import hashlib
 
-
+import symenergy
 from symenergy.assets.plant import Plant
 from symenergy.assets.storage import Storage
 from symenergy.assets.curtailment import Curtailment
@@ -52,6 +54,8 @@ class Model:
             self.init_total_param_values()
             self.get_variabs_params()
 
+            self.init_cache_filename()
+
         return wrapper
 
     def init_curtailment(self):
@@ -59,6 +63,14 @@ class Model:
         if self.curtailment:
             self.curt = Curtailment('curt', self.slots)
             self.comps['curt'] = self.curt
+
+    def init_cache_filename(self):
+
+        fn = '%s.csv'%self.get_name()
+        fn = os.path.join(list(symenergy.__path__)[0], 'cache_infeasible', fn)
+
+        self.cache_fn = fn
+
 
     @property
     def df_comb(self):
@@ -190,6 +202,9 @@ class Model:
         list_combs = list(itertools.product(*[[0, 1] for cc
                                               in self.constrs_neq]))
         self.df_comb = pd.DataFrame(list_combs, columns=self.constrs_cols_neq)
+
+        self.df_comb = self.combine_constraint_names(self.df_comb)
+
 
 
     def remove_mutually_exclusive_combinations(self):
@@ -515,22 +530,61 @@ class Model:
         return res_vars.mask_res_unq
 
 
-    def filter_invalid_solutions(self):
+
+    def get_name(self):
+        '''
+        Returns a unique hashed model name based on the constraint names.
+        '''
+        m_name = '_'.join([cstr.base_name for cstr in self.constrs])
+
+        m_name = hashlib.md5(m_name.encode('utf-8')).hexdigest()[:12].upper()
+
+        return m_name
+
+    def cache(self, list_infeas):
+        '''
+        Saves list of infeasible constraint combinations to file on disk.
+        '''
+
+        list_infeas.to_csv(self.cache_fn, index=False)
+
+    def delete_cached(self):
+
+        try:
+            list_infeas = pd.read_csv(self.cache_fn, header=None)
+            list_infeas = list_infeas.iloc[:, 0].tolist()
+        except:
+            print('Model cache file %s doesn\'t exist. '
+                  'Skipping.'%self.cache_fn)
+            list_infeas = None
+
+        if list_infeas:
+
+            self.df_comb = self.df_comb.loc[-self.df_comb.const_comb.isin(list_infeas)]
+
+
+
+    def filter_invalid_solutions(self, cache=True):
 
         mask_empty = self.get_mask_empty_solution()
 
         print('The following constraint combinations have empty solutions:\n',
               self.df_comb.loc[mask_empty, self.constrs_cols_neq])
 
-        self.df_comb = self.df_comb.loc[-mask_empty]
+        list_infeas = self.df_comb.loc[mask_empty, 'const_comb']
 
+        self.df_comb = self.df_comb.loc[-mask_empty]
 
         mask_lindep = self.get_mask_linear_dependencies()
 
         print('The following constraint combinations '
               'have mixed residual interdependencies of variables '
               'and are removed:\n',
-              self.df_comb.loc[mask_lindep, self.constrs_cols_neq])
+              self.df_comb.loc[(mask_lindep > 1), self.constrs_cols_neq])
+
+        list_infeas = pd.concat([list_infeas,
+                        self.df_comb.loc[mask_lindep > 1,
+                                          'const_comb']], axis=0)
 
         self.df_comb = pd.concat([self.df_comb, mask_lindep], axis=1)
         self.df_comb = self.df_comb.loc[-(mask_lindep > 1)]
@@ -538,6 +592,9 @@ class Model:
 
         self.df_comb['result'] = \
                 self.df_comb.apply(self.fix_linear_dependencies, axis=1)
+
+        if cache:
+            self.cache(list_infeas)
 
 
     def fix_linear_dependencies(self, x):
