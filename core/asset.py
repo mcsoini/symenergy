@@ -10,6 +10,7 @@ import sympy as sp
 
 import symenergy.core.component as component
 from symenergy.core.constraint import Constraint
+from symenergy.core.parameter import Parameter
 from symenergy.core.slot import noneslot
 
 
@@ -27,48 +28,77 @@ class Asset(component.Component):
     '''Mixin class containing shared methods of plants and storage'''
 
     # capacity class map
-    MAP_CAPACITY = {'C': 'p',   # all power
-                    'E': 'e'}   # storage energy capacity
+    MAP_CAPACITY = {'C': ['p', 'C_ret'],   # all power and retired capacity
+                    'E': ['e']}   # storage energy capacity
 
     def __init__(self):
 
         self.params = []
 
+
+    def get_constrained_variabs(self):
+        '''
+        Keyword argument:
+            * cap -- string, capacity name as specified in self.MAP_CAPACITY
+        '''
+
+        return {getattr(self, cap): list(getattr(self, var).values())
+                for cap, variabs in self.MAP_CAPACITY.items()
+                if cap in self.__dict__
+                for var in variabs
+                if hasattr(self, var)}
+
+
     def init_cstr_capacity(self, capacity_name):
         '''
         Instantiates a dictionary {slot symbol: Constraint}.
+
+        Applies to power and capacity retirement, both of which are smaller
+        than the initially installed capacity.
         '''
 
         if not capacity_name in self.MAP_CAPACITY.keys():
             raise UnexpectedSymbolError(capacity_name)
 
 
-        if self.MAP_CAPACITY[capacity_name] in self.VARIABS_TIME:
-            slot_objs = self.slots.values()
-        elif self.MAP_CAPACITY[capacity_name] in self.VARIABS:
-            slot_objs = [noneslot]
+        list_var_names = self.MAP_CAPACITY[capacity_name]
 
-        setattr(self, 'cstr_cap_%s'%capacity_name, {})
-        cstr_dict = getattr(self, 'cstr_cap_%s'%capacity_name)
+        list_var_names = [var for var in list_var_names
+                          if hasattr(self, var)]
 
-        for slot in slot_objs:
+        for var_name in list_var_names:
 
-            base_name = '%s_cap_%s_%s'%(self.name, capacity_name,
-                                     str(slot.name))
+            if var_name in self.VARIABS_TIME:
+                slot_objs = self.slots.values()
+            elif var_name in self.VARIABS:
+                slot_objs = [noneslot]
 
-            cstr = Constraint(base_name=base_name, slot=slot)
+            cstr_name = 'cstr_%s_cap_%s'%(var_name, capacity_name)
+            setattr(self, cstr_name, {})
+            cstr_dict = getattr(self, cstr_name)
 
-            # define expression
-            var = getattr(self, self.MAP_CAPACITY[capacity_name])[slot]
-            cap = getattr(self, capacity_name).symb
+            print(cstr_name)
 
-            # subtract retired capacity if applicable
-            if capacity_name + '_ret' in self.__dict__:
-                cap -= getattr(self, capacity_name + '_ret')[noneslot]
+            for slot in slot_objs:
 
-            cstr.expr = cstr.mlt * (var - cap)
+                base_name = '%s_%s_cap_%s_%s'%(self.name, var_name,
+                                               capacity_name, str(slot.name))
 
-            cstr_dict[slot] = cstr
+                cstr = Constraint(base_name=base_name, slot=slot)
+
+                # define expression
+                var = getattr(self, var_name)[slot]
+                cap = getattr(self, capacity_name).symb
+
+                # subtract retired capacity if applicable
+                if (capacity_name + '_ret' in self.__dict__
+                    # ... not for retired capacity constraint
+                    and not capacity_name + '_ret' == var_name):
+                    cap -= getattr(self, capacity_name + '_ret')[noneslot]
+
+                cstr.expr = cstr.mlt * (var - cap)
+
+                cstr_dict[slot] = cstr
 
     def init_cstr_positive(self, variable):
         '''
