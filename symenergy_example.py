@@ -29,52 +29,51 @@ self = m
 
 m.add_slot(name='day', load=4.5, vre=3)
 #m.add_slot(name='night', load=3, vre=1)
-m.add_slot(name='evening', load=5, vre=1)
+m.add_slot(name='evening', load=5, vre=0.5)
 
 #m.add_plant(name='b', vc0=1, vc1=0, slots=m.slots, capacity=1.5)
-m.add_plant(name='n', vc0=2, vc1=0.1, slots=m.slots, capacity=4,
+m.add_plant(name='n', vc0=1, vc1=0, slots=m.slots, capacity=3,
             fcom=10,
             cap_ret=True
             )
-m.add_plant(name='g', vc0=1, vc1=0.5, slots=m.slots)
-
+m.add_plant(name='g', vc0=2, vc1=0, slots=m.slots)
+#
 m.add_storage(name='phs',
               eff=0.75,
               slots=m.slots,
               capacity=0.5,
-              energy_capacity=1,
+#              energy_capacity=1,
               slots_map={'day': 'chg',
                          'evening': 'dch'
                          })
-
 
 comp = m.comps['n']
 #
 m.init_supply_constraints()
 m.init_constraint_combinations()
-m.df_comb = m.combine_constraint_names(m.df_comb)
 
 m.remove_mutually_exclusive_combinations()
 
-# %%
-m.solve_all(nthreads=6)
+m.delete_cached()
 
 # %
+m.solve_all(nthreads=7)
+
 m.filter_invalid_solutions()
 
 
 # %%
 reload(evaluator)
 
-m.comps['n'].vc1.value = 0
-m.comps['g'].vc1.value = 0
+#m.comps['n'].vc1.value = 0
+#m.comps['g'].vc1.value = 0
 ##m.comps['phs'].C.value = 0.5
 #m.slots['day'].vre.value = 0.2
-#m.slots['evening'].vre.value = 4
+m.slots['evening'].vre.value = 0.5
 
 select_x = m.vre_scale
-select_x = m.storages['phs'].C
-x_vals = np.linspace(0, 4, 21)
+select_x = m.comps['phs'].C
+x_vals = np.linspace(0, 4, 51)
 model = m
 ev = evaluator.Evaluator(model, select_x, x_vals)
 
@@ -102,7 +101,7 @@ ev.df_exp = ev.model.combine_constraint_names(ev.df_exp)
 #      'act_lb_phs_cap_C_evening=0, '
 #      'act_lb_curt_pos_p_day=0, '
 #      'act_lb_curt_pos_p_evening=1')]
-
+# %
 ev.enforce_constraints()
 
 ev.init_cost_optimum()
@@ -134,7 +133,7 @@ df_bal_add = pd.DataFrame(df_bal[ev.select_x.name].drop_duplicates())
 for par in pars:
     df_bal_add[par.name] = par.value
 
-df_bal_add = df_bal_add.set_index('vre_scale').stack().rename('lambd').reset_index()
+df_bal_add = df_bal_add.set_index('C_phs').stack().rename('lambd').reset_index()
 df_bal_add = df_bal_add.rename(columns={'level_1': 'func'})
 df_bal_add['func_no_slot'] = df_bal_add.func.apply(lambda x: '_'.join(x.split('_')[:-1]))
 df_bal_add['slot'] = df_bal_add.func.apply(lambda x: x.split('_')[-1])
@@ -145,8 +144,6 @@ df_bal = pd.concat([df_bal, df_bal_add], axis=0, sort=True)
 if ev.select_x == m.vre_scale:
     mask_vre = df_bal.func.str.contains('vre')
     df_bal.loc[mask_vre, 'lambd'] *= df_bal.loc[mask_vre, 'vre_scale']
-
-#assert m.storages == {}, 'Fix storage.'
 
 varpar_neg = ['l', 'curt_p_lam_plot']
 
