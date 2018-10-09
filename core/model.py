@@ -222,9 +222,9 @@ class Model:
                     select_cstr = select_cstr[0]
                     cols_mut_excl_0.append((cstr, select_cstr, is_exclusive))
 
-        cols_mut_excl_0 += [('lambda_phs_pos_p_day', 'lambda_phs_pos_p_evening', False),
-                          ('lambda_phs_pos_p_day', 'lambda_phs_pos_e_None', False),
-                          ('lambda_phs_pos_p_evening', 'lambda_phs_pos_e_None', False)]
+        cols_mut_excl_0 += [('act_lb_phs_pos_p_day', 'act_lb_phs_pos_p_evening', False),
+                          ('act_lb_phs_pos_p_day', 'act_lb_phs_pos_e_None', False),
+                          ('act_lb_phs_pos_p_evening', 'act_lb_phs_pos_e_None', False)]
 
         # make sure all cols are present
         cols_mut_excl = []
