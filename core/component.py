@@ -39,7 +39,8 @@ class Component():
         '''
 
         return tuple(var
-                     for cap_name, var_name in self.MAP_CAPACITY.items()
+                     for cap_name, var_names in self.MAP_CAPACITY.items()
+                     for var_name in var_names
                      if var_name in self.__dict__.keys()
                          and cap_name in self.__dict__.keys()
                      for slot, var in getattr(self, var_name).items())
