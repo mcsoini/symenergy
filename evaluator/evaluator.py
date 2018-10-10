@@ -285,7 +285,7 @@ class Evaluator(plotting.EvPlotting):
         Generates a table representing the supply constraint for easy plotting.
         '''
 
-        df_bal = self.df_exp.loc[self.df_exp.const_comb == 'cost_optimum'].copy()
+        df_bal = self.df_exp.loc[self.df_exp.is_optimum].copy()
 
         # base dataframe: all operational variables
         drop = ['tc', 'pi_', 'lb_']
@@ -353,7 +353,7 @@ class Evaluator(plotting.EvPlotting):
                     .apply(lambda x: x.nsmallest(1, 'lambd')))
 
         tc_min['is_optimum'] = True
-        tc_min = tc_min.set_index(['func', 'const_comb'] + self.x_name)
+        tc_min = tc_min.set_index(['const_comb'] + self.x_name)
 
 
 
