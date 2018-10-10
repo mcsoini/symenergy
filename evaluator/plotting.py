@@ -7,6 +7,8 @@ Part of symenergy. Copyright 2018 authors listed in AUTHORS.
 """
 
 import numpy as np
+import pandas as pd
+
 import pyAndy.core.plotpage as pltpg
 import matplotlib.pyplot as plt
 
@@ -16,13 +18,19 @@ class EvPlotting():
     '''
     def line_plot(self, all_labels=False):
 # %%
+
+        df_plot = pd.concat([self.df_exp.drop('is_optimum', axis=1),
+                   self.df_exp.loc[self.df_exp.is_optimum].drop('is_optimum', axis=1).assign(const_comb='cost_optimum')], axis=0)
+
+
+
         data_kw = dict(ind_axx=self.x_name, ind_pltx=['func_no_slot'],
-                       ind_plty=['slot'],
-                           series=['const_comb'], values=['lambd'],
+                       ind_plty=['slot'], series=['const_comb'],
+                       values=['lambd'],
                        aggfunc=np.mean, harmonize=True)
         page_kw = dict(left=0.05, right=0.99, bottom=0.050, top=0.8)
 
-        do = pltpg.PlotPageData.from_df(df=self.df_exp.drop('is_optimum', axis=1), **data_kw)
+        do = pltpg.PlotPageData.from_df(df=df_plot, **data_kw)
 
         cmap = plt.get_cmap('Set3')
         colormap={col[-1]: cmap(ncol) for ncol, col in enumerate(do.data.columns)}
@@ -32,10 +40,6 @@ class EvPlotting():
                        xlabel=', '.join(self.x_name), legend='',
                        colormap=colormap)
         plt0 = pltpg.PlotTiled(do, **plot_kw, **page_kw)
-
-        #do_tc = do.copy()
-        #do_tc.data = do_tc.data.loc[do_tc.data.index.get_level_values(data_kw['ind_pltx'][0]) == 'n_C_ret_None_lam_plot']
-        #plttc = pltpg.PlotTiled(do_tc, **plot_kw, **page_kw)
 
         for ix, namex, iy, namey, plot, ax, kind in plt0.get_plot_ax_list():
             ''''''
@@ -64,8 +68,8 @@ class EvPlotting():
     def supply_plot(self, ind_axx, ind_plty):
 
 # %%
-        data_kw = dict(ind_axx=[ind_axx], ind_pltx=['slot'],
-                       ind_plty=[ind_plty],
+        data_kw = dict(ind_axx=ind_axx, ind_pltx=['slot'],
+                       ind_plty=ind_plty,
                        series=['func_no_slot'],
                        values=['lambd'],
                        aggfunc=np.mean)
