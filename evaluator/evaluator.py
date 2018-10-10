@@ -352,26 +352,24 @@ class Evaluator(plotting.EvPlotting):
         tc_min = (tc.groupby(self.x_name, as_index=0)
                     .apply(lambda x: x.nsmallest(1, 'lambd')))
 
-        self.const_comb_opt = tc_min.const_comb.unique().tolist()
-
-        merge_on = self.x_name + ['const_comb']
-        df_exp_min = pd.merge(tc_min[merge_on], self.df_exp,
-                              on=merge_on, how='inner')
+        tc_min['is_optimum'] = True
+        tc_min = tc_min.set_index(['func', 'const_comb'] + self.x_name)
 
 
-        df_exp_min['const_comb'] = 'cost_optimum'
 
-        self.df_exp = pd.concat([self.df_exp, df_exp_min],
-                                axis=0, sort=False)
-        self.df_exp = self.df_exp.reset_index(drop=True)
+        self.df_exp = self.df_exp.join(tc_min['is_optimum'],
+                                       on=tc_min.index.names)
+
+        self.df_exp['is_optimum'] = self.df_exp.is_optimum.fillna(False)
+
+        self.const_comb_opt = (tc_min.index.get_level_values('const_comb')
+                                     .unique().tolist())
 
     def drop_non_optimal_combinations(self):
 
 
-        constrs_opt = self.df_exp.loc[self.df_exp.const_comb == 'cost_optimum']
-        constrs_opt = constrs_opt['const_comb'].drop_duplicates()
-        constrs_opt = self.model.combine_constraint_names(constrs_opt)['const_comb'].tolist()
-        constrs_opt += ['cost_optimum']
+        constrs_opt = self.df_exp.loc[self.df_exp.is_optimum]
+        constrs_opt = constrs_opt['const_comb'].unique().tolist()
 
         self.df_exp = self.df_exp.loc[self.df_exp.const_comb.isin(constrs_opt)]
 
