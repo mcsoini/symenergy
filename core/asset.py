@@ -40,14 +40,30 @@ class Asset(component.Component):
         '''
         Keyword argument:
             * cap -- string, capacity name as specified in self.MAP_CAPACITY
+
+        Returns:
+            * list of tuples [(parameter object capacity,
+                               list relevant var strings)]
         '''
 
-        return {getattr(self, cap): list(getattr(self, var).values())
-                for cap, variabs in self.MAP_CAPACITY.items()
-                if cap in self.__dict__
-                for var in variabs
-                if hasattr(self, var)}
+        cap_var = []
 
+        c_name, variabs = list(self.MAP_CAPACITY.items())[0]
+        for c_name, variabs in self.MAP_CAPACITY.items():
+            if c_name in self.__dict__:
+                cap = getattr(self, c_name)
+
+                constr_var = []
+
+                for var in variabs:
+                    if hasattr(self, var):
+                        variabs = getattr(self, var, None)
+
+                        constr_var += list(variabs.values())
+
+                cap_var.append((cap, constr_var))
+
+        return cap_var
 
     def init_cstr_capacity(self, capacity_name):
         '''
