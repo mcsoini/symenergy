@@ -29,30 +29,25 @@ m = model.Model(curtailment=True, nthreads=7)
 self = m
 
 m.add_slot(name='day', load=4.5, vre=3)
-# m.add_slot(name='night', load=3, vre=1)
-m.add_slot(name='evening', load=5, vre=0.5)
+#m.add_slot(name='evening', load=5, vre=0.5)
 
-#m.add_plant(name='b', vc0=1, vc1=0, slots=m.slots, capacity=1.5)
 m.add_plant(name='n', vc0=1, vc1=0, slots=m.slots, capacity=3,
-            fcom=10,
-            cap_ret=True
+#            fcom=10,
+#            cap_ret=True
             )
 m.add_plant(name='g', vc0=2, vc1=0, slots=m.slots)
 
-m.add_storage(name='phs',
-              eff=0.75,
-              slots=m.slots,
-              capacity=0.5,
-              energy_capacity=1,
-              slots_map={'day': 'chg',
-                         'evening': 'dch'
-                         })
-
-comp = m.comps['n']
+#m.add_storage(name='phs',
+#              eff=0.75,
+#              slots=m.slots,
+#              capacity=0.5,
+#              energy_capacity=1,
+#              slots_map={'day': 'chg',
+#                         'evening': 'dch'
+#                         })
 
 m.generate_solve()
 
-m.filter_invalid_solutions()
 
 
 # %%
@@ -60,11 +55,11 @@ reload(evaluator)
 
 m.comps['n'].vc1.value = 0
 m.comps['n'].vc0.value = 1.9 / 0.33 + 3.9
-m.comps['n'].fcom.value = 20000 / 8760 * 2
+#m.comps['n'].fcom.value = 20000 / 8760 * 2
 m.comps['n'].C.value = 6666.6#3500
 
-m.comps['g'].vc1.value = 0
-m.comps['g'].vc0.value = 50 + 3
+#m.comps['g'].vc1.value = 0
+#m.comps['g'].vc0.value = 50 + 3
 
 m.slots['day'].vre.value = 1
 m.slots['day'].l.value = 4500
