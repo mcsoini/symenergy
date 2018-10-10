@@ -22,7 +22,7 @@ class EvPlotting():
                        aggfunc=np.mean, harmonize=True)
         page_kw = dict(left=0.05, right=0.99, bottom=0.050, top=0.8)
 
-        do = pltpg.PlotPageData.from_df(df=self.df_exp, **data_kw)
+        do = pltpg.PlotPageData.from_df(df=self.df_exp.drop('is_optimum', axis=1), **data_kw)
 
         cmap = plt.get_cmap('Set3')
         colormap={col[-1]: cmap(ncol) for ncol, col in enumerate(do.data.columns)}
@@ -59,20 +59,20 @@ class EvPlotting():
         plt0.legend = 'page'
 
         plt0.add_page_legend(lgdplotkey, hdl, lbl)
-
+# %%
 
     def supply_plot(self, ind_axx, ind_plty):
 
-
-        data_kw = dict(ind_axx=['vre_scale'], ind_pltx=['slot'],
-                       ind_plty=['C_n'],
+# %%
+        data_kw = dict(ind_axx=[ind_axx], ind_pltx=['slot'],
+                       ind_plty=[ind_plty],
                        series=['func_no_slot'],
                        values=['lambd'],
                        aggfunc=np.mean)
         page_kw = dict(left=0.05, right=0.99, bottom=0.050, top=0.8)
         plot_kw = dict(kind_def='StackedArea', stacked=True, on_values=True,
                        sharex=True, sharey=True, linewidth=4, marker=None,
-                       xlabel=self.select_x.name, legend='')
+                       xlabel=ind_axx, legend='')
 
         do = pltpg.PlotPageData.from_df(df=self.df_bal, **data_kw)
         plt0 = pltpg.PlotTiled(do, **plot_kw, **page_kw)
