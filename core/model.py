@@ -137,8 +137,6 @@ class Model:
 
             self.cstr_supply[cstr_supply] = slot
 
-        print(self.cstr_supply)
-
     def get_supply_constraint_expr(self, cstr):
         '''
         Initialize the load constraints for a given time slot.
