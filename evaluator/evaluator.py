@@ -82,10 +82,10 @@ class Evaluator(plotting.EvPlotting):
 
             lambdify = lambda res_plot: sp.lambdify(self.x_symb, res_plot,
                                                     modules=['numpy'])
+
             self.dfev[slct_eq + '_lam_plot'] = (
                             self.dfev[slct_eq + '_expr_plot']
-                                .apply(lambda res_plot: lambdify))
-
+                                .apply(lambdify))
 
         idx = list(map(str, self.model.constrs_cols_neq)) + ['const_comb']
         cols = [c for c in self.dfev.columns
@@ -173,9 +173,7 @@ class Evaluator(plotting.EvPlotting):
         df_exp_0 = pd.DataFrame(rows, columns=(['func', 'const_comb', 'lambd']
                                                + self.x_name))
 
-        x = df_exp_0.iloc[0]
-
-        x.lambd(x.vre_scale, x.C_n)
+        df_exp_0.apply(lambda x: x.lambd(x.vre_scale, x.C_n), axis=1)
 
         # expand all data to selected values
         group_levels = self.model.constrs_cols_neq + ['const_comb', 'func']
