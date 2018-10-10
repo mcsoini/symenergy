@@ -102,8 +102,6 @@ class Model:
         '''
         Generates dictionary {parameter object: parameter value}
         for all parameters for all components.
-
-        FOR NOW SLOTS ONLY HAVE PARAMS_TIME, PLANTS ONLY HAVE PARAMS_.
         '''
 
         self.param_values = {symb: val
@@ -546,7 +544,8 @@ class Model:
         Saves list of infeasible constraint combinations to file on disk.
         '''
 
-        list_infeas.to_csv(self.cache_fn, index=False)
+        if not os.path.isfile(self.cache_fn):
+            list_infeas.to_csv(self.cache_fn, index=False)
 
     def delete_cached(self):
 
