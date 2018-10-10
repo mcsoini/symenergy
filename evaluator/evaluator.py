@@ -121,7 +121,7 @@ class Evaluator(plotting.EvPlotting):
                             if not kk == self.select_x.symb})
             return x_ret
 
-    def get_expanded_row(self, lam_plot):
+    def _get_expanded_row(self, lam_plot):
         '''
         Apply single lambda function/row to the self.x_vals.
 
@@ -139,15 +139,13 @@ class Evaluator(plotting.EvPlotting):
 
         return pd.Series(y_vals, index=pd.Index(self.x_vals))
 
-    def expand_data_to_x_vals(self):
+    def expand_to_x_vals(self):
 
         # expand all data to selected values
         group_levels = self.model.constrs_cols_neq + ['const_comb', 'func']
         dfg = self.df_lam_plot.groupby(level=group_levels)['lambd']
 
-
-
-        df_exp_0 = dfg.apply(self.get_expanded_row).reset_index()
+        df_exp_0 = dfg.apply(self._get_expanded_row).reset_index()
 
         col_names = {'level_%d'%(len(self.model.constrs_neq) + 2):
                      self.select_x.name}
@@ -182,7 +180,6 @@ class Evaluator(plotting.EvPlotting):
             self.df_exp[[lst, 'func']].drop_duplicates()
 
 
-
     def _get_mask_valid_solutions(self):
 
         mask_valid = pd.Series(1, index=self.df_exp.index)
@@ -196,16 +193,16 @@ class Evaluator(plotting.EvPlotting):
 
         self.df_exp['mv_pos'] = mask_valid.copy()
 
-        dict_cap = {cap: val
+        dict_cap = [(cap, val)
                     for comp in self.model.comps.values()
                     if hasattr(comp, 'get_constrained_variabs') # exclude slots
-                    for cap, val in comp.get_constrained_variabs().items()}
+                    for cap, val in comp.get_constrained_variabs()]
 
         if dict_cap:
-            msk_cap_cstr = self.df_exp.is_capacity_constrained == 1
+            mask_cap_cstr = self.df_exp.is_capacity_constrained == 1
 
-#            C, pp = list(dict_cap.items())[0]
-            for C, pp in dict_cap.items():
+            C, pp = dict_cap[0]
+            for C, pp in dict_cap:
 
                 slct_func = ['%s_lam_plot'%symb.name for symb in pp]
 
@@ -213,29 +210,37 @@ class Evaluator(plotting.EvPlotting):
 
                 # things are different depending on whether or not select_x is the corresponding capacity
                 if self.select_x is C:
-                    val_cap = self.df_exp.loc[mask_slct_func].loc[msk_cap_cstr, self.select_x.name]
+                    val_cap = self.df_exp[self.select_x.name]
                 else:
-                    val_cap = C.value
+                    val_cap = pd.Series(C.value, index=self.df_exp.index)
 
                 # need to add retired and additional capacity
                 for addret, sign in {'add': +1, 'ret': -1}.items():
-                    if hasattr(pp, 'C_%s'%addret):
-                        name_func = '_'.join(list(reversed(C.name.split('_'))) + [addret, 'None'])
-                        df_C = self.df_exp.loc[self.df_exp.func.str.contains(name_func)].copy()
+                    func_C_addret = [variab for variab in slct_func if 'C_%s_None'%addret in variab]
+                    func_C_addret = func_C_addret[0] if func_C_addret else None
+                    if func_C_addret:
+                        mask_addret = (self.df_exp.func.str
+                                                  .contains(func_C_addret))
+                        df_C = self.df_exp.loc[mask_addret].copy()
                         df_C = df_C.set_index(['const_comb', self.select_x.name])['lambd'].rename('_C_%s'%addret)
                         self.df_exp = self.df_exp.join(df_C, on=df_C.index.names)
-                        val_cap = val_cap + sign * self.df_exp.loc[msk_cap_cstr, '_C_%s'%addret]
 
-                constraint_met = self.df_exp.lambd.copy()
-                constraint_met.loc[:] = True
+                        # doesn't apply to itself, hence -mask_addret
+                        val_cap.loc[-mask_addret] += \
+                            + sign * self.df_exp.loc[-mask_addret,
+                                                     '_C_%s'%addret]
+
+                constraint_met = pd.Series(True, index=self.df_exp.index)
                 constraint_met.loc[mask_slct_func] = \
-                    self.df_exp.loc[mask_slct_func].lambd <= val_cap
+                                    (self.df_exp.loc[mask_slct_func].lambd
+                                     <= val_cap.loc[mask_slct_func])
 
                 # delete temporary columns:
                 self.df_exp = self.df_exp[[c for c in self.df_exp.columns
                                         if not c in ['_C_ret', '_C_add']]]
 
-                mask_valid.loc[msk_cap_cstr] *= constraint_met
+                mask_valid.loc[mask_cap_cstr] *= \
+                        constraint_met.loc[mask_cap_cstr]
 
             self.df_exp['mv_n'] = mask_valid.copy()
 
