@@ -93,8 +93,6 @@ class Asset(component.Component):
             setattr(self, cstr_name, {})
             cstr_dict = getattr(self, cstr_name)
 
-            print(cstr_name)
-
             for slot in slot_objs:
 
                 base_name = '%s_%s_cap_%s_%s'%(self.name, var_name,
