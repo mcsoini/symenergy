@@ -154,23 +154,23 @@ class Evaluator(plotting.EvPlotting):
                                           in self.x_vals.keys()]})
             return x_ret
 
-#    def _get_expanded_row(self, lam_plot):
-#        '''
-#        Apply single lambda function/row to the self.x_vals.
-#
-#        Input parameters:
-#            * lam_plot -- Single row of the self.df_lam_plot dataframe.
-#
-#        Return values:
-#            * Series with y values
-#        '''
-#
-#        y_vals = lam_plot.iloc[0](self.x_vals)
-#
-#        if isinstance(y_vals, float):
-#            y_vals = np.ones(self.x_vals.shape) * y_vals
-#
-#        return pd.Series(y_vals, index=pd.Index(self.x_vals))
+    def _get_expanded_row(self, lam_plot, x_vals):
+        '''
+        Apply single lambda function/row to the self.x_vals.
+
+        Input parameters:
+            * lam_plot -- Single row of the self.df_lam_plot dataframe.
+
+        Return values:
+            * Series with y values
+        '''
+
+        y_val = [lam_plot.iloc[0](*val_row) for val_row in x_vals]
+
+        if isinstance(y_vals, float):
+            y_vals = np.ones(self.x_vals.shape) * y_vals
+
+        return pd.Series(y_vals, index=pd.Index(self.x_vals))
 
 
     def eval_single(self, x):
@@ -184,12 +184,16 @@ class Evaluator(plotting.EvPlotting):
     def expand_to_x_vals(self):
 
         # construct new dataframe
-        fnc_cstr = self.df_lam_plot.reset_index()[['func', 'const_comb', 'lambd']]
-        fnc_cstr = fnc_cstr.values.tolist()
+#        fnc_cstr = self.df_lam_plot.reset_index()[['func', 'const_comb', 'lambd']]
+#        fnc_cstr = fnc_cstr.values.tolist()
         x_vals = list(itertools.product(*self.x_vals.values()))
+#        x_vals = {par.name: x_vals[npar] for npar, par in enumerate(self.x_vals.keys())}
 
-        rows = list(itertools.product(fnc_cstr, x_vals))
-        rows = [[col for cols in row for col in cols] for row in rows]
+        lbd = self.df_lam_plot.iloc[0].values[0]
+
+
+#        rows = list(itertools.product(fnc_cstr, x_vals))
+#        rows = [[col for cols in row for col in cols] for row in rows]
 
         df_exp_0 = pd.DataFrame(rows, columns=(['func', 'const_comb', 'lambd']
                                                + self.x_name))
