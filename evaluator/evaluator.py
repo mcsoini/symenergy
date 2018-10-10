@@ -10,8 +10,10 @@ import sympy as sp
 import numpy as np
 import pandas as pd
 import itertools
+import multiprocessing
 
 import symenergy.evaluator.plotting as plotting
+from symenergy.auxiliary.parallelization import parallelize_df
 
 class Evaluator(plotting.EvPlotting):
     '''
@@ -28,7 +30,7 @@ class Evaluator(plotting.EvPlotting):
         '''
 
         self.model = model
-        self.x_vals = x_vals
+        self.x_vals = self.sanitize_x_vals(x_vals)
         self.x_symb = [x.symb for x in self.x_vals.keys()]
         self.x_name = [x.name for x in self.x_symb]
 
@@ -37,6 +39,17 @@ class Evaluator(plotting.EvPlotting):
         self.model.init_total_param_values()
 
         print('param_values=', self.model.param_values)
+
+
+    def sanitize_x_vals(self, x_vals):
+        '''
+        TODO: Figure out why this is necessary for the numerical evaluation
+        of the results!
+        '''
+
+        return {comp: [int(val * 100) / 100 for val in vals]
+                for comp, vals in x_vals.items()}
+
 
     def get_default_list_dep_var(self):
 
@@ -159,6 +172,15 @@ class Evaluator(plotting.EvPlotting):
 #
 #        return pd.Series(y_vals, index=pd.Index(self.x_vals))
 
+
+    def eval_single(self, x):
+
+        return x.lambd(*x.loc[self.x_name].values)
+
+    def call_eval_all(self, df):
+
+        return df.apply(self.eval_single, axis=1)
+
     def expand_to_x_vals(self):
 
         # construct new dataframe
@@ -172,8 +194,7 @@ class Evaluator(plotting.EvPlotting):
         df_exp_0 = pd.DataFrame(rows, columns=(['func', 'const_comb', 'lambd']
                                                + self.x_name))
 
-        eval_lambd = lambda x: x.lambd(*x.loc[self.x_name].values)
-        df_exp_0['lambd'] = df_exp_0.apply(eval_lambd, axis=1)
+        df_exp_0['lambd'] = self.call_eval_all(df_exp_0)
 
         self.df_exp = df_exp_0
 
@@ -245,7 +266,7 @@ class Evaluator(plotting.EvPlotting):
                         mask_addret = (self.df_exp.func.str
                                                   .contains(func_C_addret))
                         df_C = self.df_exp.loc[mask_addret].copy()
-                        df_C = df_C.set_index(['const_comb', self.select_x.name])['lambd'].rename('_C_%s'%addret)
+                        df_C = df_C.set_index(['const_comb'] + self.x_name)['lambd'].rename('_C_%s'%addret)
                         self.df_exp = self.df_exp.join(df_C, on=df_C.index.names)
 
                         # doesn't apply to itself, hence -mask_addret
