@@ -93,7 +93,7 @@ class Plant(asset.Asset):
 
 
         if 'fcom' in self.__dict__:
-            print('HERE')
+
             cc_fcom = self.C.symb * self.fcom.symb
 
             if 'C_ret' in self.__dict__:
