@@ -29,24 +29,24 @@ m = model.Model(curtailment=False)
 self = m
 
 m.add_slot(name='day', load=4.5, vre=3)
-#m.add_slot(name='night', load=3, vre=1)
-#m.add_slot(name='evening', load=5, vre=0.5)
+m.add_slot(name='night', load=3, vre=1)
+m.add_slot(name='evening', load=5, vre=0.5)
 
 #m.add_plant(name='b', vc0=1, vc1=0, slots=m.slots, capacity=1.5)
 m.add_plant(name='n', vc0=1, vc1=0, slots=m.slots, capacity=3,
-#            fcom=10,
-#            cap_ret=True
+            fcom=10,
+            cap_ret=True
             )
 m.add_plant(name='g', vc0=2, vc1=0, slots=m.slots)
 
-#m.add_storage(name='phs',
-#              eff=0.75,
-#              slots=m.slots,
-#              capacity=0.5,
-#              energy_capacity=1,
-#              slots_map={'day': 'chg',
-#                         'evening': 'dch'
-#                         })
+m.add_storage(name='phs',
+              eff=0.75,
+              slots=m.slots,
+              capacity=0.5,
+              energy_capacity=1,
+              slots_map={'day': 'chg',
+                         'evening': 'dch'
+                         })
 
 comp = m.comps['n']
 
@@ -75,17 +75,17 @@ m.comps['g'].vc0.value = 50 + 3
 
 m.slots['day'].vre.value = 1
 m.slots['day'].l.value = 4500
-#m.slots['evening'].vre.value = 0.1
-#m.slots['evening'].l.value = 3700
+m.slots['evening'].vre.value = 0.1
+m.slots['evening'].l.value = 3700
 
-#m.storages['phs'].eff.value = 0.75
-#m.storages['phs'].C.value = 1000
-#m.storages['phs'].E.value = 20000
+m.storages['phs'].eff.value = 0.75
+m.storages['phs'].C.value = 1000
+m.storages['phs'].E.value = 20000
 
 m.vre_scale.value = 0.5
 
 select_x = m.vre_scale
-x_vals = {m.vre_scale: np.linspace(0, 9000, 401),
+x_vals = {m.vre_scale: np.linspace(0, 9000, 41),
           m.plants['n'].C: np.linspace(1000, 5000, 3)
           }
 
@@ -108,13 +108,13 @@ ev.init_cost_optimum()
 
 ev.map_func_to_slot()
 
-#ev.drop_non_optimal_combinations()
+ev.drop_non_optimal_combinations()
 
 ev.line_plot(all_labels=False)
 
 ev.build_supply_table()
 
-ev.plot_supply()
+ev.supply_plot(ind_axx='vre_scale', ind_plty='C_n')
 
 
 
