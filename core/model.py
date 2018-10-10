@@ -11,7 +11,6 @@ import itertools
 import pandas as pd
 import sympy as sp
 import numpy as np
-import multiprocessing
 import hashlib
 
 import symenergy
@@ -21,17 +20,19 @@ from symenergy.assets.curtailment import Curtailment
 from symenergy.core.constraint import Constraint
 from symenergy.core.slot import Slot, noneslot
 from symenergy.core.parameter import Parameter
-
+from symenergy.auxiliary.parallelization import parallelize_df
 
 class Model:
 
-    def __init__(self, curtailment=False):
+    def __init__(self, nthreads=None, curtailment=False):
 
         self.plants = {}
         self.slots = {}
         self.storages = {}
 
         self.comps = []
+
+        self.nthreads = nthreads
 
         # global vre scaling parameter, set to 1; used for evaluation
         self.vre_scale = Parameter('vre_scale', noneslot, 1)
@@ -54,7 +55,9 @@ class Model:
             self.init_total_param_values()
             self.get_variabs_params()
 
-            self.init_cache_filename()
+            self.init_supply_constraints()
+
+            self.init_cache_pickle_filename()
 
         return wrapper
 
@@ -64,12 +67,13 @@ class Model:
             self.curt = Curtailment('curt', self.slots)
             self.comps['curt'] = self.curt
 
-    def init_cache_filename(self):
+    def init_cache_pickle_filename(self):
 
         fn = '%s.csv'%self.get_name()
-        fn = os.path.join(list(symenergy.__path__)[0], 'cache_infeasible', fn)
+        fn = os.path.join(list(symenergy.__path__)[0], 'cache', fn)
 
         self.cache_fn = fn
+        self.pickle_fn = fn.replace('.csv', '.pickle')
 
 
     @property
@@ -167,6 +171,28 @@ class Model:
 
         return equ
 
+    def generate_solve(self):
+
+        if os.path.isfile(self.pickle_fn):
+
+            self.df_comb = pd.read_pickle(self.pickle_fn)
+
+        else:
+
+            self.init_constraint_combinations()
+
+            self.remove_mutually_exclusive_combinations()
+
+            self.delete_cached()
+
+            self.solve_all()
+
+            self.filter_invalid_solutions()
+
+            self.df_comb.to_pickle(self.pickle_fn)
+
+
+
     def collect_component_constraints(self):
         '''
         Note: Doesn't include supply constraints, which are a model attribute.
@@ -185,6 +211,11 @@ class Model:
         # list of constraint columns
         self.constrs_cols = [cstr.col for cstr in self.constrs.keys()]
 
+        self.constrs_neq = [cstr for cstr in self.constrs
+                            if not cstr.is_equality_constraint]
+        self.constrs_cols_neq = [cstr.col for cstr
+                                 in self.constrs_neq]
+
     def init_constraint_combinations(self):
         '''
         Gathers all non-equal component constraints,
@@ -192,10 +223,6 @@ class Model:
         (binding, non-binding) combinations and instantiates dataframe.
         '''
 
-        self.constrs_neq = [cstr for cstr in self.constrs
-                            if not cstr.is_equality_constraint]
-        self.constrs_cols_neq = [cstr.col for cstr
-                                 in self.constrs_neq]
 
         list_combs = list(itertools.product(*[[0, 1] for cc
                                               in self.constrs_neq]))
@@ -375,33 +402,25 @@ class Model:
                                                         x.variabs_multips,
                                                         x.idx), axis=1)
 
-    def solve_all(self, nthreads=None):
+
+
+
+
+
+    def solve_all(self):
 
         self.define_problems()
 
-        nthreads = min(nthreads, len(self.df_comb))
-        nchunks = min(nthreads * 4, len(self.df_comb))
-
-        def parallelize_df(df, func):
-            df_split = np.array_split(df, nchunks)
-            pool = multiprocessing.Pool(nthreads)
-            df = pd.concat(pool.map(func, df_split))
-            pool.close()
-            pool.join()
-            return df
-
-
-        if not nthreads:
+        if not self.nthreads:
             self.df_comb['result'] = self.call_solve_df(self.df_comb)
 
         else:
             self.df_comb['result'] = parallelize_df(self.df_comb,
-                                                    self.call_solve_df)
-
+                                                    self.call_solve_df,
+                                                    self.nthreads)
 
         call_subs_tc = lambda x: self.subs_total_cost(x.result,
                                                       x.variabs_multips)
-
         self.df_comb['tc'] = self.df_comb.apply(call_subs_tc, axis=1)
 
     def combine_constraint_names(self, df):
@@ -546,6 +565,11 @@ class Model:
 
         if not os.path.isfile(self.cache_fn):
             list_infeas.to_csv(self.cache_fn, index=False)
+
+
+
+
+
 
     def delete_cached(self):
 
