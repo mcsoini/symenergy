@@ -1,1 +1,1 @@
-**File names are model hashes, encoding constraint combination names.**
+**File names are model hashes, generated from constraint combination names.**
