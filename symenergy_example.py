@@ -29,7 +29,7 @@ m = model.Model(curtailment=True, nthreads=7)
 self = m
 
 m.add_slot(name='day', load=4.5, vre=3)
-m.add_slot(name='evening', load=5, vre=0.5)
+m.add_slot(name='night', load=5, vre=0.5)
 
 m.add_plant(name='n', vc0=1, vc1=0, slots=m.slots, capacity=3,
             fcom=10,
@@ -41,143 +41,74 @@ m.add_storage(name='phs',
               eff=0.75,
               slots=m.slots,
               capacity=0.5,
-#              energy_capacity=1,
+              energy_capacity=1,
               slots_map={'day': 'chg',
-                         'evening': 'dch'
+                         'night': 'dch'
                          })
 
 m.generate_solve()
 
-
-# fix stored energy
-store = m.storages['phs']
-
-def get_result_dict(x, string_keys=False):
-
-    dict_res = {str(var): res for var, res in zip(x.variabs_multips, x.result[0])}
-    return dict_res
-
-def set_phs_p_day_zero(x, eff):
-
-    dict_var = get_result_dict(x, True)
-
-    dict_var['phs_e_None'] = dict_var['phs_p_day'] * eff**0.5
-
-    return [[dict_var[str(var)] for var in x.variabs_multips]]
-
-
-m.df_comb['result'] = m.df_comb.apply(set_phs_p_day_zero, args=(store.eff.symb,), axis=1)
 
 
 # %%
 reload(evaluator)
 
 m.comps['n'].vc1.value = 0
-m.comps['n'].vc0.value = 1.9 / 0.33 + 3.9
-m.comps['n'].fcom.value = 200 #/ 8760 * 2
-m.comps['n'].C.value = 4000
+m.comps['n'].vc0.value = 10
+m.comps['n'].fcom.value = 9
+m.comps['n'].C.value = 5000
 
 m.comps['g'].vc1.value = 0
-m.comps['g'].vc0.value = 29.5 / 0.21 + 20
+m.comps['g'].vc0.value = 160
 
-m.slots['day'].vre.value = (6569 + 5239)
-m.slots['evening'].vre.value = 0
-m.slots['day'].l.value = 6569
-m.slots['evening'].l.value = 5239
+m.slots['day'].l.value = 6500
+m.slots['night'].l.value = 5200
+m.slots['day'].vre.value = m.slots['day'].l.value + m.slots['night'].l.value
+m.slots['night'].vre.value = 0
 
 
 m.storages['phs'].eff.value = 0.75
-m.storages['phs'].C.value = 2000
-#m.storages['phs'].E.value = 20000
-
-m.vre_scale.value = 0.5
-
-x_vals = {m.vre_scale: np.linspace(0, 1, 21),
-          m.comps['n'].C: np.linspace(0, 3285, 3)
-         }
-
-m.init_total_param_values()
+m.storages['phs'].C.value = 1
+m.storages['phs'].E.value = 1
 
 
-#m.df_comb = m.df_comb.loc[m.df_comb.const_comb == dict_const_comb_confl['expected']]
+phs_C_max = m.slots['day'].l.value * 0.5
+dd = 20
 
-model = m
-ev = evaluator.Evaluator(model, x_vals)
+x_vals = {
+         m.vre_scale: np.linspace(0, 0.8, 41),
+         m.comps['phs'].C: np.linspace(0, phs_C_max, 2),
+         m.comps['phs'].E: np.linspace(0, phs_C_max * dd, 2)
+        }
+
+ev = evaluator.Evaluator(m, x_vals)
+
+ev.df_x_vals = ev.df_x_vals.loc[ev.df_x_vals[['C_phs', 'E_phs']].apply(lambda x: tuple(x), axis=1).isin([(0,0), (phs_C_max,phs_C_max * dd)])]
 
 self = ev
 
-list_dep_var = (list(map(str, list(self.model.variabs.keys()) + list(self.model.multips.keys()))))
+
+
+list_dep_var = (list(map(str, list(self.model.variabs.keys())
+              + list(self.model.multips.keys()))))
 list_dep_var = ['tc'] + [v for v in list_dep_var if not 'lb_' in v]
 ev.get_evaluated_lambdas(list_dep_var)
 
 
-
-
-
-
+# %%
+slct_const_comb = \
+['act_lb_n_pos_p_day=0, act_lb_n_pos_p_night=0, act_lb_n_pos_C_ret_None=1, act_lb_n_p_cap_C_day=1, act_lb_n_p_cap_C_night=0, act_lb_n_C_ret_cap_C_None=0, act_lb_g_pos_p_day=1, act_lb_g_pos_p_night=1, act_lb_phs_pos_p_day=0, act_lb_phs_pos_p_night=0, act_lb_phs_pos_e_None=0, act_lb_phs_p_cap_C_day=0, act_lb_phs_p_cap_C_night=0, act_lb_phs_e_cap_E_None=0, act_lb_curt_pos_p_day=1, act_lb_curt_pos_p_night=1',
+ 'act_lb_n_pos_p_day=0, act_lb_n_pos_p_night=0, act_lb_n_pos_C_ret_None=0, act_lb_n_p_cap_C_day=1, act_lb_n_p_cap_C_night=1, act_lb_n_C_ret_cap_C_None=0, act_lb_g_pos_p_day=1, act_lb_g_pos_p_night=1, act_lb_phs_pos_p_day=0, act_lb_phs_pos_p_night=0, act_lb_phs_pos_e_None=0, act_lb_phs_p_cap_C_day=0, act_lb_phs_p_cap_C_night=0, act_lb_phs_e_cap_E_None=0, act_lb_curt_pos_p_day=1, act_lb_curt_pos_p_night=1']
 
 # %%
 
-# optimum original
-['act_lb_n_pos_p_day=0, act_lb_n_pos_p_evening=0, act_lb_n_pos_C_ret_None=1, act_lb_n_p_cap_C_day=1, act_lb_n_p_cap_C_evening=1, act_lb_n_C_ret_cap_C_None=0, act_lb_g_pos_p_day=0, act_lb_g_pos_p_evening=0, act_lb_phs_pos_p_day=1, act_lb_phs_pos_p_evening=1, act_lb_phs_pos_e_None=1, act_lb_phs_p_cap_C_day=0, act_lb_phs_p_cap_C_evening=0',
- 'act_lb_n_pos_p_day=0, act_lb_n_pos_p_evening=0, act_lb_n_pos_C_ret_None=1, act_lb_n_p_cap_C_day=0, act_lb_n_p_cap_C_evening=1, act_lb_n_C_ret_cap_C_None=0, act_lb_g_pos_p_day=1, act_lb_g_pos_p_evening=0, act_lb_phs_pos_p_day=0, act_lb_phs_pos_p_evening=0, act_lb_phs_pos_e_None=0, act_lb_phs_p_cap_C_day=1, act_lb_phs_p_cap_C_evening=0']
-# optimum force
-const_comb_force = \
-['act_lb_n_pos_p_day=0, act_lb_n_pos_p_evening=0, act_lb_n_pos_C_ret_None=1, act_lb_n_p_cap_C_day=1, act_lb_n_p_cap_C_evening=1, act_lb_n_C_ret_cap_C_None=0, act_lb_g_pos_p_day=0, act_lb_g_pos_p_evening=0, act_lb_phs_pos_p_day=1, act_lb_phs_pos_p_evening=1, act_lb_phs_pos_e_None=1, act_lb_phs_p_cap_C_day=0, act_lb_phs_p_cap_C_evening=0',
-'act_lb_n_pos_p_day=0, act_lb_n_pos_p_evening=0, act_lb_n_pos_C_ret_None=1, act_lb_n_p_cap_C_day=1, act_lb_n_p_cap_C_evening=1, act_lb_n_C_ret_cap_C_None=0, act_lb_g_pos_p_day=1, act_lb_g_pos_p_evening=0, act_lb_phs_pos_p_day=0, act_lb_phs_pos_p_evening=0, act_lb_phs_pos_e_None=0, act_lb_phs_p_cap_C_day=0, act_lb_phs_p_cap_C_evening=0',
-'act_lb_n_pos_p_day=0, act_lb_n_pos_p_evening=0, act_lb_n_pos_C_ret_None=0, act_lb_n_p_cap_C_day=1, act_lb_n_p_cap_C_evening=1, act_lb_n_C_ret_cap_C_None=0, act_lb_g_pos_p_day=1, act_lb_g_pos_p_evening=1, act_lb_phs_pos_p_day=0, act_lb_phs_pos_p_evening=0, act_lb_phs_pos_e_None=0, act_lb_phs_p_cap_C_day=0, act_lb_phs_p_cap_C_evening=0',
-'act_lb_n_pos_p_day=0, act_lb_n_pos_p_evening=0, act_lb_n_pos_C_ret_None=0, act_lb_n_p_cap_C_day=0, act_lb_n_p_cap_C_evening=1, act_lb_n_C_ret_cap_C_None=0, act_lb_g_pos_p_day=1, act_lb_g_pos_p_evening=1, act_lb_phs_pos_p_day=0, act_lb_phs_pos_p_evening=0, act_lb_phs_pos_e_None=0, act_lb_phs_p_cap_C_day=1, act_lb_phs_p_cap_C_evening=0']
 
-# optimum conflict
-
-const_comb_confl = \
-['act_lb_n_pos_p_day=0, act_lb_n_pos_p_evening=0, act_lb_n_pos_C_ret_None=1, act_lb_n_p_cap_C_day=1, act_lb_n_p_cap_C_evening=1, act_lb_n_C_ret_cap_C_None=0, act_lb_g_pos_p_day=0, act_lb_g_pos_p_evening=0, act_lb_phs_pos_p_day=1, act_lb_phs_pos_p_evening=1, act_lb_phs_pos_e_None=1, act_lb_phs_p_cap_C_day=0, act_lb_phs_p_cap_C_evening=0',
-'act_lb_n_pos_p_day=0, act_lb_n_pos_p_evening=0, act_lb_n_pos_C_ret_None=1, act_lb_n_p_cap_C_day=1, act_lb_n_p_cap_C_evening=1, act_lb_n_C_ret_cap_C_None=0, act_lb_g_pos_p_day=1, act_lb_g_pos_p_evening=0, act_lb_phs_pos_p_day=0, act_lb_phs_pos_p_evening=0, act_lb_phs_pos_e_None=0, act_lb_phs_p_cap_C_day=0, act_lb_phs_p_cap_C_evening=0',
-'act_lb_n_pos_p_day=0, act_lb_n_pos_p_evening=0, act_lb_n_pos_C_ret_None=1, act_lb_n_p_cap_C_day=0, act_lb_n_p_cap_C_evening=1, act_lb_n_C_ret_cap_C_None=0, act_lb_g_pos_p_day=1, act_lb_g_pos_p_evening=1, act_lb_phs_pos_p_day=0, act_lb_phs_pos_p_evening=0, act_lb_phs_pos_e_None=0, act_lb_phs_p_cap_C_day=0, act_lb_phs_p_cap_C_evening=0',
-'act_lb_n_pos_p_day=0, act_lb_n_pos_p_evening=0, act_lb_n_pos_C_ret_None=0, act_lb_n_p_cap_C_day=1, act_lb_n_p_cap_C_evening=0, act_lb_n_C_ret_cap_C_None=0, act_lb_g_pos_p_day=1, act_lb_g_pos_p_evening=1, act_lb_phs_pos_p_day=0, act_lb_phs_pos_p_evening=0, act_lb_phs_pos_e_None=0, act_lb_phs_p_cap_C_day=1, act_lb_phs_p_cap_C_evening=0',
-'act_lb_n_pos_p_day=0, act_lb_n_pos_p_evening=0, act_lb_n_pos_C_ret_None=0, act_lb_n_p_cap_C_day=0, act_lb_n_p_cap_C_evening=1, act_lb_n_C_ret_cap_C_None=0, act_lb_g_pos_p_day=1, act_lb_g_pos_p_evening=1, act_lb_phs_pos_p_day=0, act_lb_phs_pos_p_evening=0, act_lb_phs_pos_e_None=0, act_lb_phs_p_cap_C_day=1, act_lb_phs_p_cap_C_evening=0',
-'act_lb_n_pos_p_day=0, act_lb_n_pos_p_evening=0, act_lb_n_pos_C_ret_None=0, act_lb_n_p_cap_C_day=1, act_lb_n_p_cap_C_evening=1, act_lb_n_C_ret_cap_C_None=0, act_lb_g_pos_p_day=1, act_lb_g_pos_p_evening=1, act_lb_phs_pos_p_day=0, act_lb_phs_pos_p_evening=0, act_lb_phs_pos_e_None=0, act_lb_phs_p_cap_C_day=0, act_lb_phs_p_cap_C_evening=0']
-
-dict_const_comb_confl = {'rep peak': 'act_lb_n_pos_p_day=0, act_lb_n_pos_p_evening=0, act_lb_n_pos_C_ret_None=1, act_lb_n_p_cap_C_day=1, act_lb_n_p_cap_C_evening=1, act_lb_n_C_ret_cap_C_None=0, act_lb_g_pos_p_day=0, act_lb_g_pos_p_evening=0, act_lb_phs_pos_p_day=1, act_lb_phs_pos_p_evening=1, act_lb_phs_pos_e_None=1, act_lb_phs_p_cap_C_day=0, act_lb_phs_p_cap_C_evening=0',
-'rep. pk storage': 'act_lb_n_pos_p_day=0, act_lb_n_pos_p_evening=0, act_lb_n_pos_C_ret_None=1, act_lb_n_p_cap_C_day=1, act_lb_n_p_cap_C_evening=1, act_lb_n_C_ret_cap_C_None=0, act_lb_g_pos_p_day=1, act_lb_g_pos_p_evening=0, act_lb_phs_pos_p_day=0, act_lb_phs_pos_p_evening=0, act_lb_phs_pos_e_None=0, act_lb_phs_p_cap_C_day=0, act_lb_phs_p_cap_C_evening=0',
-'weird':           'act_lb_n_pos_p_day=0, act_lb_n_pos_p_evening=0, act_lb_n_pos_C_ret_None=1, act_lb_n_p_cap_C_day=0, act_lb_n_p_cap_C_evening=1, act_lb_n_C_ret_cap_C_None=0, act_lb_g_pos_p_day=1, act_lb_g_pos_p_evening=1, act_lb_phs_pos_p_day=0, act_lb_phs_pos_p_evening=0, act_lb_phs_pos_e_None=0, act_lb_phs_p_cap_C_day=0, act_lb_phs_p_cap_C_evening=0',
-'rep bs storage':  'act_lb_n_pos_p_day=0, act_lb_n_pos_p_evening=0, act_lb_n_pos_C_ret_None=0, act_lb_n_p_cap_C_day=1, act_lb_n_p_cap_C_evening=0, act_lb_n_C_ret_cap_C_None=0, act_lb_g_pos_p_day=1, act_lb_g_pos_p_evening=1, act_lb_phs_pos_p_day=0, act_lb_phs_pos_p_evening=0, act_lb_phs_pos_e_None=0, act_lb_phs_p_cap_C_day=1, act_lb_phs_p_cap_C_evening=0',
-'storage constr':  'act_lb_n_pos_p_day=0, act_lb_n_pos_p_evening=0, act_lb_n_pos_C_ret_None=0, act_lb_n_p_cap_C_day=0, act_lb_n_p_cap_C_evening=1, act_lb_n_C_ret_cap_C_None=0, act_lb_g_pos_p_day=1, act_lb_g_pos_p_evening=1, act_lb_phs_pos_p_day=0, act_lb_phs_pos_p_evening=0, act_lb_phs_pos_e_None=0, act_lb_phs_p_cap_C_day=1, act_lb_phs_p_cap_C_evening=0',
-'expected':        'act_lb_n_pos_p_day=0, act_lb_n_pos_p_evening=0, act_lb_n_pos_C_ret_None=0, act_lb_n_p_cap_C_day=1, act_lb_n_p_cap_C_evening=1, act_lb_n_C_ret_cap_C_None=0, act_lb_g_pos_p_day=1, act_lb_g_pos_p_evening=1, act_lb_phs_pos_p_day=0, act_lb_phs_pos_p_evening=0, act_lb_phs_pos_e_None=0, act_lb_phs_p_cap_C_day=0, act_lb_phs_p_cap_C_evening=0',
-}
-
-
-# %%
-
-# phs_e_None_lam_plot of expected is empty!
-
-res = m.df_comb.loc[m.df_comb.const_comb == (dict_const_comb_confl['expected'])].result.values[0]
-
-var = m.df_comb.loc[m.df_comb.const_comb == (dict_const_comb_confl['expected'])].variabs_multips.values[0]
-
-dict_res = {str(v): r for v, r in zip(var, res[0])}
-
-phs = m.comps['phs']
-
-sp.simplify('lb_phs_pwrerg_None')
-
-
-# %%
-
-ev.df_lam_plot = ev.df_lam_plot.loc[ev.df_lam_plot.index.get_level_values('const_comb').str.contains('|'.join(const_comb_confl))]
-
-ev.x_vals = {m.vre_scale: np.linspace(0, 0.8, 81),
-             m.comps['n'].C: np.linspace(4000, 4000, 1)
-            }
+ev.df_lam_plot = ev.df_lam_plot.reset_index().loc[ev.df_lam_plot.reset_index().const_comb.isin(slct_const_comb)].set_index(ev.df_lam_plot.index.names)
 
 
 ev.expand_to_x_vals()
 
-#ev.df_exp = ev.df_exp.loc[ev.df_exp.vre_scale.isin(np.arange(0.385, 0.4, 0.005))]
-
-#ev.df_exp['const_comb'] = ev.df_exp.const_comb.replace({vv: kk for kk, vv in dict_const_comb_confl.items()})
-#ev.df_exp = ev.df_exp.loc[ev.df_exp.const_comb.isin(['rep bs storage', 'weird'])]
-
+ev.df_exp = ev.df_exp.loc[ev.df_exp.vre_scale == 0.3]
 
 ev.enforce_constraints()
 
@@ -185,27 +116,99 @@ ev.init_cost_optimum()
 
 ev.map_func_to_slot()
 
-ev.drop_non_optimal_combinations()
+#ev.drop_non_optimal_combinations()
 
 ev.build_supply_table()
 
-#ev.df_exp.loc[-ev.df_exp.lambd.isnull()]
-# %%
-print_full(
-ev.df_exp.loc[
-#        (ev.df_exp.const_comb.isin(const_comb_confl[0:3]))
-#             (ev.df_exp.vre_scale == 0.405)
-           (-ev.df_exp.lambd.isnull())
-             ]#.drop('const_comb', axis=1)
-.pivot_table(index=['func'], columns=['const_comb', 'vre_scale'], values='lambd'))
-# %%
 
+# %%
 
 ev.line_plot(all_labels=False)
 
-#ev.df_bal = ev.df_bal.loc[ev.df_bal.fcom_n == 200]
+ev.supply_plot(ind_axx=['vre_scale'], ind_plty=['C_phs'])
 
-ev.supply_plot(ind_axx=['vre_scale'], ind_plty=[])
+
+
+# %%
+
+ind_axx=['vre_scale']
+ind_plty=['C_phs']
+
+
+
+data_kw = dict(ind_axx=ind_axx, ind_pltx=['slot'],
+               ind_plty=ind_plty,
+               series=['func_no_slot'],
+               values=['lambd'],
+               aggfunc=np.mean)
+page_kw = dict(left=0.05, right=0.99, bottom=0.050, top=0.8)
+plot_kw = dict(kind_def='StackedArea', stacked=True, on_values=True,
+               sharex=True, sharey=True, linewidth=4, marker='o',
+               xlabel=ind_axx, legend='')
+
+do = pltpg.PlotPageData.from_df(df=ev.df_bal, **data_kw)
+plt0 = pltpg.PlotTiled(do, **plot_kw, **page_kw)
+
+
+lgdplotkey = list(plt0.plotdict.keys())[0]
+lgdplot = plt0.plotdict[lgdplotkey]
+hdl, lbl = lgdplot.ax.get_legend_handles_labels()
+
+plt0.legend = 'page'
+plt0.add_page_legend(lgdplotkey, hdl, lbl)
+
+lgdplotkey = list(plt0.plotdict.keys())[-1]
+plt0.plotdict[lgdplotkey].ax.legend()
+
+
+
+
+
+ev.df_exp.loc[ev.df_exp.is_optimum & (ev.df_exp.C_phs > 0)].pivot_table(values='vre_scale',
+                                                index='const_comb',
+                                                aggfunc=[min, max]).T
+
+
+
+ev.const_comb_opt
+
+# %% REPORT CONSTRAINT COMBINATIONS
+
+dict_const_combs = {
+'Peak replacement day': 'act_lb_n_pos_p_day=0, act_lb_n_pos_p_night=0, act_lb_n_pos_C_ret_None=1, act_lb_n_p_cap_C_day=1, act_lb_n_p_cap_C_night=1, act_lb_n_C_ret_cap_C_None=0, act_lb_g_pos_p_day=0, act_lb_g_pos_p_night=0, act_lb_phs_pos_p_day=0, act_lb_phs_pos_p_night=1, act_lb_phs_pos_e_None=0, act_lb_phs_p_cap_C_day=0, act_lb_phs_p_cap_C_night=0, act_lb_phs_e_cap_E_None=0, act_lb_curt_pos_p_day=1, act_lb_curt_pos_p_night=1',
+'Storage peak replacement night': 'act_lb_n_pos_p_day=0, act_lb_n_pos_p_night=0, act_lb_n_pos_C_ret_None=1, act_lb_n_p_cap_C_day=1, act_lb_n_p_cap_C_night=1, act_lb_n_C_ret_cap_C_None=0, act_lb_g_pos_p_day=1, act_lb_g_pos_p_night=0, act_lb_phs_pos_p_day=0, act_lb_phs_pos_p_night=0, act_lb_phs_pos_e_None=0, act_lb_phs_p_cap_C_day=0, act_lb_phs_p_cap_C_night=0, act_lb_phs_e_cap_E_None=0, act_lb_curt_pos_p_day=1, act_lb_curt_pos_p_night=1',
+'Storage base load replacement night': 'act_lb_n_pos_p_day=0, act_lb_n_pos_p_night=0, act_lb_n_pos_C_ret_None=1, act_lb_n_p_cap_C_day=1, act_lb_n_p_cap_C_night=0, act_lb_n_C_ret_cap_C_None=0, act_lb_g_pos_p_day=1, act_lb_g_pos_p_night=1, act_lb_phs_pos_p_day=0, act_lb_phs_pos_p_night=0, act_lb_phs_pos_e_None=0, act_lb_phs_p_cap_C_day=0, act_lb_phs_p_cap_C_night=0, act_lb_phs_e_cap_E_None=0, act_lb_curt_pos_p_day=1, act_lb_curt_pos_p_night=1'
+}
+
+
+
+dict_constrs = {
+'act_lb_n_pos_p_day': 'Base load production zero day',
+'act_lb_n_pos_p_night': 'Base load production zero night',
+'act_lb_n_pos_C_ret_None': 'Zero retirement',
+'act_lb_n_p_cap_C_day': 'Maximum base load production day',
+'act_lb_n_p_cap_C_night': 'Maximum base load production night',
+'act_lb_n_C_ret_cap_C_None': 'Maximum retirement',
+'act_lb_g_pos_p_day': 'Peak load production zero day',
+'act_lb_g_pos_p_night': 'Peak load production zero night',
+'act_lb_phs_pos_p_day': 'Zero storage charging day',
+'act_lb_phs_pos_p_night': 'Zero storage charging night',
+'act_lb_phs_pos_e_None': 'Zero stored energy',
+'act_lb_phs_p_cap_C_day': 'Maximum storage charging day',
+'act_lb_phs_p_cap_C_night': 'Maximum storage charging night',
+'act_lb_phs_e_cap_E_None': 'Maximum charged energy',
+'act_lb_curt_pos_p_day': 'Zero curtailment day',
+'act_lb_curt_pos_p_night': 'Zero curtailment night'}
+
+table_const_combs = m.df_comb.loc[m.df_comb.const_comb.isin(ev.const_comb_opt), m.constrs_cols_neq + ['const_comb']]
+
+table_const_combs.columns = [dict_constrs[cstr] for cstr in table_const_combs.columns if not cstr == 'const_comb'] + ['const_comb']
+table_const_combs['const_comb'] = table_const_combs.const_comb.replace({vv: kk for kk, vv in dict_const_combs.items()})
+
+table_const_combs.T
+
+
+
 
 
 
