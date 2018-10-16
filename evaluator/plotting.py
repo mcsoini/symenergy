@@ -22,9 +22,7 @@ class EvPlotting():
         df_plot = pd.concat([self.df_exp.drop('is_optimum', axis=1),
                    self.df_exp.loc[self.df_exp.is_optimum].drop('is_optimum', axis=1).assign(const_comb='cost_optimum')], axis=0)
 
-
-
-        data_kw = dict(ind_axx=self.x_name, ind_pltx=['func_no_slot'],
+        data_kw = dict(ind_axx=[self.x_name[0]], ind_pltx=['func_no_slot'],
                        ind_plty=['slot'], series=['const_comb'],
                        values=['lambd'],
                        aggfunc=np.mean, harmonize=True)
@@ -51,8 +49,9 @@ class EvPlotting():
                 lin.set_marker('x')
                 lin.set_linewidth(0)
 
-        lgdplotkey = (('tc_lam_plot',), ('global',), 'LinePlot')
-        lgdplot = plt0.plotdict[lgdplotkey]
+#        lgdplotkey = (('tc_lam_plot',), ('global',), 'LinePlot')
+#        lgdplot = plt0.plotdict[lgdplotkey]
+        lgdplotkey, lgdplot = list(plt0.plotdict.items())[0]
         hdl, lbl = lgdplot.ax.get_legend_handles_labels()
 
         if not all_labels:
@@ -75,7 +74,7 @@ class EvPlotting():
                        aggfunc=np.mean)
         page_kw = dict(left=0.05, right=0.99, bottom=0.050, top=0.8)
         plot_kw = dict(kind_def='StackedArea', stacked=True, on_values=True,
-                       sharex=True, sharey=True, linewidth=4, marker=None,
+                       sharex=True, sharey=True, linewidth=4, marker='o',
                        xlabel=ind_axx, legend='')
 
         do = pltpg.PlotPageData.from_df(df=self.df_bal, **data_kw)
