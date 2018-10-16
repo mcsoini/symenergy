@@ -40,6 +40,8 @@ class Evaluator(plotting.EvPlotting):
 
         self.model.init_total_param_values()
 
+        self.df_x_vals = self.get_x_vals_combs()
+
         print('param_values=', self.model.param_values)
 
 
@@ -53,6 +55,7 @@ class Evaluator(plotting.EvPlotting):
         self.x_symb = [x.symb for x in self._x_vals.keys()]
         self.x_name = [x.name for x in self.x_symb]
 
+        self.df_x_vals = self.get_x_vals_combs()
 
 
     def sanitize_x_vals(self, x_vals):
@@ -197,18 +200,32 @@ class Evaluator(plotting.EvPlotting):
 
         return pd.Series(y_vals, index=pd.Index(x_vals))
 
-    def expand_to_x_vals(self):
 
-        x_vals = list(itertools.product(*self.x_vals.values()))
+    def get_x_vals_combs(self):
+        '''
+        Generates dataframe with all combinations of x_vals.
+
+        Used as default by expand_to_x_vals or can be used externally to
+        select subsets of
+        '''
+
+        return pd.DataFrame(list(itertools.product(*self.x_vals.values())),
+                            columns=[col.name for col in self.x_vals.keys()])
+
+
+    def expand_to_x_vals(self):
 
         self.ngroups = len(self.df_lam_plot)
 
         group_levels = ['idx', 'func']
         dfg = self.df_lam_plot.reset_index().groupby(group_levels)['lambd']
 
-        lam_plot = dfg.get_group(list(dfg.groups.keys())[0])
+        if __name__ == '__main__':
+            lam_plot = dfg.get_group(list(dfg.groups.keys())[0])
 
-        df_exp_0 = dfg.apply(self._get_expanded_row, x_vals).reset_index()
+        df_exp_0 = dfg.apply(self._get_expanded_row,
+                             [tuple(row) for row
+                              in self.df_x_vals.values]).reset_index()
 
         # expand all data to selected values
         print('Adding original indices...', end='')
@@ -267,7 +284,7 @@ class Evaluator(plotting.EvPlotting):
         if dict_cap:
 
 
-            C, pp = dict_cap[0]
+            C, pp = dict_cap[1]
             for C, pp in dict_cap:
 
                 print('Valid capacity constraint %s, %s'%(C.name, pp))
