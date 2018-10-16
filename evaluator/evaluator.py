@@ -20,18 +20,21 @@ class Evaluator(plotting.EvPlotting):
     Evaluates model results for selected
     '''
 
-    def __init__(self, model, x_vals):
+    def __init__(self, model, x_vals, eval_accuracy=1e-9):
         '''
         Keyword arguments:
             * model -- symenergy model
            ( * select_x -- symenergy Parameter; to be varied
                            according to x_vals )
             * x_vals -- iterable with value for the evaluation of select_x
+            * eval_accuracy -- absolute slack for constraint evaluation
         '''
 
         self.model = model
 
         self.x_vals = x_vals
+
+        self.eval_accuracy = eval_accuracy
 
         self.dfev = model.df_comb.copy()
 
@@ -248,7 +251,7 @@ class Evaluator(plotting.EvPlotting):
 
         msk_pos = self.df_exp.is_positive == 1
         mask_positive = pd.Series(True, index=self.df_exp.index)
-        mask_positive.loc[msk_pos] = self.df_exp.loc[msk_pos].lambd >= 0
+        mask_positive.loc[msk_pos] = self.df_exp.loc[msk_pos].lambd + self.eval_accuracy >= 0
 
         return mask_positive
 
@@ -297,7 +300,7 @@ class Evaluator(plotting.EvPlotting):
 
                 constraint_met = pd.Series(True, index=self.df_exp.index)
                 constraint_met.loc[mask_slct_func] = \
-                                    (self.df_exp.loc[mask_slct_func].lambd
+                                    (self.df_exp.loc[mask_slct_func].lambd * (1 - self.eval_accuracy)
                                      <= val_cap.loc[mask_slct_func])
 
                 # delete temporary columns:
@@ -306,7 +309,7 @@ class Evaluator(plotting.EvPlotting):
 
                 mask_valid &= constraint_met
 
-            self.df_exp['mv_n'] = mask_valid.copy()
+#            self.df_exp['mv_n'] = mask_valid.copy()
 
         return mask_valid
 
@@ -397,7 +400,6 @@ class Evaluator(plotting.EvPlotting):
         mask_valid = self._get_mask_valid_solutions()
 
         self.df_exp = self.df_exp.join(mask_valid, on=mask_valid.index.names)
-
 
         self.df_exp.loc[self.df_exp.mask_valid == 0, 'lambd'] = np.nan
 
