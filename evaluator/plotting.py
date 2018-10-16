@@ -46,7 +46,8 @@ class EvPlotting():
             if name_lin in plot.linedict.keys():
 
                 lin = plot.linedict[name_lin]
-                lin.set_marker('x')
+                lin.set_marker('o')
+                lin.set_markerfacecolor('r')
                 lin.set_linewidth(0)
 
 #        lgdplotkey = (('tc_lam_plot',), ('global',), 'LinePlot')
@@ -87,4 +88,9 @@ class EvPlotting():
 
         plt0.legend = 'page'
         plt0.add_page_legend(lgdplotkey, hdl, lbl)
+
+        lgdplotkey = list(plt0.plotdict.keys())[-1]
+        plt0.plotdict[lgdplotkey].ax.legend()
+
+
 
