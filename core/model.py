@@ -137,6 +137,12 @@ class Model:
 
             self.cstr_supply[cstr_supply] = slot
 
+    def get_result_dict(self, row, as_string=False):
+
+        return {str(var) if as_string else var: res
+                for res, var in zip(row.result[0], row.variabs_multips)}
+
+
     def get_supply_constraint_expr(self, cstr):
         '''
         Initialize the load constraints for a given time slot.
