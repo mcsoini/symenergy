@@ -68,13 +68,18 @@ class Evaluator(plotting.EvPlotting):
                 for comp, vals in x_vals.items()}
 
 
-    def get_default_list_dep_var(self):
+    def _get_list_dep_var(self, skip_multipliers=False):
 
-        return (['tc'] + [str(var) for var
-                in list(self.model.variabs.keys())
-                + list(self.model.multips.keys())])
+        list_dep_var = list(map(str, list(self.model.variabs.keys())
+                                   + list(self.model.multips.keys())))
+        list_dep_var += ['tc']
 
-    def get_evaluated_lambdas(self, list_dep_var=None):
+        if skip_multipliers:
+            list_dep_var = [v for v in list_dep_var if not 'lb_' in v]
+
+        return list_dep_var
+
+    def get_evaluated_lambdas(self, skip_multipliers=False):
         '''
         For each dependent variable and total cost get a lambda function
         evaluated by constant parameters. This subsequently evaluated
@@ -86,8 +91,7 @@ class Evaluator(plotting.EvPlotting):
         '''
 
         # get dependent variables (variabs and multips)
-        list_dep_var = (list_dep_var if list_dep_var
-                        else self.get_default_list_dep_var())
+        list_dep_var = self._get_list_dep_var(skip_multipliers)
 
         slct_eq_0 = ('n_p_day' if 'n_p_day' in list_dep_var
                      else list_dep_var[0])
@@ -450,7 +454,7 @@ class Evaluator(plotting.EvPlotting):
 
 
         mask_opt = self.df_exp.const_comb.isin(constrs_opt)
-        self.df_exp_opt = self.df_exp.loc[mask_opt]
+        self.df_exp_opt = self.df_exp.loc[mask_opt].copy()
 
     def map_func_to_slot(self):
 
