@@ -57,6 +57,13 @@ class Evaluator(plotting.EvPlotting):
 
         self.df_x_vals = self.get_x_vals_combs()
 
+    def get_x_val_steps(self):
+        '''
+        Assumes constant step size.
+        '''
+
+        return {par.name: (val[1] - val[0]) if len(val) > 1 else None
+                for par, val in self.x_vals.items()}
 
     def sanitize_x_vals(self, x_vals):
         '''
