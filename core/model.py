@@ -137,10 +137,6 @@ class Model:
 
             self.cstr_supply[cstr_supply] = slot
 
-    def get_result_dict(self, row, as_string=False):
-
-        return {str(var) if as_string else var: res
-                for res, var in zip(row.result[0], row.variabs_multips)}
 
 
     def get_supply_constraint_expr(self, cstr):
@@ -193,7 +189,58 @@ class Model:
 
             self.filter_invalid_solutions()
 
+            self.fix_stored_energy()
+
             self.df_comb.to_pickle(self.pickle_fn)
+
+
+
+    def get_result_dict(self, row, string_keys=False):
+        '''
+        Combines the variabs_multips and the result iterables into a dict.
+
+        Keyword argument:
+            * x -- df_comb table row, must contain columns
+                   'variabs_multibs', 'result'
+            * string_keys -- boolean; if True, return symbol names as keys
+                             rather than symbols
+        '''
+
+        dict_res = {str(var) if string_keys else var: res
+                    for var, res
+                    in zip(row.variabs_multips, row.result[0])}
+        return dict_res
+
+
+    def fix_stored_energy(self):
+
+        self.df_comb['result'] = self.df_comb.apply(self._fix_stored_energy,
+                                            axis=1)
+
+    def _fix_stored_energy(self, x):
+        '''
+        Recalculates stored energy from power results.
+
+        Input parameters:
+            * x -- df_comb table row, must contain columns
+                   'variabs_multibs', 'result'
+            * name -- storage object name
+
+        TODO: Should be done by storage class.
+        '''
+
+        dict_var = self.get_result_dict(x, True)
+
+        for store in self.storages.values():
+            sum_chg = sum(dict_var['%s_p_%s'%(store.name, chg_slot)]
+                          for chg_slot in
+                          tuple(slot for slot, cd in store.slots_map.items()
+                                if cd == 'chg'))
+
+            dict_var['%s_e_None'%store.name] = sum_chg * store.eff.symb**0.5
+
+        return [[dict_var[str(var)] for var in x.variabs_multips]]
+
 
 
 
@@ -266,9 +313,10 @@ class Model:
                     select_cstr = select_cstr[0]
                     cols_mut_excl_0.append((cstr, select_cstr, is_exclusive))
 
-        cols_mut_excl_0 += [('act_lb_phs_pos_p_day', 'act_lb_phs_pos_p_evening', False),
-                          ('act_lb_phs_pos_p_day', 'act_lb_phs_pos_e_None', False),
-                          ('act_lb_phs_pos_p_evening', 'act_lb_phs_pos_e_None', False)]
+        cols_mut_excl_0 += \
+            [('act_lb_phs_pos_p_day', 'act_lb_phs_pos_p_night', False),
+             ('act_lb_phs_pos_p_day', 'act_lb_phs_pos_e_None', False),
+             ('act_lb_phs_pos_p_night', 'act_lb_phs_pos_e_None', False)]
 
         # make sure all cols are present
         cols_mut_excl = []
@@ -541,11 +589,16 @@ class Model:
                                               for var in res_vars])))
                                     for res_vars in x.res_vars
                                     if res_vars)
-        res_vars.loc[mask_valid, 'res_comps'] = res_vars.loc[mask_valid].apply(get_comps, axis=1)
+        res_vars.loc[mask_valid, 'res_comps'] = \
+                res_vars.loc[mask_valid].apply(get_comps, axis=1)
 
         # maximum unique component number
-        get_max_nunq = lambda x: max(len(set(comp_list))
-                                     for comp_list in x.res_comps) if x.res_comps else 0
+        def get_max_nunq(x):
+            nmax = 0
+            if x.res_comps:
+                nmax = max(len(set(comp_list)) for comp_list in x.res_comps)
+            return nmax
+
         res_vars.loc[mask_valid, 'mask_res_unq'] = res_vars.loc[mask_valid].apply(get_max_nunq, axis=1)
 
         return res_vars.mask_res_unq
