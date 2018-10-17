@@ -44,6 +44,8 @@ class Plant(asset.Asset):
             * slots -- iterable of time slot names
             * capacity --
             * cap_ret -- boolean, capacity can be retired True/False
+
+        TODO: Make vc1 optional.
         '''
         super().__init__()
 
