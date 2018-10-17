@@ -80,7 +80,10 @@ x_vals = {
 ev = evaluator.Evaluator(m, x_vals)
 self = ev
 
-ev.df_x_vals = ev.df_x_vals.loc[ev.df_x_vals[['C_phs', 'E_phs']].apply(lambda x: tuple(x), axis=1).isin([(0,0), (phs_C_max,phs_C_max * dd)])]
+# Delete
+ev.df_x_vals = ev.df_x_vals.loc[ev.df_x_vals[['C_phs', 'E_phs']].apply(lambda x: tuple(x), axis=1).isin([(0,0), (3250, 3250 * dd)])]
+
+
 
 list_dep_var = (list(map(str, list(self.model.variabs.keys())
               + list(self.model.multips.keys()))))
