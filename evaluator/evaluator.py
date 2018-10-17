@@ -445,11 +445,12 @@ class Evaluator(plotting.EvPlotting):
 
     def drop_non_optimal_combinations(self):
 
-
         constrs_opt = self.df_exp.loc[self.df_exp.is_optimum]
         constrs_opt = constrs_opt['const_comb'].unique().tolist()
 
-        self.df_exp = self.df_exp.loc[self.df_exp.const_comb.isin(constrs_opt)]
+
+        mask_opt = self.df_exp.const_comb.isin(constrs_opt)
+        self.df_exp_opt = self.df_exp.loc[mask_opt]
 
     def map_func_to_slot(self):
 
