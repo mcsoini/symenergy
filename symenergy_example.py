@@ -45,9 +45,6 @@ m.add_storage(name='phs',
 m.generate_solve()
 
 
-
-
-
 # %%
 reload(evaluator)
 
@@ -64,31 +61,18 @@ m.slots['night'].l.value = 5200
 m.slots['day'].vre.value = m.slots['day'].l.value + m.slots['night'].l.value
 m.slots['night'].vre.value = 0
 
-
 m.storages['phs'].eff.value = 0.75
-m.storages['phs'].C.value = 1
-m.storages['phs'].E.value = 1
-
-dd = 20
+m.storages['phs'].C.value = 3250
+m.storages['phs'].E.value = 10000
 
 x_vals = {
          m.vre_scale: np.linspace(0, 1, 101),
          m.comps['phs'].C: np.linspace(0, 3250, 2),
-         m.comps['phs'].E: np.linspace(0 * dd, 3250 * dd, 2)
         }
 
 ev = evaluator.Evaluator(m, x_vals)
-self = ev
 
-# Delete
-ev.df_x_vals = ev.df_x_vals.loc[ev.df_x_vals[['C_phs', 'E_phs']].apply(lambda x: tuple(x), axis=1).isin([(0,0), (3250, 3250 * dd)])]
-
-
-
-list_dep_var = (list(map(str, list(self.model.variabs.keys())
-              + list(self.model.multips.keys()))))
-list_dep_var = ['tc'] + [v for v in list_dep_var if not 'lb_' in v]
-ev.get_evaluated_lambdas(list_dep_var)
+ev.get_evaluated_lambdas(skip_multipliers=True)
 
 ev.expand_to_x_vals()
 
