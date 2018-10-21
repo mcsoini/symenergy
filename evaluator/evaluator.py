@@ -455,10 +455,15 @@ class Evaluator(plotting.EvPlotting):
                                      .unique().tolist())
 
     def drop_non_optimal_combinations(self):
+        '''
+        Creates new attribute df_exp_opt with optimal constraint combs only.
+
+        Note: This keeps all constraint combinations which are optimal
+        for *some* parameter combinations.
+        '''
 
         constrs_opt = self.df_exp.loc[self.df_exp.is_optimum]
         constrs_opt = constrs_opt['const_comb'].unique().tolist()
-
 
         mask_opt = self.df_exp.const_comb.isin(constrs_opt)
         self.df_exp_opt = self.df_exp.loc[mask_opt].copy()
