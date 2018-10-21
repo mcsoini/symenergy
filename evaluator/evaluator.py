@@ -120,13 +120,11 @@ class Evaluator(plotting.EvPlotting):
             self.dfev['%s_expr_plot'%slct_eq] = \
                         self.dfev[slct_eq].apply(self._subs_param_values)
 
-
             lambdify = lambda res_plot: sp.lambdify(self.x_symb, res_plot,
                                                     modules=['numpy'])
 
             self.dfev[slct_eq + '_lam_plot'] = (
-                            self.dfev[slct_eq + '_expr_plot']
-                                .apply(lambdify))
+                            self.dfev['%s_expr_plot'%slct_eq].apply(lambdify))
 
         idx = list(map(str, self.model.constrs_cols_neq)) + ['const_comb']
         cols = [c for c in self.dfev.columns
@@ -198,19 +196,12 @@ class Evaluator(plotting.EvPlotting):
             * Series with y values
         '''
 
-#        print(lam_plot.name[0], self.ngroups - 1)
-#        print(lam_plot.reset_index())
-
-#        y_vals = [lam_plot.iloc[0](*val_row) for val_row in x_vals]
         y_vals = [lam_plot.iloc[0](*val_row) for val_row in x_vals]
-#        print(len(y_vals))
-
 
         if isinstance(y_vals, float):
             y_vals = np.ones(len(x_vals)) * y_vals
 
         return pd.Series(y_vals, index=pd.Index(x_vals))
-
 
     def get_x_vals_combs(self):
         '''
