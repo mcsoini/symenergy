@@ -20,7 +20,7 @@ import pyAndy.core.plotpage as pltpg
 
 reload(model)
 
-m = model.Model(curtailment=True, nthreads=7)
+m = model.Model(curtailment=False, nthreads=7)
 
 self = m
 
@@ -40,7 +40,8 @@ m.add_storage(name='phs',
               energy_capacity=1,
               slots_map={'day': 'chg',
                          'night': 'dch'
-                         })
+                         }
+              )
 
 m.generate_solve()
 
@@ -66,23 +67,20 @@ m.storages['phs'].C.value = 3250
 m.storages['phs'].E.value = 10000
 
 x_vals = {
-         m.vre_scale: np.linspace(0, 1, 101),
+         m.vre_scale: np.linspace(0, 1, 31),
          m.comps['phs'].C: np.linspace(0, 3250, 2),
         }
 
+model = m
 ev = evaluator.Evaluator(m, x_vals)
+self = ev
 
 ev.get_evaluated_lambdas(skip_multipliers=True)
+# %%
 
 ev.expand_to_x_vals()
 
-ev.enforce_constraints()
-
-ev.init_cost_optimum()
-
 ev.map_func_to_slot()
-
-ev.drop_non_optimal_combinations()
 
 ev.build_supply_table()
 
@@ -90,7 +88,5 @@ ev.build_supply_table()
 
 ev.line_plot(all_labels=False)
 
-ev.supply_plot(ind_axx=['vre_scale'],
-               ind_plty=['C_phs'])
-
+ev.supply_plot(ind_axx=['vre_scale'], ind_plty=['C_phs'])
 
