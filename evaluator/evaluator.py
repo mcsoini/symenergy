@@ -241,11 +241,7 @@ class Evaluator(plotting.EvPlotting):
         '''
 
 
-    #%%
         def evaluate_by_x(x):
-
-#            if __name__ == '__main__':
-#                x = self.df_x_vals.iloc[10]
 
             df = self.df_lam_plot.reset_index()[['func', 'const_comb', 'lambd']]
 
@@ -260,21 +256,13 @@ class Evaluator(plotting.EvPlotting):
 
             df['lambd'] = self._evaluate(df)
 
-
             df = self._init_constraints_active(df)
-#            mask_positive = self._get_mask_valid_positive(df)
-#
-#            mask_capacity = self._get_mask_valid_capacity(df)
 
             mask_valid = self._get_mask_valid_solutions(df)
-
             df = df.join(mask_valid, on=mask_valid.index.names)
-
             df.loc[df.mask_valid == 0, 'lambd'] = np.nan
 
             df['is_optimum'] = self.init_cost_optimum(df)
-
-
 
             if self.drop_non_optimum == True:
                 df = df.loc[df.is_optimum]
@@ -289,37 +277,6 @@ class Evaluator(plotting.EvPlotting):
 
         self.const_comb_opt = (self.df_exp.loc[self.df_exp.is_optimum,
                                                'const_comb'].unique().tolist())
-
-
-
-#%%
-
-#    def expand_to_x_vals(self):
-#
-#        self.ngroups = len(self.df_lam_plot)
-#
-#        group_levels = ['idx', 'func']
-#        dfg = self.df_lam_plot.reset_index().groupby(group_levels)['lambd']
-#
-#        if __name__ == '__main__':
-#            lam_plot = dfg.get_group(list(dfg.groups.keys())[0])
-#
-#        df_exp_0 = dfg.apply(self._get_expanded_row,
-#                             [tuple(row) for row
-#                              in self.df_x_vals.values]).reset_index()
-#
-#        # expand all data to selected values
-#        print('Adding original indices...', end='')
-#        df_exp_0 = df_exp_0.join(self.df_lam_plot.reset_index()
-#                                     .set_index('idx')[['const_comb']],
-#                                 on='idx')
-#        print('done.')
-#
-#        col_names = {'level_%d'%(nx + 2): name for nx, name in enumerate(self.x_name)}
-#        col_names.update({0: 'lambd'})
-#        df_exp_0 = df_exp_0.rename(columns=col_names)
-#
-#        self.df_exp = df_exp_0
 
     def _init_constraints_active(self, df):
         '''
@@ -520,9 +477,6 @@ class Evaluator(plotting.EvPlotting):
         df['is_optimum'] = df.is_optimum.fillna(False)
 
         return df.is_optimum
-
-#        self.const_comb_opt = (tc_min.index.get_level_values('const_comb')
-#                                     .unique().tolist())
 
     def drop_non_optimal_combinations(self):
         '''
