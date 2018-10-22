@@ -20,7 +20,8 @@ class Evaluator(plotting.EvPlotting):
     Evaluates model results for selected
     '''
 
-    def __init__(self, model, x_vals, eval_accuracy=1e-9):
+    def __init__(self, model, x_vals, drop_non_optimum=True,
+                 eval_accuracy=1e-9):
         '''
         Keyword arguments:
             * model -- symenergy model
@@ -31,6 +32,8 @@ class Evaluator(plotting.EvPlotting):
         '''
 
         self.model = model
+
+        self.drop_non_optimum = drop_non_optimum
 
         self.x_vals = x_vals
 
@@ -145,6 +148,20 @@ class Evaluator(plotting.EvPlotting):
 
         self.df_lam_plot = df_lam_plot
 
+
+
+    def get_x_vals_combs(self):
+        '''
+        Generates dataframe with all combinations of x_vals.
+
+        Used as default by expand_to_x_vals or can be used externally to
+        select subsets of
+        '''
+
+        return pd.DataFrame(list(itertools.product(*self.x_vals.values())),
+                            columns=[col.name for col in self.x_vals.keys()])
+
+
     def _get_func_from_idx(self, x, slct_eq):
         '''
         Get result expression corresponding to the selected variable slct_eq.
@@ -203,46 +220,108 @@ class Evaluator(plotting.EvPlotting):
 
         return pd.Series(y_vals, index=pd.Index(x_vals))
 
-    def get_x_vals_combs(self):
+    def _evaluate(self, df):
         '''
-        Generates dataframe with all combinations of x_vals.
-
-        Used as default by expand_to_x_vals or can be used externally to
-        select subsets of
+        Input dataframe:
+            df[['func', 'const_comb', 'lambd', 'self.x_name[0]', ...]]
+        Returns expanded data for all rows in the input dataframe.
         '''
 
-        return pd.DataFrame(list(itertools.product(*self.x_vals.values())),
-                            columns=[col.name for col in self.x_vals.keys()])
+
+
+        x = df[['func', 'const_comb', 'lambd'] + self.x_name].iloc[0]
+        return df.apply(lambda x: x.lambd(*x.loc[self.x_name]), axis=1)
+
 
 
     def expand_to_x_vals(self):
 
-        self.ngroups = len(self.df_lam_plot)
+        '''
+        Applies evaluate_by_x to all df_x_vals rows
+        '''
 
-        group_levels = ['idx', 'func']
-        dfg = self.df_lam_plot.reset_index().groupby(group_levels)['lambd']
 
-        if __name__ == '__main__':
-            lam_plot = dfg.get_group(list(dfg.groups.keys())[0])
+    #%%
+        def evaluate_by_x(x):
 
-        df_exp_0 = dfg.apply(self._get_expanded_row,
-                             [tuple(row) for row
-                              in self.df_x_vals.values]).reset_index()
+#            if __name__ == '__main__':
+#                x = self.df_x_vals.iloc[10]
 
-        # expand all data to selected values
-        print('Adding original indices...', end='')
-        df_exp_0 = df_exp_0.join(self.df_lam_plot.reset_index()
-                                     .set_index('idx')[['const_comb']],
-                                 on='idx')
-        print('done.')
+            df = self.df_lam_plot.reset_index()[['func', 'const_comb', 'lambd']]
 
-        col_names = {'level_%d'%(nx + 2): name for nx, name in enumerate(self.x_name)}
-        col_names.update({0: 'lambd'})
-        df_exp_0 = df_exp_0.rename(columns=col_names)
+            print(x)
+
+            # add x val columns
+            for col in self.x_name:
+                df[col] = x[col].values[0]
+
+
+            df = df[['func', 'const_comb', 'lambd'] + self.x_name]
+
+            df['lambd'] = self._evaluate(df)
+
+
+            df = self._init_constraints_active(df)
+#            mask_positive = self._get_mask_valid_positive(df)
+#
+#            mask_capacity = self._get_mask_valid_capacity(df)
+
+            mask_valid = self._get_mask_valid_solutions(df)
+
+            df = df.join(mask_valid, on=mask_valid.index.names)
+
+            df.loc[df.mask_valid == 0, 'lambd'] = np.nan
+
+            df['is_optimum'] = self.init_cost_optimum(df)
+
+
+
+            if self.drop_non_optimum == True:
+                df = df.loc[df.is_optimum]
+
+            return df
+
+        dfg = self.df_x_vals.groupby(level=0, as_index=False)
+
+        df_exp_0 = dfg.apply(evaluate_by_x).reset_index(drop=True)
 
         self.df_exp = df_exp_0
 
-    def _init_constraints_active(self):
+        self.const_comb_opt = (self.df_exp.loc[self.df_exp.is_optimum,
+                                               'const_comb'].unique().tolist())
+
+
+
+#%%
+
+#    def expand_to_x_vals(self):
+#
+#        self.ngroups = len(self.df_lam_plot)
+#
+#        group_levels = ['idx', 'func']
+#        dfg = self.df_lam_plot.reset_index().groupby(group_levels)['lambd']
+#
+#        if __name__ == '__main__':
+#            lam_plot = dfg.get_group(list(dfg.groups.keys())[0])
+#
+#        df_exp_0 = dfg.apply(self._get_expanded_row,
+#                             [tuple(row) for row
+#                              in self.df_x_vals.values]).reset_index()
+#
+#        # expand all data to selected values
+#        print('Adding original indices...', end='')
+#        df_exp_0 = df_exp_0.join(self.df_lam_plot.reset_index()
+#                                     .set_index('idx')[['const_comb']],
+#                                 on='idx')
+#        print('done.')
+#
+#        col_names = {'level_%d'%(nx + 2): name for nx, name in enumerate(self.x_name)}
+#        col_names.update({0: 'lambd'})
+#        df_exp_0 = df_exp_0.rename(columns=col_names)
+#
+#        self.df_exp = df_exp_0
+
+    def _init_constraints_active(self, df):
         '''
         Create binary columns depending on whether the plant constraints
         are active or not.
@@ -258,30 +337,32 @@ class Evaluator(plotting.EvPlotting):
         lst = 'is_positive'
         for lst in ['is_positive']:
 
-            constr_act = (self.df_exp.func.apply(get_var)
+            constr_act = (df.func.apply(get_var)
                                           .apply(lambda x:
                                                  set_constr(x, lst)))
-            self.df_exp[lst] = constr_act
+            df[lst] = constr_act
 
-            self.df_exp[[lst, 'func']].drop_duplicates()
+            df[[lst, 'func']].drop_duplicates()
+
+        return df
 
 
-    def _get_mask_valid_positive(self):
+    def _get_mask_valid_positive(self, df):
 
-        msk_pos = self.df_exp.is_positive == 1
-        mask_positive = pd.Series(True, index=self.df_exp.index)
-        mask_positive.loc[msk_pos] = self.df_exp.loc[msk_pos].lambd + self.eval_accuracy >= 0
+        msk_pos = df.is_positive == 1
+        mask_positive = pd.Series(True, index=df.index)
+        mask_positive.loc[msk_pos] = df.loc[msk_pos].lambd + self.eval_accuracy >= 0
 
         return mask_positive
 
-    def _get_mask_valid_capacity(self):
+    def _get_mask_valid_capacity(self, df):
 
         dict_cap = [(cap, val)
                     for comp in self.model.comps.values()
                     if hasattr(comp, 'get_constrained_variabs') # exclude slots
                     for cap, val in comp.get_constrained_variabs()]
 
-        mask_valid = pd.Series(True, index=self.df_exp.index)
+        mask_valid = pd.Series(True, index=df.index)
 
         if dict_cap:
 
@@ -293,38 +374,38 @@ class Evaluator(plotting.EvPlotting):
 
                 slct_func = ['%s_lam_plot'%symb.name for symb in pp]
 
-                mask_slct_func = self.df_exp.func.isin(slct_func)
+                mask_slct_func = df.func.isin(slct_func)
 
                 # things are different depending on whether or not select_x is the corresponding capacity
                 if C in self.x_vals.keys():
-                    val_cap = self.df_exp[C.name]
+                    val_cap = df[C.name]
                 else:
-                    val_cap = pd.Series(C.value, index=self.df_exp.index)
+                    val_cap = pd.Series(C.value, index=df.index)
 
                 # need to add retired and additional capacity
                 for addret, sign in {'add': +1, 'ret': -1}.items():
                     func_C_addret = [variab for variab in slct_func if 'C_%s_None'%addret in variab]
                     func_C_addret = func_C_addret[0] if func_C_addret else None
                     if func_C_addret:
-                        mask_addret = (self.df_exp.func.str
+                        mask_addret = (df.func.str
                                                   .contains(func_C_addret))
-                        df_C = self.df_exp.loc[mask_addret].copy()
+                        df_C = df.loc[mask_addret].copy()
                         df_C = df_C.set_index(['const_comb'] + self.x_name)['lambd'].rename('_C_%s'%addret)
-                        self.df_exp = self.df_exp.join(df_C, on=df_C.index.names)
+                        df = df.join(df_C, on=df_C.index.names)
 
                         # doesn't apply to itself, hence -mask_addret
                         val_cap.loc[-mask_addret] += \
-                            + sign * self.df_exp.loc[-mask_addret,
+                            + sign * df.loc[-mask_addret,
                                                      '_C_%s'%addret]
 
-                constraint_met = pd.Series(True, index=self.df_exp.index)
+                constraint_met = pd.Series(True, index=df.index)
                 constraint_met.loc[mask_slct_func] = \
-                                    (self.df_exp.loc[mask_slct_func].lambd * (1 - self.eval_accuracy)
+                                    (df.loc[mask_slct_func].lambd * (1 - self.eval_accuracy)
                                      <= val_cap.loc[mask_slct_func])
 
-                # delete temporary columns:
-                self.df_exp = self.df_exp[[c for c in self.df_exp.columns
-                                        if not c in ['_C_ret', '_C_add']]]
+#                # delete temporary columns:
+#                df = df[[c for c in df.columns
+#                                        if not c in ['_C_ret', '_C_add']]]
 
                 mask_valid &= constraint_met
 
@@ -332,29 +413,29 @@ class Evaluator(plotting.EvPlotting):
 
         return mask_valid
 
-    def _get_mask_valid_solutions(self):
+    def _get_mask_valid_solutions(self, df):
 
-        mask_valid = pd.Series(True, index=self.df_exp.index)
+        mask_valid = pd.Series(True, index=df.index)
 
-        mask_positive = self._get_mask_valid_positive()
+        mask_positive = self._get_mask_valid_positive(df)
         mask_valid = mask_valid & mask_positive
 
 
-        self.df_exp['mv_pos'] = mask_positive.copy()
+        df['mv_pos'] = mask_positive.copy()
 
-        mask_capacity = self._get_mask_valid_capacity()
+        mask_capacity = self._get_mask_valid_capacity(df)
         mask_valid &= mask_capacity
-        self.df_exp['mv_cap'] = mask_capacity.copy()
+        df['mv_cap'] = mask_capacity.copy()
 
-        self.df_exp['mask_valid'] = mask_valid.copy()
+        df['mask_valid'] = mask_valid.copy()
 
         # consolidate mask by constraint combination and x values
         index = self.x_name + ['const_comb']
-        mask_valid = self.df_exp.pivot_table(index=index,
-                                             values='mask_valid',
-                                             aggfunc=min)
+        mask_valid = df.pivot_table(index=index,
+                                    values='mask_valid',
+                                    aggfunc=min)
 
-        self.df_exp.drop('mask_valid', axis=1, inplace=True)
+        df.drop('mask_valid', axis=1, inplace=True)
 
         return mask_valid
 
@@ -414,19 +495,18 @@ class Evaluator(plotting.EvPlotting):
         TODO: Ideally this would be modular and part of the components.
         '''
 
-        self._init_constraints_active()
+        self.df_exp = self._init_constraints_active(self.df_exp)
 
-        mask_valid = self._get_mask_valid_solutions()
+        mask_valid = self._get_mask_valid_solutions(self.df_exp)
 
         self.df_exp = self.df_exp.join(mask_valid, on=mask_valid.index.names)
 
         self.df_exp.loc[self.df_exp.mask_valid == 0, 'lambd'] = np.nan
 
-
-    def init_cost_optimum(self):
+    def init_cost_optimum(self, df):
         ''' Adds cost optimum column to the expanded dataframe. '''
 
-        tc = self.df_exp.loc[self.df_exp.func == 'tc_lam_plot'].copy()
+        tc = df.loc[df.func == 'tc_lam_plot'].copy()
 
         tc_min = (tc.groupby(self.x_name, as_index=0)
                     .apply(lambda x: x.nsmallest(1, 'lambd')))
@@ -434,16 +514,15 @@ class Evaluator(plotting.EvPlotting):
         tc_min['is_optimum'] = True
         tc_min = tc_min.set_index(['const_comb'] + self.x_name)
 
+        df = df[[c for c in df.columns if not c == 'is_optimum']]
+        df = df.join(tc_min['is_optimum'], on=tc_min.index.names)
 
-        self.df_exp = self.df_exp[[c for c in self.df_exp.columns
-                                   if not c == 'is_optimum']]
-        self.df_exp = self.df_exp.join(tc_min['is_optimum'],
-                                       on=tc_min.index.names)
+        df['is_optimum'] = df.is_optimum.fillna(False)
 
-        self.df_exp['is_optimum'] = self.df_exp.is_optimum.fillna(False)
+        return df.is_optimum
 
-        self.const_comb_opt = (tc_min.index.get_level_values('const_comb')
-                                     .unique().tolist())
+#        self.const_comb_opt = (tc_min.index.get_level_values('const_comb')
+#                                     .unique().tolist())
 
     def drop_non_optimal_combinations(self):
         '''
