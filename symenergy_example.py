@@ -6,7 +6,7 @@ Created on Thu Sep  6 13:38:17 2018
 @author: user
 """
 
-%reset -f
+#%reset -f
 
 from importlib import reload
 import sympy as sp
@@ -33,15 +33,15 @@ m.add_plant(name='n', vc0=1, vc1=0, slots=m.slots, capacity=3,
             )
 m.add_plant(name='g', vc0=2, vc1=0, slots=m.slots)
 
-m.add_storage(name='phs',
-              eff=0.75,
-              slots=m.slots,
-              capacity=0.5,
-              energy_capacity=1,
-              slots_map={'day': 'chg',
-                         'night': 'dch'
-                         }
-              )
+#m.add_storage(name='phs',
+#              eff=0.75,
+#              slots=m.slots,
+#              capacity=0.5,
+#              energy_capacity=1,
+#              slots_map={'day': 'chg',
+#                         'night': 'dch'
+#                         }
+#              )
 
 m.generate_solve()
 
@@ -62,13 +62,13 @@ m.slots['night'].l.value = 5200
 m.slots['day'].vre.value = m.slots['day'].l.value + m.slots['night'].l.value
 m.slots['night'].vre.value = 0
 
-m.storages['phs'].eff.value = 0.75
-m.storages['phs'].C.value = 3250
-m.storages['phs'].E.value = 10000
+#m.storages['phs'].eff.value = 0.75
+#m.storages['phs'].C.value = 3250
+#m.storages['phs'].E.value = 10000
 
 x_vals = {
          m.vre_scale: np.linspace(0, 1, 31),
-         m.comps['phs'].C: np.linspace(0, 3250, 2),
+#         m.comps['phs'].C: np.linspace(0, 3250, 2),
         }
 
 model = m
@@ -86,7 +86,7 @@ ev.build_supply_table()
 
 # %%
 
-ev.line_plot(all_labels=False)
-
-ev.supply_plot(ind_axx=['vre_scale'], ind_plty=['C_phs'])
+#ev.line_plot(all_labels=False)
+#
+#ev.supply_plot(ind_axx=['vre_scale'], ind_plty=[])
 
