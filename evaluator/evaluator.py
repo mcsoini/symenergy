@@ -10,6 +10,7 @@ import sympy as sp
 import numpy as np
 import pandas as pd
 import itertools
+import time
 import multiprocessing
 
 import symenergy.evaluator.plotting as plotting
@@ -228,17 +229,13 @@ class Evaluator(plotting.EvPlotting):
         Returns expanded data for all rows in the input dataframe.
         '''
 
-
-
-        x = df[['func', 'const_comb', 'lambd'] + self.x_name].iloc[0]
-
-
+        if __name__ == '__main__':
+            x = df[['func', 'const_comb', 'lambd'] + self.x_name].iloc[0]
 
         import time
 
         tm = {}
         tm['t'] = time.time()
-
 
         def report(tok, index):
             if index % 10000 == 0:
@@ -247,19 +244,19 @@ class Evaluator(plotting.EvPlotting):
                 tm['t'] = time.time()
 
         def process(x, report=None):
-            if report:
-                report(x, x.name)
+#            if report:
+#                report(x, x.name)
             return x.lambd(*x.loc[self.x_name])
-#
-#        [process(x, nx, report) for nx, x in df[['lambd'] + self.x_name].iterrows()]
+
+        return df.apply(process, axis=1)
+
+#        return df.apply(process, args=(report,), axis=1)
 
 
-
-        return df.apply(process, args=(report,), axis=1)
 
 
     def evaluate_by_x(self, x, df):
-
+        t = time.time()
         print(x)
 
         # add x val columns
@@ -276,6 +273,8 @@ class Evaluator(plotting.EvPlotting):
 
         if self.drop_non_optimum == True:
             df = df.loc[df.is_optimum]
+
+        print(time.time() - t)
 
         return df
 
@@ -304,6 +303,22 @@ class Evaluator(plotting.EvPlotting):
         df_lam_plot = self._init_constraints_active(df_lam_plot)
 
         dfg = self.df_x_vals.groupby(level=0, as_index=False)
+
+        if __name__ == '__main__':
+            x = dfg.get_group(list(dfg.groups.keys())[0])
+            df = df_lam_plot.copy()
+
+#        class lambd_container:
+#
+#            def __init__(self, df):
+#
+#                for lambd in df.lambd:
+#                    setattr(self, 'lambd_%d'%lambd.__hash__(), lambd)
+#        lambd_cont = lambd_container(df)
+#
+#        len([f for f in lambd_cont.__dict__.keys() if 'lambd_' in f])
+#
+
 
         df_exp_0 = dfg.apply(lambda x: self.evaluate_by_x(x,
                                                           df_lam_plot.copy()))
