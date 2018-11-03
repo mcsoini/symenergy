@@ -359,12 +359,15 @@ class Evaluator(plotting.EvPlotting):
         return mask_valid
 
 
-    def build_supply_table(self):
+    def build_supply_table(self, df=None):
         '''
         Generates a table representing the supply constraint for easy plotting.
         '''
 
-        df_bal = self.df_exp.loc[self.df_exp.is_optimum].copy()
+        if not isinstance(df, pd.DataFrame):
+            df=self.df_exp
+
+        df_bal = df.loc[df.is_optimum].copy()
 
         # base dataframe: all operational variables
         drop = ['tc', 'pi_', 'lb_']
