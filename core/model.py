@@ -491,12 +491,24 @@ class Model:
                 lagrange += cstr.expr
 
         return lagrange
+
+
+
     def call_construct_lagrange(self, df):
         '''
         Top-level method for parallelization of construct_lagrange.
         '''
         print('Calling call_construct_lagrange on DataFrame with length %d'%len(df))
         return df.apply(self.construct_lagrange, axis=1).tolist()
+
+
+    def call_get_variabs_multips_slct(self, df):
+
+        print('Calling get_variabs_multips_slct on DataFrame with length %d'%len(df))
+#        return df.apply()
+        return list(map(self.get_variabs_multips_slct, df))
+
+
     def define_problems(self):
         '''
         For each combination of constraints, get the lagrangian
@@ -517,9 +529,16 @@ class Model:
             self.list_lagrange = parallelize_df(df, func, nthreads)
             print(time.time() - t)
 
+
         print('Getting selected variables/multipliers...')
-        self.df_comb['variabs_multips'] = \
-            self.df_comb.lagrange.apply(self.get_variabs_multips_slct)
+#        if not self.nthreads:
+        df = self.list_lagrange
+        self.list_variabs_multips = self.call_get_variabs_multips_slct(df)
+#        else:
+#            df = self.list_lagrange
+#            func = self.call_get_variabs_multips_slct
+#            nthreads = self.nthreads
+#            self.list_variabs_multips = parallelize_df(df, func, nthreads)
 
         # get index for reporting
         self.df_comb = self.df_comb[[c for c in self.df_comb.columns
