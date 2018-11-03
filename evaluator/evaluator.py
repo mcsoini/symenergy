@@ -373,7 +373,8 @@ class Evaluator(plotting.EvPlotting):
         drop = ['tc', 'pi_', 'lb_']
         df_bal = df_bal.loc[-df_bal.func.str.contains('|'.join(drop))]
 
-        df_bal = df_bal[['func', 'func_no_slot', 'slot', 'lambd'] + self.x_name]
+        df_bal = df_bal[['func', 'const_comb', 'func_no_slot',
+                         'slot', 'lambd'] + self.x_name]
 
         # add parameters
         par_add = ['l', 'vre']
@@ -388,6 +389,9 @@ class Evaluator(plotting.EvPlotting):
         df_bal_add = df_bal_add.rename(columns={'level_%d'%len(self.x_name): 'func'})
         df_bal_add['func_no_slot'] = df_bal_add.func.apply(lambda x: '_'.join(x.split('_')[:-1]))
         df_bal_add['slot'] = df_bal_add.func.apply(lambda x: x.split('_')[-1])
+        map_const_comb = df_bal[self.x_name + ['const_comb']].drop_duplicates()
+        df_bal_add = df_bal_add.join(map_const_comb.set_index(self.x_name)['const_comb'], on=self.x_name)
+
 
         df_bal = pd.concat([df_bal, df_bal_add], axis=0, sort=True)
 
