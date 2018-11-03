@@ -12,6 +12,7 @@ import pandas as pd
 import sympy as sp
 import numpy as np
 import hashlib
+import time
 
 import symenergy
 from symenergy.assets.plant import Plant
