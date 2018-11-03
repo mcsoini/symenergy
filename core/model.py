@@ -437,17 +437,12 @@ class Model:
 
         self.define_problems()
 
+        df = list(zip(self.list_lagrange,
+                      self.list_variabs_multips,
+                      self.df_comb.idx))
         if not self.nthreads:
-
-            df = list(zip(self.list_lagrange,
-                          self.list_variabs_multips,
-                          self.df_comb.idx))
             self.df_comb['result'] = self.call_solve_df(df)
-
         else:
-            df = list(zip(self.list_lagrange,
-                          self.list_variabs_multips,
-                          self.df_comb.idx))
             func = self.call_solve_df
             nthreads = self.nthreads
             self.df_comb['result'] = parallelize_df(df, func, nthreads)
@@ -456,6 +451,7 @@ class Model:
         non_empty = lambda x: not isinstance(x, sp.EmptySet)
         mask_non_empty = self.df_comb.result.apply(non_empty)
         self.df_comb = self.df_comb.loc[mask_non_empty]
+
         # get total cost for results
         df = list(zip(self.df_comb.result,
                       self.df_comb.variabs_multips,
