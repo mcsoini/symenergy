@@ -452,6 +452,10 @@ class Model:
             nthreads = self.nthreads
             self.df_comb['result'] = parallelize_df(df, func, nthreads)
 
+        # drop empty solutions
+        non_empty = lambda x: not isinstance(x, sp.EmptySet)
+        mask_non_empty = self.df_comb.result.apply(non_empty)
+        self.df_comb = self.df_comb.loc[mask_non_empty]
         # get total cost for results
         df = list(zip(self.df_comb.result,
                       self.df_comb.variabs_multips,
