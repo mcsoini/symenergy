@@ -427,14 +427,8 @@ class Model:
     def call_solve_df(self, df):
         ''' Applies to dataframe. '''
 
-        slct_cols = ['lagrange', 'variabs_multips', 'idx']
-
-        return df[slct_cols].apply(lambda x: self.solve(x.lagrange,
-                                                        x.variabs_multips,
-                                                        x.idx), axis=1)
-
-
-
+        print('Calling call_solve_df on list with length %d'%len(df))
+        return [self.solve(lag, var, idx) for lag, var, idx in df]
 
 
 
@@ -443,12 +437,19 @@ class Model:
         self.define_problems()
 
         if not self.nthreads:
-            self.df_comb['result'] = self.call_solve_df(self.df_comb)
+
+            df = list(zip(self.list_lagrange,
+                          self.list_variabs_multips,
+                          self.df_comb.idx))
+            self.df_comb['result'] = self.call_solve_df(df)
 
         else:
-            self.df_comb['result'] = parallelize_df(self.df_comb,
-                                                    self.call_solve_df,
-                                                    self.nthreads)
+            df = list(zip(self.list_lagrange,
+                          self.list_variabs_multips,
+                          self.df_comb.idx))
+            func = self.call_solve_df
+            nthreads = self.nthreads
+            self.df_comb['result'] = parallelize_df(df, func, nthreads)
 
         call_subs_tc = lambda x: self.subs_total_cost(x.result,
                                                       x.variabs_multips)
