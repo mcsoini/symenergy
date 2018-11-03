@@ -12,6 +12,7 @@ import pandas as pd
 import sympy as sp
 import numpy as np
 import hashlib
+import time
 
 import symenergy
 from symenergy.assets.plant import Plant
@@ -372,27 +373,6 @@ class Model:
         self.multips.update({cstr.mlt: slot
                              for cstr, slot in self.cstr_supply.items()})
 
-    def construct_lagrange(self, row):
-
-        slct_constr = row.loc[self.constrs_cols_neq].to_dict()
-
-        lagrange = self.tc
-        lagrange += sum([cstr.expr for cstr in self.cstr_supply])
-        lagrange += sum([cstr.expr for cstr in self.constrs
-                         if cstr.is_equality_constraint])
-
-
-        constr, is_active = list(slct_constr.items())[0]
-        for col, is_active in slct_constr.items():
-
-            if is_active:
-
-                cstr = self.constrs_dict[col]
-
-                lagrange += cstr.expr
-
-        return lagrange
-
 
     def get_variabs_multips_slct(self, lagrange):
         '''
@@ -448,14 +428,8 @@ class Model:
     def call_solve_df(self, df):
         ''' Applies to dataframe. '''
 
-        slct_cols = ['lagrange', 'variabs_multips', 'idx']
-
-        return df[slct_cols].apply(lambda x: self.solve(x.lagrange,
-                                                        x.variabs_multips,
-                                                        x.idx), axis=1)
-
-
-
+        print('Calling call_solve_df on list with length %d'%len(df))
+        return [self.solve(lag, var, idx) for lag, var, idx in df]
 
 
 
@@ -463,17 +437,56 @@ class Model:
 
         self.define_problems()
 
+        df = list(zip(self.list_lagrange,
+                      self.list_variabs_multips,
+                      self.df_comb.idx))
         if not self.nthreads:
-            self.df_comb['result'] = self.call_solve_df(self.df_comb)
-
+            self.df_comb['result'] = self.call_solve_df(df)
         else:
-            self.df_comb['result'] = parallelize_df(self.df_comb,
-                                                    self.call_solve_df,
-                                                    self.nthreads)
+            func = self.call_solve_df
+            nthreads = self.nthreads
+            self.df_comb['result'] = parallelize_df(df, func, nthreads)
 
-        call_subs_tc = lambda x: self.subs_total_cost(x.result,
-                                                      x.variabs_multips)
-        self.df_comb['tc'] = self.df_comb.apply(call_subs_tc, axis=1)
+        # drop empty solutions
+        non_empty = lambda x: not isinstance(x, sp.EmptySet)
+        mask_non_empty = self.df_comb.result.apply(non_empty)
+        self.df_comb = self.df_comb.loc[mask_non_empty]
+
+        # get total cost for results
+        df = list(zip(self.df_comb.result,
+                      self.df_comb.variabs_multips,
+                      self.df_comb.idx))
+        if not self.nthreads:
+            self.df_comb['tc'] = self.call_subs_tc(df)
+        else:
+            func = self.call_subs_tc
+            nthreads = self.nthreads
+            self.df_comb['tc'] = parallelize_df(df, func, nthreads)
+
+
+
+    def subs_total_cost(self, result, var_mlt_slct, idx):
+        '''
+        Substitutes solution into TC variables.
+        This expresses the total cost as a function of the parameters.
+        '''
+
+        if not idx % 1:
+            print(idx)
+
+        dict_var = {var: list(result)[0][ivar]
+                    if not isinstance(result, sp.sets.EmptySet)
+                    else np.nan for ivar, var
+                    in enumerate(var_mlt_slct)}
+
+        return self.tc.copy().subs(dict_var)
+
+
+    def call_subs_tc(self, df):
+
+        print('Calling call_subs_tc on list with length %d'%len(df))
+        return [self.subs_total_cost(res, var, idx) for res, var, idx in df]
+
 
     def combine_constraint_names(self, df):
 
@@ -488,6 +501,46 @@ class Model:
         return df
 
 
+    def construct_lagrange(self, row):
+
+        if not row.name % 1000:
+            print(row.name)
+
+        slct_constr = row.loc[self.constrs_cols_neq].to_dict()
+
+        lagrange = self.tc
+        lagrange += sum([cstr.expr for cstr in self.cstr_supply])
+        lagrange += sum([cstr.expr for cstr in self.constrs
+                         if cstr.is_equality_constraint])
+
+        constr, is_active = list(slct_constr.items())[0]
+        for col, is_active in slct_constr.items():
+
+            if is_active:
+
+                cstr = self.constrs_dict[col]
+
+                lagrange += cstr.expr
+
+        return lagrange
+
+
+
+    def call_construct_lagrange(self, df):
+        '''
+        Top-level method for parallelization of construct_lagrange.
+        '''
+        print('Calling call_construct_lagrange on DataFrame with length %d'%len(df))
+        return df.apply(self.construct_lagrange, axis=1).tolist()
+
+
+    def call_get_variabs_multips_slct(self, df):
+
+        print('Calling get_variabs_multips_slct on DataFrame with length %d'%len(df))
+#        return df.apply()
+        return list(map(self.get_variabs_multips_slct, df))
+
+
     def define_problems(self):
         '''
         For each combination of constraints, get the lagrangian
@@ -495,12 +548,24 @@ class Model:
         '''
 
         print('Defining lagrangians...')
-        self.df_comb['lagrange'] = \
-            self.df_comb.apply(self.construct_lagrange, axis=1)
+        if not self.nthreads:
+            t = time.time()
+            df = self.df_comb[self.constrs_cols_neq]
+            self.list_lagrange = self.call_construct_lagrange(df)
+            print(time.time() - t)
+        else:
+            t = time.time()
+            df = self.df_comb[self.constrs_cols_neq]
+            func = self.call_construct_lagrange
+            nthreads = self.nthreads
+            self.list_lagrange = parallelize_df(df, func, nthreads)
+            print(time.time() - t)
+
 
         print('Getting selected variables/multipliers...')
-        self.df_comb['variabs_multips'] = \
-            self.df_comb.lagrange.apply(self.get_variabs_multips_slct)
+        df = self.list_lagrange
+        self.list_variabs_multips = self.call_get_variabs_multips_slct(df)
+        self.df_comb['variabs_multips'] = self.list_variabs_multips
 
         # get index for reporting
         self.df_comb = self.df_comb[[c for c in self.df_comb.columns
@@ -714,18 +779,6 @@ class Model:
 
         return [list_res_new]
 
-    def subs_total_cost(self, result, var_mlt_slct):
-        '''
-        Substitutes solution into TC variables.
-        This expresses the total cost as a function of the parameters.
-        '''
-
-        dict_var = {var: list(result)[0][ivar]
-                    if not isinstance(result, sp.sets.EmptySet)
-                    else np.nan for ivar, var
-                    in enumerate(var_mlt_slct)}
-
-        return self.tc.copy().subs(dict_var)
 
     def __repr__(self):
 
