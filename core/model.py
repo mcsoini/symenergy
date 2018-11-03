@@ -452,9 +452,41 @@ class Model:
             nthreads = self.nthreads
             self.df_comb['result'] = parallelize_df(df, func, nthreads)
 
-        call_subs_tc = lambda x: self.subs_total_cost(x.result,
-                                                      x.variabs_multips)
-        self.df_comb['tc'] = self.df_comb.apply(call_subs_tc, axis=1)
+        # get total cost for results
+        df = list(zip(self.df_comb.result,
+                      self.df_comb.variabs_multips,
+                      self.df_comb.idx))
+        if not self.nthreads:
+            self.df_comb['tc'] = self.call_subs_tc(df)
+        else:
+            func = self.call_subs_tc
+            nthreads = self.nthreads
+            self.df_comb['tc'] = parallelize_df(df, func, nthreads)
+
+
+
+    def subs_total_cost(self, result, var_mlt_slct, idx):
+        '''
+        Substitutes solution into TC variables.
+        This expresses the total cost as a function of the parameters.
+        '''
+
+        if not idx % 1:
+            print(idx)
+
+        dict_var = {var: list(result)[0][ivar]
+                    if not isinstance(result, sp.sets.EmptySet)
+                    else np.nan for ivar, var
+                    in enumerate(var_mlt_slct)}
+
+        return self.tc.copy().subs(dict_var)
+
+
+    def call_subs_tc(self, df):
+
+        print('Calling call_subs_tc on list with length %d'%len(df))
+        return [self.subs_total_cost(res, var, idx) for res, var, idx in df]
+
 
     def combine_constraint_names(self, df):
 
@@ -747,18 +779,6 @@ class Model:
 
         return [list_res_new]
 
-    def subs_total_cost(self, result, var_mlt_slct):
-        '''
-        Substitutes solution into TC variables.
-        This expresses the total cost as a function of the parameters.
-        '''
-
-        dict_var = {var: list(result)[0][ivar]
-                    if not isinstance(result, sp.sets.EmptySet)
-                    else np.nan for ivar, var
-                    in enumerate(var_mlt_slct)}
-
-        return self.tc.copy().subs(dict_var)
 
     def __repr__(self):
 
