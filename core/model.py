@@ -372,27 +372,6 @@ class Model:
         self.multips.update({cstr.mlt: slot
                              for cstr, slot in self.cstr_supply.items()})
 
-    def construct_lagrange(self, row):
-
-        slct_constr = row.loc[self.constrs_cols_neq].to_dict()
-
-        lagrange = self.tc
-        lagrange += sum([cstr.expr for cstr in self.cstr_supply])
-        lagrange += sum([cstr.expr for cstr in self.constrs
-                         if cstr.is_equality_constraint])
-
-
-        constr, is_active = list(slct_constr.items())[0]
-        for col, is_active in slct_constr.items():
-
-            if is_active:
-
-                cstr = self.constrs_dict[col]
-
-                lagrange += cstr.expr
-
-        return lagrange
-
 
     def get_variabs_multips_slct(self, lagrange):
         '''
@@ -488,6 +467,28 @@ class Model:
         return df
 
 
+    def construct_lagrange(self, row):
+
+        if not row.name % 1000:
+            print(row.name)
+
+        slct_constr = row.loc[self.constrs_cols_neq].to_dict()
+
+        lagrange = self.tc
+        lagrange += sum([cstr.expr for cstr in self.cstr_supply])
+        lagrange += sum([cstr.expr for cstr in self.constrs
+                         if cstr.is_equality_constraint])
+
+        constr, is_active = list(slct_constr.items())[0]
+        for col, is_active in slct_constr.items():
+
+            if is_active:
+
+                cstr = self.constrs_dict[col]
+
+                lagrange += cstr.expr
+
+        return lagrange
     def define_problems(self):
         '''
         For each combination of constraints, get the lagrangian
