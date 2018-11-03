@@ -531,14 +531,9 @@ class Model:
 
 
         print('Getting selected variables/multipliers...')
-#        if not self.nthreads:
         df = self.list_lagrange
         self.list_variabs_multips = self.call_get_variabs_multips_slct(df)
-#        else:
-#            df = self.list_lagrange
-#            func = self.call_get_variabs_multips_slct
-#            nthreads = self.nthreads
-#            self.list_variabs_multips = parallelize_df(df, func, nthreads)
+        self.df_comb['variabs_multips'] = self.list_variabs_multips
 
         # get index for reporting
         self.df_comb = self.df_comb[[c for c in self.df_comb.columns
