@@ -6,7 +6,7 @@ Contains the auxiliary functions.
 Part of symenergy. Copyright 2018 authors listed in AUTHORS.
 """
 
-#import multiprocessing
+import multiprocessing
 import numpy
 import pandas as pd
 import itertools
@@ -21,9 +21,9 @@ def parallelize_df(df, func, nthreads, use_pathos=True, **kwargs):
     if use_pathos:
         pool = Pool(nthreads)
         results = pool.map(func, df_split, **kwargs)
-#    else:
-#        pool = multiprocessing.Pool(nthreads)
-#        results = pool.map(func, df_split)
+    else:
+        pool = multiprocessing.Pool(nthreads)
+        results = pool.map(func, df_split)
     pool.close()
     pool.join()
     pool.clear()
