@@ -466,24 +466,6 @@ class Model:
             nthreads = self.nthreads
             self.df_comb['result'] = parallelize_df(df, func, nthreads)
 
-        # drop empty solutions
-        non_empty = lambda x: not isinstance(x, sp.EmptySet)
-        mask_non_empty = self.df_comb.result.apply(non_empty)
-        self.df_comb = self.df_comb.loc[mask_non_empty]
-
-        # get total cost for results
-        df = list(zip(self.df_comb.result,
-                      self.df_comb.variabs_multips,
-                      self.df_comb.idx))
-        if not self.nthreads:
-            self.df_comb['tc'] = self.call_subs_tc(df)
-        else:
-            func = self.call_subs_tc
-            nthreads = self.nthreads
-            self.df_comb['tc'] = parallelize_df(df, func, nthreads)
-
-
-
     def subs_total_cost(self, result, var_mlt_slct, idx):
         '''
         Substitutes solution into TC variables.
