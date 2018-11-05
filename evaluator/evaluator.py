@@ -297,7 +297,6 @@ class Evaluator(plotting.EvPlotting):
         df = pd.merge(self.df_x_vals.assign(key=1),
                       df_lam_plot.assign(key=1), on='key')
 
-        df['lambd'] = self._evaluate(df)
 
 
     def call_evaluate_by_x(self, df_x, df_lam):
@@ -325,7 +324,15 @@ class Evaluator(plotting.EvPlotting):
                                                       'const_comb',
                                                       'lambd_func']]
 
-        df_lam_plot = self._init_constraints_active(df_lam_plot)
+        df_lam_plot['lambd_func_hash'] = \
+                df_lam_plot.lambd_func.apply(lambda x: 'func_%d'%abs(hash(x)))
+        if len(df_lam_plot.lambd_func.unique()) != len(df_lam_plot):
+            raise RuntimeError('lambd_func_hash has non-unique values.')
+
+
+        funcs = (df_lam_plot[['lambd_func_hash', 'lambd_func']]
+                            .apply(tuple, axis=1).tolist())
+        self.lambd_container = LambdContainer(funcs)
 
         dfg = self.df_x_vals.groupby(level=0, as_index=False)
 
