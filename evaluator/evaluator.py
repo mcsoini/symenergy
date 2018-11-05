@@ -248,9 +248,8 @@ class Evaluator(plotting.EvPlotting):
         Returns expanded data for all rows in the input dataframe.
         '''
 
-        if __name__ == '__main__':
-            x = df[['func', 'const_comb', 'lambd_func'] + self.x_name].iloc[0]
 
+#        def process(x, report=None):
 
         def process(x):
             return getattr(self.lambd_container,
@@ -276,13 +275,11 @@ class Evaluator(plotting.EvPlotting):
     def evaluate_by_x(self, x, df):
         print(x)
 
-        # add x val columns
+        print('x', x)
         for col in self.x_name:
             df[col] = x[col]
 
-        df['lambd'] = self._evaluate(df)
 
-        mask_valid = self._get_mask_valid_solutions(df)
         df = df.join(mask_valid, on=mask_valid.index.names)
 
         df['is_optimum'] = self.init_cost_optimum(df)
@@ -290,17 +287,6 @@ class Evaluator(plotting.EvPlotting):
         if self.drop_non_optimum == True:
             df = df.loc[df.is_optimum]
 
-        if self.to_sql:
-            aql.write_sql(df[['func',
-                             'const_comb',
-                             'is_positive',
-                             'lambd',
-                             'mask_valid',
-                             'is_optimum',
-                             'vre_scale',
-                             'vc1_g'] + self.x_name], 'storage2', sc='public', tb='test_evaluator', if_exists='append')
-        else:
-            return df
 
     def evaluate_all(self):
 
