@@ -313,8 +313,21 @@ class Evaluator(plotting.EvPlotting):
         df['lambd'] = self._evaluate(df)
 
 
-    def expand_to_x_vals(self, by_x_vals=True):
+    def call_evaluate_by_x(self, df_x, df_lam):
+
+        eval_x = lambda x: self.evaluate_by_x(x, df_lam)
+
+        if __name__ == '__main__':
             x = df_x.iloc[0]
+            df = df_lam
+            eval_x(x)
+
+        result = self.df_x_vals.apply(eval_x, axis=1)
+
+
+        return result
+
+    def expand_to_x_vals(self):
         '''
         Applies evaluate_by_x to all df_x_vals rows.
             * by_x_vals -- if True: expand x_vals for all const_combs/func
@@ -329,20 +342,22 @@ class Evaluator(plotting.EvPlotting):
 
         dfg = self.df_x_vals.groupby(level=0, as_index=False)
 
-        if __name__ == '__main__':
-            x = dfg.get_group(list(dfg.groups.keys())[0])
-            df = df_lam_plot.copy()
+#        if __name__ == '__main__':
+#            x = dfg.get_group(list(dfg.groups.keys())[0])
+#            df = df_lam_plot.copy()
+#
 
-#        class lambd_container:
-#
-#            def __init__(self, df):
-#
-#                for lambd in df.lambd:
-#                    setattr(self, 'lambd_%d'%lambd.__hash__(), lambd)
-#        lambd_cont = lambd_container(df)
-#
-#        len([f for f in lambd_cont.__dict__.keys() if 'lambd_' in f])
-#
+        df_x = self.df_x_vals
+        df_lam = df_lam_plot
+        if not self.nthreads:
+            df_exp_0 = self.call_evaluate_by_x(df_x, df_lam)
+        else:
+            func = self.call_evaluate_by_x
+            nthreads = self.nthreads
+            df_exp_0 = parallelize_df(df_x, func, nthreads, df_lam=df_lam)
+
+
+
 
         if not self.to_sql:
             df_exp_0 = pd.concat(df_exp_0.tolist())
