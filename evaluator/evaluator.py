@@ -347,14 +347,12 @@ class Evaluator(plotting.EvPlotting):
         if not self.to_sql:
             df_exp_0 = pd.concat(df_exp_0.tolist())
 
-        df_exp_0 = dfg.apply(lambda x: self.evaluate_by_x(x,
-                                                          df_lam_plot.copy()))
-        df_exp_0 = df_exp_0.reset_index(drop=True)
+            df_exp_0 = df_exp_0.reset_index(drop=True)
 
-        self.df_exp = df_exp_0
+            self.df_exp = df_exp_0
 
-        self.const_comb_opt = (self.df_exp.loc[self.df_exp.is_optimum,
-                                               'const_comb'].unique().tolist())
+            self.const_comb_opt = (self.df_exp.loc[self.df_exp.is_optimum,
+                                                   'const_comb'].unique().tolist())
 
 
 
