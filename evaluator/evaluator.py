@@ -269,7 +269,6 @@ class Evaluator(plotting.EvPlotting):
 
         mask_valid = self._get_mask_valid_solutions(df)
         df = df.join(mask_valid, on=mask_valid.index.names)
-        df.loc[df.mask_valid == 0, 'lambd'] = np.nan
 
         df['is_optimum'] = self.init_cost_optimum(df)
 
@@ -544,7 +543,7 @@ class Evaluator(plotting.EvPlotting):
     def init_cost_optimum(self, df):
         ''' Adds cost optimum column to the expanded dataframe. '''
 
-        tc = df.loc[df.func == 'tc_lam_plot'].copy()
+        tc = df.loc[(df.func == 'tc_lam_plot') & df.mask_valid].copy()
 
         tc_min = (tc.groupby(self.x_name, as_index=0)
                     .apply(lambda x: x.nsmallest(1, 'lambd')))
