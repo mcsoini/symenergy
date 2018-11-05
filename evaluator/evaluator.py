@@ -18,6 +18,20 @@ import grimsel.auxiliary.aux_sql_func as aql
 
 from symenergy.auxiliary.parallelization import parallelize_df
 
+import types
+import functools
+
+class LambdContainer():
+
+    def __init__(self, funcs):
+        '''
+        Input arguments:
+            * funcs -- lists of tuples (name, function)
+        '''
+        for func_name, func in funcs:
+            setattr(self, func_name, func)
+
+
 class Evaluator(plotting.EvPlotting):
     '''
     Evaluates model results for selected
@@ -238,8 +252,9 @@ class Evaluator(plotting.EvPlotting):
             x = df[['func', 'const_comb', 'lambd_func'] + self.x_name].iloc[0]
 
 
-        def process(x, report=None):
-            return x.lambd_func(*x.loc[self.x_name])
+        def process(x):
+            return getattr(self.lambd_container,
+                           x.lambd_func_hash)(*x.loc[self.x_name])
 
         return df.apply(process, axis=1)
 
