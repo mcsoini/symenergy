@@ -279,17 +279,53 @@ class Evaluator(plotting.EvPlotting):
             df[col] = x[col]
 
 
-        df = df.join(mask_valid, on=mask_valid.index.names)
+        if self.drop_non_optimum:
 
-        df['is_optimum'] = self.init_cost_optimum(df)
+            # evaluate total cost
+            df_tc = df.loc[df.func == 'tc_lam_plot'].copy()
+            df_tc['lambd'] = self._evaluate(df.loc[df.func == 'tc_lam_plot'])
+            # drop nan
+            df_tc = df_tc.loc[-df_tc.lambd.isnull()]
+            # sort lowest to highest
+            df_tc = df_tc.sort_values('lambd', ascending=True)
 
-        if self.drop_non_optimum == True:
-            df = df.loc[df.is_optimum]
+            for ind, row in df_tc.iterrows():
 
+                df_cc = df.loc[(df.const_comb == row.const_comb)
+                             & (df.func != 'tc_lam_plot')].copy()
 
+                df_cc['lambd'] = self._evaluate(df_cc)
 
+                mask_valid = self._get_mask_valid_solutions(df_cc)
 
+                if mask_valid.mask_valid.iloc[0]:
+                    # we found the optimum
+                    df_tc_slct = df_tc.loc[df_tc.const_comb == row.const_comb]
+                    df_result = pd.concat([df_cc, df_tc_slct],
+                                          axis=0, sort=False)
+                    df_result['mask_valid'] = True
+                    df_result['is_optimum'] = True
+                    break
+                else:
+                    pass
 
+        else:
+
+            df_result = df.copy()
+            df_result['lambd'] = self._evaluate(df_result)
+            mask_valid = self._get_mask_valid_solutions(df_result)
+            df_result = df_result.join(mask_valid, on=mask_valid.index.names)
+            df_result['is_optimum'] = self.init_cost_optimum(df_result)
+            df_result = df_result.loc[df_result.is_optimum]
+
+        if self.to_sql:
+            cols = ['func', 'const_comb', 'is_positive', 'lambd',
+                    'mask_valid', 'is_optimum', 'vre_scale',
+                    'vc1_g'] + self.x_name
+            aql.write_sql(df_result[cols], 'storage2', sc='public',
+                          tb='test_evaluator', if_exists='append')
+        else:
+            return df_result
 
 
     def call_evaluate_by_x(self, df_x, df_lam):
@@ -327,12 +363,9 @@ class Evaluator(plotting.EvPlotting):
                             .apply(tuple, axis=1).tolist())
         self.lambd_container = LambdContainer(funcs)
 
-        dfg = self.df_x_vals.groupby(level=0, as_index=False)
 
-#        if __name__ == '__main__':
-#            x = dfg.get_group(list(dfg.groups.keys())[0])
-#            df = df_lam_plot.copy()
-#
+        df_lam_plot = self._init_constraints_active(df_lam_plot)
+
 
         df_x = self.df_x_vals
         df_lam = df_lam_plot
