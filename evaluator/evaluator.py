@@ -14,6 +14,8 @@ import time
 import multiprocessing
 
 import symenergy.evaluator.plotting as plotting
+import grimsel.auxiliary.aux_sql_func as aql
+
 from symenergy.auxiliary.parallelization import parallelize_df
 
 class Evaluator(plotting.EvPlotting):
@@ -22,7 +24,7 @@ class Evaluator(plotting.EvPlotting):
     '''
 
     def __init__(self, model, x_vals, drop_non_optimum=True,
-                 eval_accuracy=1e-9):
+                 eval_accuracy=1e-9, nthreads=None, to_sql=False):
         '''
         Keyword arguments:
             * model -- symenergy model
@@ -33,6 +35,8 @@ class Evaluator(plotting.EvPlotting):
         '''
 
         self.model = model
+
+        self.to_sql = to_sql
 
         self.drop_non_optimum = drop_non_optimum
 
@@ -253,10 +257,19 @@ class Evaluator(plotting.EvPlotting):
 #        return df.apply(process, args=(report,), axis=1)
 
 
+    def init_schema(self):
 
+        cols = [('func', 'VARCHAR'),
+                ('const_comb', 'VARCHAR'),
+                ('is_positive', 'SMALLINT'),
+                ('lambd', 'DOUBLE PRECISION'),
+                ('mask_valid', 'BOOLEAN'),
+                ('is_optimum', 'BOOLEAN'),
+                ] + [(x, 'DOUBLE PRECISION') for x in self.x_name]
+
+        aql.init_table('test_evaluator', cols, db='storage2')
 
     def evaluate_by_x(self, x, df):
-        t = time.time()
         print(x)
 
         # add x val columns
@@ -276,7 +289,17 @@ class Evaluator(plotting.EvPlotting):
 
         print(time.time() - t)
 
-        return df
+        if self.to_sql:
+            aql.write_sql(df[['func',
+                             'const_comb',
+                             'is_positive',
+                             'lambd',
+                             'mask_valid',
+                             'is_optimum',
+                             'vre_scale',
+                             'vc1_g'] + self.x_name], 'storage2', sc='public', tb='test_evaluator', if_exists='append')
+        else:
+            return df
 
     def evaluate_all(self):
 
@@ -291,6 +314,7 @@ class Evaluator(plotting.EvPlotting):
 
 
     def expand_to_x_vals(self, by_x_vals=True):
+            x = df_x.iloc[0]
         '''
         Applies evaluate_by_x to all df_x_vals rows.
             * by_x_vals -- if True: expand x_vals for all const_combs/func
@@ -298,7 +322,8 @@ class Evaluator(plotting.EvPlotting):
         '''
 
         df_lam_plot = self.df_lam_plot.reset_index()[['func',
-                                                      'const_comb', 'lambd']]
+                                                      'const_comb',
+                                                      'lambd_func']]
 
         df_lam_plot = self._init_constraints_active(df_lam_plot)
 
@@ -319,6 +344,8 @@ class Evaluator(plotting.EvPlotting):
 #        len([f for f in lambd_cont.__dict__.keys() if 'lambd_' in f])
 #
 
+        if not self.to_sql:
+            df_exp_0 = pd.concat(df_exp_0.tolist())
 
         df_exp_0 = dfg.apply(lambda x: self.evaluate_by_x(x,
                                                           df_lam_plot.copy()))
