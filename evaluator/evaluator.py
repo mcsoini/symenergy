@@ -143,7 +143,7 @@ class Evaluator(plotting.EvPlotting):
 
 
         col_names = {'level_%d'%(len(self.model.constrs_cols_neq) + 1): 'func',
-                     0: 'lambd'}
+                     0: 'lambd_func'}
         df_lam_plot = (df_lam_plot.stack().reset_index()
                                   .rename(columns=col_names))
         df_lam_plot = (df_lam_plot.reset_index(drop=True)
@@ -234,7 +234,7 @@ class Evaluator(plotting.EvPlotting):
         '''
 
         if __name__ == '__main__':
-            x = df[['func', 'const_comb', 'lambd'] + self.x_name].iloc[0]
+            x = df[['func', 'const_comb', 'lambd_func'] + self.x_name].iloc[0]
 
         import time
 
@@ -248,9 +248,7 @@ class Evaluator(plotting.EvPlotting):
                 tm['t'] = time.time()
 
         def process(x, report=None):
-#            if report:
-#                report(x, x.name)
-            return x.lambd(*x.loc[self.x_name])
+            return x.lambd_func(*x.loc[self.x_name])
 
         return df.apply(process, axis=1)
 
@@ -303,9 +301,9 @@ class Evaluator(plotting.EvPlotting):
 
     def evaluate_all(self):
 
-
         df_lam_plot = self.df_lam_plot.reset_index()[['func',
-                                                      'const_comb', 'lambd']]
+                                                      'const_comb',
+                                                      'lambd_func']]
 
         df = pd.merge(self.df_x_vals.assign(key=1),
                       df_lam_plot.assign(key=1), on='key')
