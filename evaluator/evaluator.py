@@ -237,16 +237,6 @@ class Evaluator(plotting.EvPlotting):
         if __name__ == '__main__':
             x = df[['func', 'const_comb', 'lambd_func'] + self.x_name].iloc[0]
 
-        import time
-
-        tm = {}
-        tm['t'] = time.time()
-
-        def report(tok, index):
-            if index % 10000 == 0:
-
-                print(index / len(df) * 100, time.time() - tm['t'])
-                tm['t'] = time.time()
 
         def process(x, report=None):
             return x.lambd_func(*x.loc[self.x_name])
@@ -285,8 +275,6 @@ class Evaluator(plotting.EvPlotting):
 
         if self.drop_non_optimum == True:
             df = df.loc[df.is_optimum]
-
-        print(time.time() - t)
 
         if self.to_sql:
             aql.write_sql(df[['func',
