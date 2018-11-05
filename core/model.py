@@ -190,9 +190,28 @@ class Model:
 
             self.filter_invalid_solutions()
 
+            self.generate_total_costs()
+
             self.fix_stored_energy()
 
             self.df_comb.to_pickle(self.pickle_fn)
+
+
+    def generate_total_costs(self):
+        '''
+        Substitute result variable expressions into total costs
+
+
+        '''
+        df = list(zip(self.df_comb.result,
+                      self.df_comb.variabs_multips,
+                      self.df_comb.idx))
+        if not self.nthreads:
+            self.df_comb['tc'] = self.call_subs_tc(df)
+        else:
+            func = self.call_subs_tc
+            nthreads = self.nthreads
+            self.df_comb['tc'] = parallelize_df(df, func, nthreads)
 
 
 
