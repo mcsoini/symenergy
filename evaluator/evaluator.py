@@ -287,14 +287,8 @@ class Evaluator(plotting.EvPlotting):
             df = df.loc[df.is_optimum]
 
 
-    def evaluate_all(self):
 
-        df_lam_plot = self.df_lam_plot.reset_index()[['func',
-                                                      'const_comb',
-                                                      'lambd_func']]
 
-        df = pd.merge(self.df_x_vals.assign(key=1),
-                      df_lam_plot.assign(key=1), on='key')
 
 
 
@@ -546,6 +540,18 @@ class Evaluator(plotting.EvPlotting):
         self.df_exp = self.df_exp.join(mask_valid, on=mask_valid.index.names)
 
         self.df_exp.loc[self.df_exp.mask_valid == 0, 'lambd'] = np.nan
+
+    def evaluate_all(self):
+
+        df_lam_plot = self.df_lam_plot.reset_index()[['func',
+                                                      'const_comb',
+                                                      'lambd_func']]
+
+        df = pd.merge(self.df_x_vals.assign(key=1),
+                      df_lam_plot.assign(key=1), on='key')
+
+        df['lambd'] = self._evaluate(df)
+
 
     def init_cost_optimum(self, df):
         ''' Adds cost optimum column to the expanded dataframe. '''
