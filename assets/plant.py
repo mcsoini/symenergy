@@ -33,7 +33,8 @@ class Plant(asset.Asset):
 
     VARIABS_POSITIVE = ['p', 'C_ret', 'C_add']
 
-    def __init__(self, name, vc0, vc1, fcom=None, slots=None, capacity=False, cap_ret=False):
+    def __init__(self, name, vc0, vc1=None,
+                 fcom=None, slots=None, capacity=False, cap_ret=False):
 
         '''
         Params:
@@ -61,9 +62,7 @@ class Plant(asset.Asset):
         self.init_cstr_positive('p')
 
         if fcom:
-
             self.fcom = Parameter('fcom_%s'%self.name, noneslot, fcom)
-
 
         if cap_ret:
             # needs to be initialized before init_cstr_capacity('C')!
@@ -87,8 +86,11 @@ class Plant(asset.Asset):
         Set constant and linear components of variable costs.
         '''
 
-        self.vc = {slot: self.vc0.symb + self.vc1.symb * self.p[slot]
-                   for slot in self.slots.values()}
+        if self.vc1.value:
+            self.vc = {slot: self.vc0.symb + self.vc1.symb * self.p[slot]
+                       for slot in self.slots.values()}
+        else:
+            self.vc = {slot: self.vc0.symb for slot in self.slots.values()}
 
         self.cc = sum(sp.integrate(vc, self.p[slot])
                          for slot, vc in self.vc.items())
