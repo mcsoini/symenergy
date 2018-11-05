@@ -247,17 +247,14 @@ class Evaluator(plotting.EvPlotting):
         Returns expanded data for all rows in the input dataframe.
         '''
 
-
 #        def process(x, report=None):
+#            return x.lambd_func(*x.loc[self.x_name])
 
         def process(x):
             return getattr(self.lambd_container,
                            x.lambd_func_hash)(*x.loc[self.x_name])
 
         return df.apply(process, axis=1)
-
-#        return df.apply(process, args=(report,), axis=1)
-
 
     def init_schema(self):
 
@@ -335,7 +332,6 @@ class Evaluator(plotting.EvPlotting):
         if __name__ == '__main__':
             x = df_x.iloc[0]
             df = df_lam
-            eval_x(x)
 
         result = self.df_x_vals.apply(eval_x, axis=1)
 
@@ -348,6 +344,7 @@ class Evaluator(plotting.EvPlotting):
             * by_x_vals -- if True: expand x_vals for all const_combs/func
                            if False: expand const_combs/func for all x_vals
         '''
+
 
         df_lam_plot = self.df_lam_plot.reset_index()[['func',
                                                       'const_comb',
@@ -375,9 +372,6 @@ class Evaluator(plotting.EvPlotting):
             func = self.call_evaluate_by_x
             nthreads = self.nthreads
             df_exp_0 = parallelize_df(df_x, func, nthreads, df_lam=df_lam)
-
-
-
 
         if not self.to_sql:
             df_exp_0 = pd.concat(df_exp_0.tolist())
@@ -437,8 +431,6 @@ class Evaluator(plotting.EvPlotting):
 
 #            C, pp = dict_cap[0]
             for C, pp in dict_cap:
-
-                print('Valid capacity constraint %s, %s'%(C.name, pp))
 
                 slct_func = ['%s_lam_plot'%symb.name for symb in pp]
 
