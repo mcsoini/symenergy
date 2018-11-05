@@ -162,10 +162,9 @@ class Evaluator(plotting.EvPlotting):
         df_lam_plot = (df_lam_plot.stack().reset_index()
                                   .rename(columns=col_names))
         df_lam_plot = (df_lam_plot.reset_index(drop=True)
-                                  .reset_index()
-                                  .rename(columns={'index': 'idx'}))
+                                  .reset_index())
         df_lam_plot = df_lam_plot.set_index(self.model.constrs_cols_neq
-                                            + ['const_comb', 'func', 'idx'])
+                                            + ['const_comb', 'func'])
 
         self.df_lam_plot = df_lam_plot
 
