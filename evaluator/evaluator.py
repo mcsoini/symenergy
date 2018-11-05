@@ -36,6 +36,7 @@ class Evaluator(plotting.EvPlotting):
 
         self.model = model
 
+        self.nthreads = nthreads
         self.to_sql = to_sql
 
         self.drop_non_optimum = drop_non_optimum
@@ -272,7 +273,7 @@ class Evaluator(plotting.EvPlotting):
 
         # add x val columns
         for col in self.x_name:
-            df[col] = x[col].values[0]
+            df[col] = x[col]
 
         df['lambd'] = self._evaluate(df)
 
