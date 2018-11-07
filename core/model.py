@@ -423,6 +423,16 @@ class Model:
         return [ss for ss in lfs if ss in self.variabs or ss in self.multips]
 
 
+
+    def print_row(self, index, matrix_dim):
+
+        matrix_dim = 'Matrix %s'%'x'.join(map(str, matrix_dim))
+
+        strg = 'Constr. comb. %d out of %d: %s.'%(index, self.n_comb,
+                                                     matrix_dim)
+
+        print(strg)
+
     def solve(self, lagrange, variabs_multips_slct, index):
 
         if not index % 1000:
@@ -439,14 +449,6 @@ class Model:
 
         return None if isinstance(solution, sp.sets.EmptySet) else solution
 
-    def print_row(self, index, matrix_dim):
-
-        matrix_dim = 'Matrix %s'%'x'.join(map(str, matrix_dim))
-
-        strg = 'Constr. comb. %d out of %d: %s.'%(index, self.n_comb,
-                                                     matrix_dim)
-
-        print(strg)
 
     def call_solve_df(self, df):
         ''' Applies to dataframe. '''
@@ -459,6 +461,8 @@ class Model:
         df = list(zip(self.list_lagrange,
                       self.list_variabs_multips,
                       self.df_comb.idx))
+
+
         if not self.nthreads:
             self.df_comb['result'] = self.call_solve_df(df)
         else:
@@ -539,17 +543,13 @@ class Model:
 
         print('Defining lagrangians...')
         if not self.nthreads:
-            t = time.time()
             df = self.df_comb[self.constrs_cols_neq]
             self.list_lagrange = self.call_construct_lagrange(df)
-            print(time.time() - t)
         else:
-            t = time.time()
             df = self.df_comb[self.constrs_cols_neq]
             func = self.call_construct_lagrange
             nthreads = self.nthreads
             self.list_lagrange = parallelize_df(df, func, nthreads)
-            print(time.time() - t)
 
 
         print('Getting selected variables/multipliers...')
