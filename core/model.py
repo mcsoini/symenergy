@@ -58,6 +58,7 @@ class Model:
             self.init_supply_constraints()
             self.init_total_param_values()
             self.get_variabs_params()
+            self.init_total_cost()
 
             self.init_supply_constraints()
 
@@ -97,7 +98,6 @@ class Model:
     def add_plant(self, name, *args, **kwargs):
 
         self.plants.update({name: Plant(name, **kwargs)})
-        self.init_total_cost()
 
     @update_component_list
     def add_slot(self, name, *args, **kwargs):
