@@ -23,6 +23,9 @@ from symenergy.core.slot import Slot, noneslot
 from symenergy.core.parameter import Parameter
 from symenergy.auxiliary.parallelization import parallelize_df
 
+if __name__ == '__main__':
+    sys.exit()
+
 class Model:
 
     def __init__(self, nthreads=None, curtailment=False):
@@ -120,6 +123,11 @@ class Model:
     def init_total_cost(self):
 
         self.tc = sum(p.cc for p in self.plants.values())
+        self.lagrange_0 = (self.tc
+                           + sum([cstr.expr for cstr in self.cstr_supply]))
+        self.lagrange_0 += sum([cstr.expr for cstr in self.constrs
+                                if cstr.is_equality_constraint])
+
 
     def init_supply_constraints(self):
         '''
@@ -507,21 +515,11 @@ class Model:
         if not row.name % 1000:
             print(row.name)
 
-        slct_constr = row.loc[self.constrs_cols_neq].to_dict()
+        lagrange = self.lagrange_0
 
-        lagrange = self.tc
-        lagrange += sum([cstr.expr for cstr in self.cstr_supply])
-        lagrange += sum([cstr.expr for cstr in self.constrs
-                         if cstr.is_equality_constraint])
-
-        constr, is_active = list(slct_constr.items())[0]
-        for col, is_active in slct_constr.items():
-
-            if is_active:
-
-                cstr = self.constrs_dict[col]
-
-                lagrange += cstr.expr
+        active_cstrs = row[row == 1].index.values
+        lagrange += sum(self.constrs_dict[cstr_name].expr
+                        for cstr_name in active_cstrs)
 
         return lagrange
 
