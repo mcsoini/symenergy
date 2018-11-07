@@ -15,7 +15,7 @@ from pathos.multiprocessing import ProcessingPool as Pool
 
 def parallelize_df(df, func, nthreads, use_pathos=True, **kwargs):
     nthreads = min(nthreads, len(df))
-    nchunks = min(nthreads * 4, len(df))
+    nchunks = min(nthreads * 2, len(df))
 
     df_split = numpy.array_split(df, nchunks)
     if use_pathos:
