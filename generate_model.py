@@ -17,7 +17,7 @@ reload(model)
 
 def get_model(solve=True, nthreads=7):
 
-    m = model.Model(curtailment=True, nthreads=nthreads)
+    m = model.Model(curtailment=False, nthreads=nthreads)
 
     self = m
 
