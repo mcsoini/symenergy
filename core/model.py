@@ -429,6 +429,8 @@ class Model:
             slct_index = 20
             lagrange = self.df_comb.iloc[slct_index].lagrange
             variabs_multips_slct = self.df_comb.iloc[slct_index].variabs_multips
+        if not index % 1000:
+            print(index, self.n_comb)
 
         mat = sp.tensor.array.derive_by_array(lagrange, variabs_multips_slct)
         mat = sp.Matrix(mat).expand()
