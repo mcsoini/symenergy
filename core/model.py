@@ -425,10 +425,6 @@ class Model:
 
     def solve(self, lagrange, variabs_multips_slct, index):
 
-        if __name__ == '__main__':
-            slct_index = 20
-            lagrange = self.df_comb.iloc[slct_index].lagrange
-            variabs_multips_slct = self.df_comb.iloc[slct_index].variabs_multips
         if not index % 1000:
             print(index, self.n_comb)
 
