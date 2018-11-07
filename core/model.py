@@ -456,6 +456,22 @@ class Model:
         print('Calling call_solve_df on list with length %d'%len(df))
         return [self.solve(lag, var, idx) for lag, var, idx in df]
 
+
+    def get_matrix(self, lagrange, variabs_multips_slct):
+
+        mat = sp.tensor.array.derive_by_array(lagrange, variabs_multips_slct)
+        mat = sp.Matrix(mat).expand()
+
+        A, b = sp.linear_eq_to_matrix(mat, variabs_multips_slct)
+
+        return A
+
+    def call_get_matrix_df(self, df):
+
+        print('Calling call_get_matrix_df on list with length %d'%len(df))
+        return [self.get_matrix(lag, var, idx) for lag, var, idx in df]
+
+
     def solve_all(self):
 
         df = list(zip(self.list_lagrange,
