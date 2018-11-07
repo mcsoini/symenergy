@@ -419,10 +419,8 @@ class Model:
         '''
 
         lfs = lagrange.free_symbols
-        variabs_slct = [ss for ss in lfs if ss in self.variabs.keys()]
-        multips_slct = [ss for ss in lfs if ss in self.multips.keys()]
+        return [ss for ss in lfs if ss in self.variabs or ss in self.multips]
 
-        return variabs_slct + multips_slct
 
     def solve(self, lagrange, variabs_multips_slct, index):
 
