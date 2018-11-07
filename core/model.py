@@ -474,8 +474,8 @@ class Model:
 
     def solve_all(self):
 
-        df = list(zip(self.list_lagrange,
-                      self.list_variabs_multips,
+        df = list(zip(self.df_comb.lagrange,
+                      self.df_comb.variabs_multips,
                       self.df_comb.idx))
 
 
@@ -560,16 +560,17 @@ class Model:
         print('Defining lagrangians...')
         if not self.nthreads:
             df = self.df_comb[self.constrs_cols_neq]
-            self.list_lagrange = self.call_construct_lagrange(df)
+            self.df_comb['lagrange'] = self.call_construct_lagrange(df)
         else:
             df = self.df_comb[self.constrs_cols_neq]
             func = self.call_construct_lagrange
             nthreads = self.nthreads
-            self.list_lagrange = parallelize_df(df, func, nthreads)
+            self.df_comb['lagrange'] = parallelize_df(df, func, nthreads)
+
 
 
         print('Getting selected variables/multipliers...')
-        df = self.list_lagrange
+        df = self.df_comb.lagrange
         self.list_variabs_multips = self.call_get_variabs_multips_slct(df)
         self.df_comb['variabs_multips'] = self.list_variabs_multips
 
