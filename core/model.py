@@ -435,7 +435,7 @@ class Model:
 
         A, b = sp.linear_eq_to_matrix(mat, variabs_multips_slct)
 
-        self.print_row(index, (A.rows, A.cols))
+#        self.print_row(index, (A.rows, A.cols))
 
         solution = sp.linsolve((A, b), variabs_multips_slct)
 
