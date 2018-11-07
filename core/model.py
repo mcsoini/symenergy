@@ -440,7 +440,7 @@ class Model:
 
         solution = sp.linsolve((A, b), variabs_multips_slct)
 
-        return solution
+        return None if isinstance(solution, sp.sets.EmptySet) else solution
 
     def print_row(self, index, matrix_dim):
 
@@ -580,8 +580,7 @@ class Model:
         Infeasible solutions are empty.
         '''
 
-        check_emptyset = lambda res: isinstance(res, sp.sets.EmptySet)
-        mask_empty = self.df_comb.result.apply(check_emptyset)
+        mask_empty = self.df_comb.result.isnull()
 
         return mask_empty
 
