@@ -7,9 +7,10 @@ Created on Fri Oct 19 14:33:36 2018
 """
 
 import symenergy.core.model as model
+from symenergy.auxiliary.parallelization import parallelize_df
 from importlib import reload
 
-
+nthreads=7
 reload(model)
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -27,7 +28,6 @@ def get_model(solve=True, nthreads=7):
                 fcom=10,
                 cap_ret=True
                 )
-    m.add_plant(name='c', vc0=1, vc1=1, slots=m.slots)
     m.add_plant(name='g', vc0=2, vc1=0, slots=m.slots)
 
     m.add_storage(name='phs',
@@ -45,12 +45,9 @@ def get_model(solve=True, nthreads=7):
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-def get_model_three():
+def get_model_three(solve=True, nthreads=7):
 
-    import time
-
-    t = time.time()
-    m_three = model.Model(curtailment=False, nthreads=7)
+    m_three = model.Model(curtailment=False, nthreads=nthreads)
 
     self = m_three
 
@@ -76,9 +73,8 @@ def get_model_three():
                                  'night': 'dch'
                                  })
 
-    m_three.generate_solve()
-
-    print('Time: ', time.time() - t)
+    if solve:
+        m_three.generate_solve()
 
     return m_three
 
