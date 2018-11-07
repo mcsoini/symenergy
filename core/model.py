@@ -194,6 +194,8 @@ class Model:
 
             self.delete_cached()
 
+            self.define_problems()
+
             self.solve_all()
 
             self.filter_invalid_solutions()
@@ -400,7 +402,6 @@ class Model:
         self.multips.update({cstr.mlt: slot
                              for cstr, slot in self.cstr_supply.items()})
 
-
     def get_variabs_multips_slct(self, lagrange):
         '''
         Returns all relevant variables and multipliers for this model.
@@ -449,18 +450,13 @@ class Model:
 
         print(strg)
 
-
     def call_solve_df(self, df):
         ''' Applies to dataframe. '''
 
         print('Calling call_solve_df on list with length %d'%len(df))
         return [self.solve(lag, var, idx) for lag, var, idx in df]
 
-
-
     def solve_all(self):
-
-        self.define_problems()
 
         df = list(zip(self.list_lagrange,
                       self.list_variabs_multips,
@@ -507,7 +503,6 @@ class Model:
 
         return df
 
-
     def construct_lagrange(self, row):
 
         if not row.name % 1000:
@@ -531,12 +526,12 @@ class Model:
         return df.apply(self.construct_lagrange, axis=1).tolist()
 
 
+
     def call_get_variabs_multips_slct(self, df):
 
         print('Calling get_variabs_multips_slct on DataFrame with length %d'%len(df))
-#        return df.apply()
-        return list(map(self.get_variabs_multips_slct, df))
 
+        return list(map(self.get_variabs_multips_slct, df))
 
     def define_problems(self):
         '''
