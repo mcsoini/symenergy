@@ -47,7 +47,7 @@ def get_model(solve=True, nthreads=7):
 
 def get_model_three(solve=True, nthreads=7):
 
-    m_three = model.Model(curtailment=False, nthreads=nthreads)
+    m_three = model.Model(curtailment=True, nthreads=nthreads)
 
     self = m_three
 
