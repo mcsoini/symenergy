@@ -184,6 +184,7 @@ class Model:
 
         if os.path.isfile(self.pickle_fn):
 
+            print('Loading from pickle file %s.'%self.pickle_fn)
             self.df_comb = pd.read_pickle(self.pickle_fn)
 
         else:
@@ -680,7 +681,10 @@ class Model:
         '''
         Returns a unique hashed model name based on the constraint names.
         '''
-        m_name = '_'.join([cstr.base_name for cstr in self.constrs])
+
+        list_cstrs = [cstr.base_name for cstr in self.constrs]
+        list_cstrs.sort()
+        m_name = '_'.join(list_cstrs)
 
         m_name = hashlib.md5(m_name.encode('utf-8')).hexdigest()[:12].upper()
 
