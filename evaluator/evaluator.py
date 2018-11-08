@@ -33,7 +33,7 @@ class Evaluator(plotting.EvPlotting):
     Evaluates model results for selected
     '''
 
-    def __init__(self, model, x_vals, drop_non_optimum=True,
+    def __init__(self, model, x_vals, drop_non_optimum=False,
                  eval_accuracy=1e-9, nthreads=None, to_sql=False):
         '''
         Keyword arguments:
