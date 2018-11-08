@@ -648,3 +648,54 @@ class Evaluator(plotting.EvPlotting):
 
         self.df_exp['slot'] = self.df_exp['func'].replace(slot_map)
         self.df_exp['func_no_slot'] = self.df_exp['func'].replace(func_map)
+
+
+
+    def map_func_to_slot_sql(self):
+
+        print('map_func_to_slot')
+
+        tb = self.sql_params['sql_table']
+        sc = self.sql_params['sql_schema']
+        db = self.sql_params['sql_db']
+
+        func_list = aql.read_sql(db, sc, tb, keep=['func'], distinct=True)
+        func_list = func_list['func'].tolist()
+
+        slot_name_list = list(self.model.slots.keys())
+
+        slot_map = {func: '+'.join([ss for ss in slot_name_list
+                                    if ss in func])
+                    for func in func_list}
+
+        func_map = {func: func.replace('_None', '').replace(slot + '_lam_plot', '')
+                    for func, slot in slot_map.items()}
+        func_map = {func: func_new[:-1] if func_new.endswith('_') else func_new
+                    for func, func_new in func_map.items()}
+
+
+        slot_map = {func: slot if not slot == '' else 'global'
+                    for func, slot in slot_map.items()}
+
+
+        all_map = ', '.join([str((func, slot_map[func], func_map[func])) for func in slot_map])
+
+        exec_strg = '''
+        ALTER TABLE {sql_schema}.{sql_table}
+        ADD COLUMN IF NOT EXISTS slot VARCHAR,
+        ADD COLUMN IF NOT EXISTS func_no_slot VARCHAR;
+        '''.format(**self.sql_params)
+        aql.exec_sql(exec_strg, db=db)
+
+        exec_strg = '''
+        UPDATE {sql_schema}.{sql_table} AS tb
+        SET func_no_slot = map.func_no_slot,
+            slot = map.slot
+        FROM (
+            WITH temp (func, slot, func_no_slot) AS (VALUES {all_map})
+            SELECT * FROM temp
+        ) AS map
+        WHERE tb.func = map.func
+        '''.format(**self.sql_params, all_map=all_map)
+        aql.exec_sql(exec_strg, db=db)
+
