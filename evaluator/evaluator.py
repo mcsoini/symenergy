@@ -207,8 +207,6 @@ class Evaluator(plotting.EvPlotting):
             func = list(x.result)[0][idx]
 
             return func
-        else:
-            return np.nan
 
     def _subs_param_values(self, x):
         '''
