@@ -272,6 +272,8 @@ class Evaluator(plotting.EvPlotting):
 
     def evaluate_by_x(self, x, df):
 
+        t = time.time()
+
         print('x', x)
         for col in self.x_name:
             df[col] = x[col]
@@ -287,7 +289,7 @@ class Evaluator(plotting.EvPlotting):
             df_tc = df_tc.sort_values('lambd', ascending=True)
 
             for ind, row in df_tc.iterrows():
-
+                print(ind)
                 df_cc = df.loc[(df.const_comb == row.const_comb)
                              & (df.func != 'tc_lam_plot')].copy()
 
@@ -320,7 +322,10 @@ class Evaluator(plotting.EvPlotting):
                     'vc1_g'] + self.x_name
             aql.write_sql(df_result[cols], 'storage2', sc='public',
                           tb='test_evaluator', if_exists='append')
+            print(time.time() - t)
+            return None
         else:
+            print(time.time() - t)
             return df_result
 
 
