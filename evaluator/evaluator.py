@@ -545,7 +545,7 @@ class Evaluator(plotting.EvPlotting):
         pars = [getattr(slot, var) for var in par_add
                for slot in self.model.slots.values() if hasattr(slot, var)]
 
-        df_bal_add = pd.DataFrame(df_bal[self.x_name].drop_duplicates())
+        df_bal_add = pd.DataFrame(df_bal[self.x_name + ['const_comb']].drop_duplicates())
         for par in pars:
             df_bal_add[par.name] = par.value
 
@@ -575,6 +575,94 @@ class Evaluator(plotting.EvPlotting):
         df_bal.loc[df_bal.func.isin(varpar_neg), 'lambd'] *= -1
 
         self.df_bal = df_bal
+
+    def build_supply_table_sql(self, df=None):
+        '''
+        Generates a table representing the supply constraint for easy plotting.
+        '''
+
+        db = self.sql_params['sql_db']
+
+        exec_strg = '''
+        INSERT INTO {sql_schema}.{sql_table}_supply ({cols})
+        SELECT {cols}
+        FROM {sql_schema}.{sql_table}
+        WHERE is_optimum = True
+            AND NOT (func LIKE 'tc%' or func LIKE 'pi_%' OR func LIKE 'lb_%');
+        '''.format(**self.sql_params, cols=self.cols_tb_supply)
+        aql.exec_sql(exec_strg, db=db)
+
+        # add parameters
+        par_add = ['l', 'vre']
+        pars = [getattr(slot, var) for var in par_add
+               for slot in self.model.slots.values() if hasattr(slot, var)]
+
+        for par in pars:
+
+            par_name = par.name
+            slot_name = par.slot.name
+            par_name_no_slot = par_name.replace('_' + slot_name, '')
+            par_val = par.value
+
+            exec_strg = '''
+            WITH tb_raw AS (
+              SELECT DISTINCT const_comb, {cols_x}
+              FROM {sql_schema}.{sql_table}_supply
+            )
+            INSERT INTO {sql_schema}.{sql_table}_supply ({cols})
+            SELECT
+                '{par_name}'::VARCHAR AS func,
+                const_comb,
+                '{par_name_no_slot}'::VARCHAR AS func_no_slot,
+                '{slot_name}'::VARCHAR AS slot,
+                {par_val}::DOUBLE PRECISION AS lambd, {cols_x}
+            FROM tb_raw
+            '''.format(**self.sql_params,
+                       cols=self.cols_tb_supply,
+                       cols_x = ', '.join('"%s"'%x for x in self.x_name),
+                       par_name=par_name,
+                       par_val=par_val,
+                       par_name_no_slot=par_name_no_slot,
+                       slot_name=slot_name)
+            aql.exec_sql(exec_strg, db=db)
+
+        # if ev.select_x == m.scale_vre: join to df_bal and adjust all vre
+        if self.model.vre_scale in self.x_vals:
+            exec_strg = '''
+            UPDATE {sql_schema}.{sql_table}_supply
+            SET lambd = lambd * vre_scale
+            WHERE func LIKE '%vre%';
+            '''.format(**self.sql_params)
+            aql.exec_sql(exec_strg, db=db)
+
+
+
+
+
+        funcs_neg = []
+        # add load all slots
+        funcs_neg += [slot.l.name for slot in self.model.slots.values()]
+        # add curtailment
+        funcs_neg += [p.name for slot, p in self.model.curt.p.items()]
+        # add charging
+        funcs_neg += [p.name for store in self.model.storages.values()
+                      for slot, p in store.p.items()
+                      if store.slots_map[slot.name] == 'chg']
+
+        funcs_neg = ' OR func LIKE '.join("'{}%'".format(ff)
+                                          for ff in funcs_neg)
+
+        exec_strg = '''
+        UPDATE {sql_schema}.{sql_table}_supply
+        SET lambd = lambd * -1
+        WHERE func LIKE {funcs_neg};
+        '''.format(**self.sql_params, funcs_neg=funcs_neg)
+        aql.exec_sql(exec_strg, db=db)
+
+
+        self.df_bal = aql.read_sql(self.sql_params['sql_db'],
+                                   self.sql_params['sql_schema'],
+                                   self.sql_params['sql_table'])
 
     def enforce_constraints(self):
         '''
