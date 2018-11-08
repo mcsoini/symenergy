@@ -134,3 +134,25 @@ def get_model_simple(solve=True, nthreads=7):
 
     return m_simple
 
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+def get_model_multi_ret(solve=True, nthreads=7):
+
+    m = model.Model(curtailment=False, nthreads=nthreads)
+
+    m.add_slot(name='day', load=4.5, vre=3)
+
+    m.add_plant(name='n', vc0=1, vc1=None, slots=m.slots, capacity=3,
+                fcom=10,
+                cap_ret=True
+                )
+    m.add_plant(name='c', vc0=1, vc1=0, slots=m.slots, capacity=3,
+                fcom=10,
+                cap_ret=True
+                )
+    m.add_plant(name='g', vc0=2, vc1=0, slots=m.slots)
+
+    if solve:
+        m.generate_solve()
+
+    return m
