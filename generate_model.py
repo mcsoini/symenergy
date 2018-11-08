@@ -156,3 +156,14 @@ def get_model_multi_ret(solve=True, nthreads=7):
         m.generate_solve()
 
     return m
+
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+def generate_all(nthreads):
+
+    get_model_multi_ret(True, nthreads)
+    get_model_simple(True, nthreads)
+    get_model_three_curt(True, nthreads)
+    get_model_three(True, nthreads)
+    get_model_lin(True, nthreads)
+    get_model(True, nthreads)
