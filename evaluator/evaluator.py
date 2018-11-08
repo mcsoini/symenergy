@@ -479,9 +479,9 @@ class Evaluator(plotting.EvPlotting):
                                      * (1 - self.eval_accuracy)
                                      <= val_cap.loc[mask_slct_func])
 
-#                # delete temporary columns:
-#                df = df[[c for c in df.columns
-#                                        if not c in ['_C_ret', '_C_add']]]
+                # delete temporary columns:
+                df = df[[c for c in df.columns
+                                        if not c in ['_C_ret', '_C_add']]]
 
                 mask_valid &= constraint_met
 
