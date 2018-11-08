@@ -278,6 +278,17 @@ class Evaluator(plotting.EvPlotting):
 
         aql.init_table(tb, self.sql_cols, sc, db=db)
 
+        self.sql_cols = [('func', 'VARCHAR'),
+                         ('const_comb', 'VARCHAR'),
+                         ('func_no_slot', 'VARCHAR'),
+                         ('slot', 'VARCHAR'),
+                         ('lambd', 'DOUBLE PRECISION'),
+                         ] + [('"%s"'%x, 'DOUBLE PRECISION')
+                              for x in self.x_name]
+
+        self.cols_tb_supply = aql.init_table('%s_supply'%tb,
+                                             self.sql_cols, sc, db=db)
+
     def evaluate_by_x(self, x, df):
 
         t = time.time()
