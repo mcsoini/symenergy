@@ -266,7 +266,7 @@ class Evaluator(plotting.EvPlotting):
                 ('lambd', 'DOUBLE PRECISION'),
                 ('mask_valid', 'BOOLEAN'),
                 ('is_optimum', 'BOOLEAN'),
-                ] + [(x, 'DOUBLE PRECISION') for x in self.x_name]
+                ] + [('"%s"'%x, 'DOUBLE PRECISION') for x in self.x_name]
 
         aql.init_table('test_evaluator', cols, db='storage2')
 
