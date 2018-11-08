@@ -10,8 +10,9 @@ import multiprocessing
 import numpy
 import pandas as pd
 import itertools
-
-from pathos.multiprocessing import ProcessingPool as Pool
+try:
+    from pathos.multiprocessing import ProcessingPool as Pool
+except Exception as e: print(e)
 
 def parallelize_df(df, func, nthreads, use_pathos=True, **kwargs):
     nthreads = min(nthreads, len(df))
