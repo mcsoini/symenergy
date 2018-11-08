@@ -227,23 +227,23 @@ class Evaluator(plotting.EvPlotting):
             return x_ret
 
 
-    def _get_expanded_row(self, lam_plot, x_vals):
-        '''
-        Apply single lambda function/row to the self.x_vals.
-
-        Input parameters:
-            * lam_plot -- Single row of the self.df_lam_plot dataframe.
-
-        Return values:
-            * Series with y values
-        '''
-
-        y_vals = [lam_plot.iloc[0](*val_row) for val_row in x_vals]
-
-        if isinstance(y_vals, float):
-            y_vals = np.ones(len(x_vals)) * y_vals
-
-        return pd.Series(y_vals, index=pd.Index(x_vals))
+#    def _get_expanded_row(self, lam_plot, x_vals):
+#        '''
+#        Apply single lambda function/row to the self.x_vals.
+#
+#        Input parameters:
+#            * lam_plot -- Single row of the self.df_lam_plot dataframe.
+#
+#        Return values:
+#            * Series with y values
+#        '''
+#
+#        y_vals = [lam_plot.iloc[0](*val_row) for val_row in x_vals]
+#
+#        if isinstance(y_vals, float):
+#            y_vals = np.ones(len(x_vals)) * y_vals
+#
+#        return pd.Series(y_vals, index=pd.Index(x_vals))
 
     def _evaluate(self, df):
         '''
