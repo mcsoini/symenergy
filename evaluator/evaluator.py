@@ -77,6 +77,15 @@ class Evaluator(plotting.EvPlotting):
 
         self.df_x_vals = self.get_x_vals_combs()
 
+    @property
+    def df_x_vals(self):
+        return self._df_x_vals
+
+    @df_x_vals.setter
+    def df_x_vals(self, df_x_vals):
+        self._df_x_vals = df_x_vals.reset_index(drop=True)
+
+
     def get_x_val_steps(self):
         '''
         Assumes constant step size.
