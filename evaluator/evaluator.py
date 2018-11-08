@@ -34,7 +34,7 @@ class Evaluator(plotting.EvPlotting):
     '''
 
     def __init__(self, model, x_vals, drop_non_optimum=False,
-                 eval_accuracy=1e-9, nthreads=None, to_sql=False):
+                 eval_accuracy=1e-9, nthreads=None, sql_params=None):
         '''
         Keyword arguments:
             * model -- symenergy model
@@ -47,7 +47,7 @@ class Evaluator(plotting.EvPlotting):
         self.model = model
 
         self.nthreads = nthreads
-        self.to_sql = to_sql
+        self.sql_params = sql_params
 
         self.drop_non_optimum = drop_non_optimum
 
@@ -64,6 +64,8 @@ class Evaluator(plotting.EvPlotting):
 
         print('param_values=', self.model.param_values)
 
+        if sql_params:
+            self.init_table()
 
     @property
     def x_vals(self):
@@ -139,10 +141,9 @@ class Evaluator(plotting.EvPlotting):
                        if not isinstance(slct_eq_0, str)
                        else slct_eq_0)
 
-            # function idx depends on constraint, since not all constraints
-            # contain the same functions
             if slct_eq != 'tc':
-
+                # function idx depends on constraint, since not all constraints
+                # contain the same functions
                 get_func = lambda x: self._get_func_from_idx(x, slct_eq)
                 self.dfev[slct_eq] = self.dfev.apply(get_func, axis=1)
 
@@ -258,7 +259,13 @@ class Evaluator(plotting.EvPlotting):
 
         return df.apply(process, axis=1)
 
-    def init_schema(self):
+    def init_table(self):
+
+        sc = self.sql_params['sql_schema']
+        db = self.sql_params['sql_db']
+        tb = self.sql_params['sql_table']
+
+        aql.exec_sql('CREATE SCHEMA IF NOT EXISTS %s'%(sc), db=db)
 
         cols = [('func', 'VARCHAR'),
                 ('const_comb', 'VARCHAR'),
@@ -268,7 +275,7 @@ class Evaluator(plotting.EvPlotting):
                 ('is_optimum', 'BOOLEAN'),
                 ] + [('"%s"'%x, 'DOUBLE PRECISION') for x in self.x_name]
 
-        aql.init_table('test_evaluator', cols, db='storage2')
+        aql.init_table(tb, cols, sc, db=db)
 
     def evaluate_by_x(self, x, df):
 
@@ -316,12 +323,15 @@ class Evaluator(plotting.EvPlotting):
             df_result['is_optimum'] = self.init_cost_optimum(df_result)
             df_result = df_result.loc[df_result.is_optimum]
 
-        if self.to_sql:
+        if self.sql_params:
+            sc = self.sql_params['sql_schema']
+            db = self.sql_params['sql_db']
+            tb = self.sql_params['sql_table']
             cols = ['func', 'const_comb', 'is_positive', 'lambd',
                     'mask_valid', 'is_optimum', 'vre_scale',
                     'vc1_g'] + self.x_name
-            aql.write_sql(df_result[cols], 'storage2', sc='public',
-                          tb='test_evaluator', if_exists='append')
+            aql.write_sql(df_result[cols], db, sc=sc,
+                          tb=tb, if_exists='append')
             print(time.time() - t)
             return None
         else:
