@@ -267,15 +267,16 @@ class Evaluator(plotting.EvPlotting):
 
         aql.exec_sql('CREATE SCHEMA IF NOT EXISTS %s'%(sc), db=db)
 
-        cols = [('func', 'VARCHAR'),
-                ('const_comb', 'VARCHAR'),
-                ('is_positive', 'SMALLINT'),
-                ('lambd', 'DOUBLE PRECISION'),
-                ('mask_valid', 'BOOLEAN'),
-                ('is_optimum', 'BOOLEAN'),
-                ] + [('"%s"'%x, 'DOUBLE PRECISION') for x in self.x_name]
+        self.sql_cols = [('func', 'VARCHAR'),
+                         ('const_comb', 'VARCHAR'),
+                         ('is_positive', 'SMALLINT'),
+                         ('lambd', 'DOUBLE PRECISION'),
+                         ('mask_valid', 'BOOLEAN'),
+                         ('is_optimum', 'BOOLEAN'),
+                         ] + [('"%s"'%x, 'DOUBLE PRECISION')
+                              for x in self.x_name]
 
-        aql.init_table(tb, cols, sc, db=db)
+        aql.init_table(tb, self.sql_cols, sc, db=db)
 
     def evaluate_by_x(self, x, df):
 
@@ -327,9 +328,8 @@ class Evaluator(plotting.EvPlotting):
             sc = self.sql_params['sql_schema']
             db = self.sql_params['sql_db']
             tb = self.sql_params['sql_table']
-            cols = ['func', 'const_comb', 'is_positive', 'lambd',
-                    'mask_valid', 'is_optimum', 'vre_scale',
-                    'vc1_g'] + self.x_name
+            cols = [col[0].replace('"', '') for col in self.sql_cols]
+
             aql.write_sql(df_result[cols], db, sc=sc,
                           tb=tb, if_exists='append')
             print(time.time() - t)
@@ -387,7 +387,7 @@ class Evaluator(plotting.EvPlotting):
             nthreads = self.nthreads
             df_exp_0 = parallelize_df(df_x, func, nthreads, df_lam=df_lam)
 
-        if not self.to_sql:
+        if not self.sql_params:
             df_exp_0 = pd.concat(df_exp_0.tolist())
 
             df_exp_0 = df_exp_0.reset_index(drop=True)
