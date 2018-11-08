@@ -251,9 +251,10 @@ class Evaluator(plotting.EvPlotting):
         '''
 
 
-        def process(x):
-            return getattr(self.lambd_container,
-                           x.lambd_func_hash)(*x.loc[self.x_name])
+        x_dict = df.iloc[0].loc[self.x_name].to_dict()
+
+        def process(x, report=None):
+            return x.lambd_func(**x_dict)
 
         return df.apply(process, axis=1)
 
@@ -306,8 +307,7 @@ class Evaluator(plotting.EvPlotting):
                     pass
 
         else:
-
-            df_result = df.copy()
+            df_result = df
             df_result['lambd'] = self._evaluate(df_result)
             mask_valid = self._get_mask_valid_solutions(df_result)
             df_result = df_result.join(mask_valid, on=mask_valid.index.names)
