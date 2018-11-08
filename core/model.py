@@ -684,7 +684,14 @@ class Model:
 
         list_cstrs = [cstr.base_name for cstr in self.constrs]
         list_cstrs.sort()
-        m_name = '_'.join(list_cstrs)
+        list_param = [par.name for par in self.params]
+        list_param.sort()
+        list_cstrs = [par.name for par in self.variabs]
+        list_cstrs.sort()
+        list_multips = [par.name for par in self.multips]
+        list_multips.sort()
+
+        m_name = '_'.join(list_cstrs + list_param + list_cstrs + list_multips)
 
         m_name = hashlib.md5(m_name.encode('utf-8')).hexdigest()[:12].upper()
 
