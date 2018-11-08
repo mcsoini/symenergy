@@ -11,15 +11,11 @@ import numpy as np
 import pandas as pd
 import itertools
 import time
-import multiprocessing
 
 import symenergy.evaluator.plotting as plotting
 import grimsel.auxiliary.aux_sql_func as aql
 
 from symenergy.auxiliary.parallelization import parallelize_df
-
-import types
-import functools
 
 class LambdContainer():
 
@@ -247,8 +243,6 @@ class Evaluator(plotting.EvPlotting):
         Returns expanded data for all rows in the input dataframe.
         '''
 
-#        def process(x, report=None):
-#            return x.lambd_func(*x.loc[self.x_name])
 
         def process(x):
             return getattr(self.lambd_container,
@@ -269,12 +263,10 @@ class Evaluator(plotting.EvPlotting):
         aql.init_table('test_evaluator', cols, db='storage2')
 
     def evaluate_by_x(self, x, df):
-        print(x)
 
         print('x', x)
         for col in self.x_name:
             df[col] = x[col]
-
 
         if self.drop_non_optimum:
 
@@ -436,7 +428,8 @@ class Evaluator(plotting.EvPlotting):
 
                 mask_slct_func = df.func.isin(slct_func)
 
-                # things are different depending on whether or not select_x is the corresponding capacity
+                # things are different depending on whether or not select_x
+                # is the corresponding capacity
                 if C in self.x_vals.keys():
                     val_cap = df[C.name]
                 else:
@@ -444,11 +437,11 @@ class Evaluator(plotting.EvPlotting):
 
                 # need to add retired and additional capacity
                 for addret, sign in {'add': +1, 'ret': -1}.items():
-                    func_C_addret = [variab for variab in slct_func if 'C_%s_None'%addret in variab]
+                    func_C_addret = [variab for variab in slct_func
+                                     if 'C_%s_None'%addret in variab]
                     func_C_addret = func_C_addret[0] if func_C_addret else None
                     if func_C_addret:
-                        mask_addret = (df.func.str
-                                                  .contains(func_C_addret))
+                        mask_addret = (df.func.str.contains(func_C_addret))
                         df_C = df.loc[mask_addret].copy()
                         df_C = df_C.set_index(['const_comb'] + self.x_name)['lambd'].rename('_C_%s'%addret)
                         df = df.join(df_C, on=df_C.index.names)
@@ -460,7 +453,8 @@ class Evaluator(plotting.EvPlotting):
 
                 constraint_met = pd.Series(True, index=df.index)
                 constraint_met.loc[mask_slct_func] = \
-                                    (df.loc[mask_slct_func].lambd * (1 - self.eval_accuracy)
+                                    (df.loc[mask_slct_func].lambd
+                                     * (1 - self.eval_accuracy)
                                      <= val_cap.loc[mask_slct_func])
 
 #                # delete temporary columns:
