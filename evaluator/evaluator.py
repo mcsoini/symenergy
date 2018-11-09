@@ -358,6 +358,35 @@ class Evaluator(plotting.EvPlotting):
             return df_result
 
 
+    def _get_mask_valid_solutions(self, df):
+
+
+        if __name__ == '__main__':
+            df = df_result.copy()
+        else:
+            df = df.copy() # this is important, otherwise we change the x_vals
+
+
+        mask_valid = pd.Series(True, index=df.index)
+
+        mask_positive = self._get_mask_valid_positive(df)
+        mask_valid = mask_valid & mask_positive
+
+        mask_capacity = self._get_mask_valid_capacity(df.copy())
+        mask_valid &= mask_capacity
+
+        df['mask_valid'] = mask_valid
+
+        # consolidate mask by constraint combination and x values
+        index = self.x_name + ['const_comb']
+        mask_valid = df.pivot_table(index=index,
+                                    values='mask_valid',
+                                    aggfunc=min)
+
+        return mask_valid
+
+
+
     def call_evaluate_by_x(self, df_x, df_lam):
 
         eval_x = lambda x: self.evaluate_by_x(x, df_lam)
@@ -506,29 +535,6 @@ class Evaluator(plotting.EvPlotting):
 #            self.df_exp['mv_n'] = mask_valid.copy()
 
         return mask_valid
-
-    def _get_mask_valid_solutions(self, df):
-
-        mask_valid = pd.Series(True, index=df.index)
-
-        mask_positive = self._get_mask_valid_positive(df)
-        mask_valid = mask_valid & mask_positive
-
-        mask_capacity = self._get_mask_valid_capacity(df)
-        mask_valid &= mask_capacity
-
-        df['mask_valid'] = mask_valid
-
-        # consolidate mask by constraint combination and x values
-        index = self.x_name + ['const_comb']
-        mask_valid = df.pivot_table(index=index,
-                                    values='mask_valid',
-                                    aggfunc=min)
-
-        df.drop('mask_valid', axis=1, inplace=True)
-
-        return mask_valid
-
 
     def build_supply_table(self, df=None):
         '''
