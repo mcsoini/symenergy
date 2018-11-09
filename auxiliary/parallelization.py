@@ -14,7 +14,7 @@ try:
     from pathos.multiprocessing import ProcessingPool as Pool
 except Exception as e: print(e)
 
-def parallelize_df(df, func, nthreads, use_pathos=True, **kwargs):
+def parallelize_df(df, func, nthreads, use_pathos=False, **kwargs):
     nthreads = min(nthreads, len(df))
     nchunks = min(nthreads * 2, len(df))
 
