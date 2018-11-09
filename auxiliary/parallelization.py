@@ -27,8 +27,9 @@ def parallelize_df(df, func, nthreads, use_pathos=False, **kwargs):
         results = pool.map(func, df_split)
     pool.close()
     pool.join()
-    pool.clear()
-    pool.restart()
+    if use_pathos:
+        pool.clear()
+        pool.restart()
     print('parallelize_df: concatenating', end=' ... ')
     if isinstance(results[0], (list, tuple)):
         result = list(itertools.chain.from_iterable(results))
