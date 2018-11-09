@@ -57,7 +57,8 @@ class Plant(asset.Asset):
         self.init_symbol_operation('p')
 
         self.vc0 = Parameter('vc0_%s'%self.name, noneslot, vc0)
-        self.vc1 = Parameter('vc1_%s'%self.name, noneslot, vc1)
+        if vc1:
+            self.vc1 = Parameter('vc1_%s'%self.name, noneslot, vc1)
 
         self.init_cstr_positive('p')
 
@@ -86,7 +87,7 @@ class Plant(asset.Asset):
         Set constant and linear components of variable costs.
         '''
 
-        if self.vc1.value:
+        if hasattr(self, 'vc1'):
             self.vc = {slot: self.vc0.symb + self.vc1.symb * self.p[slot]
                        for slot in self.slots.values()}
         else:
@@ -100,7 +101,7 @@ class Plant(asset.Asset):
 
             cc_fcom = self.C.symb * self.fcom.symb
 
-            if 'C_ret' in self.__dict__:
+            if hasattr(self, 'C_ret'):
                 cc_fcom -= self.C_ret[noneslot] * self.fcom.symb
 
             self.cc += cc_fcom
