@@ -724,7 +724,7 @@ class Model:
 
 
 
-    def filter_invalid_solutions(self, cache=True):
+    def filter_invalid_solutions(self, cache=False):
 
         mask_empty = self.get_mask_empty_solution()
 
@@ -753,8 +753,10 @@ class Model:
         self.df_comb['result'] = \
                 self.df_comb.apply(self.fix_linear_dependencies, axis=1)
 
-        if cache:
-            self.cache(list_infeas)
+
+        # arguably obsolete
+#        if cache:
+#            self.cache(list_infeas)
 
 
     def fix_linear_dependencies(self, x):
