@@ -50,7 +50,7 @@ class Asset(component.Component):
 
         c_name, variabs = list(self.MAP_CAPACITY.items())[0]
         for c_name, variabs in self.MAP_CAPACITY.items():
-            if c_name in self.__dict__:
+            if hasattr(self, c_name):
                 cap = getattr(self, c_name)
 
                 constr_var = []
@@ -105,7 +105,7 @@ class Asset(component.Component):
                 cap = getattr(self, capacity_name).symb
 
                 # subtract retired capacity if applicable
-                if (capacity_name + '_ret' in self.__dict__
+                if (hasattr(self, capacity_name + '_ret')
                     # ... not for retired capacity constraint
                     and not capacity_name + '_ret' == var_name):
                     cap -= getattr(self, capacity_name + '_ret')[noneslot]
