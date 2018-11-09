@@ -11,6 +11,7 @@ from symenergy.auxiliary.parallelization import parallelize_df
 from importlib import reload
 
 nthreads=7
+solve=True
 reload(model)
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
