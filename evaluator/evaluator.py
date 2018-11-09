@@ -151,7 +151,8 @@ class Evaluator(plotting.EvPlotting):
                         self.dfev[slct_eq].apply(self._subs_param_values)
 
             lambdify = lambda res_plot: sp.lambdify(self.x_symb, res_plot,
-                                                    modules=['numpy'])
+                                                    modules=['numpy'],
+                                                    dummify=False)
 
             self.dfev[slct_eq + '_lam_plot'] = (
                             self.dfev['%s_expr_plot'%slct_eq].apply(lambdify))
