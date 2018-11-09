@@ -702,16 +702,22 @@ class Evaluator(plotting.EvPlotting):
 
         tc = df.loc[(df.func == 'tc_lam_plot') & df.mask_valid].copy()
 
-        tc_min = (tc.groupby(self.x_name, as_index=0)
-                    .apply(lambda x: x.nsmallest(1, 'lambd')))
+        if not tc.empty:
 
-        tc_min['is_optimum'] = True
-        tc_min = tc_min.set_index(['const_comb'] + self.x_name)
+            tc_min = (tc.groupby(self.x_name, as_index=0)
+                        .apply(lambda x: x.nsmallest(1, 'lambd')))
 
-        df = df[[c for c in df.columns if not c == 'is_optimum']]
-        df = df.join(tc_min['is_optimum'], on=tc_min.index.names)
+            tc_min['is_optimum'] = True
+            tc_min = tc_min.set_index(['const_comb'] + self.x_name)
 
-        df['is_optimum'] = df.is_optimum.fillna(False)
+            df = df[[c for c in df.columns if not c == 'is_optimum']]
+            df = df.join(tc_min['is_optimum'], on=tc_min.index.names)
+
+            df['is_optimum'] = df.is_optimum.fillna(False)
+
+        else:
+
+            df['is_optimum'] = False
 
         return df.is_optimum
 
