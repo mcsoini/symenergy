@@ -29,7 +29,7 @@ def get_model(solve=True, nthreads=7):
                 fcom=10,
                 cap_ret=True
                 )
-    m.add_plant(name='g', vc0=2, vc1=0, slots=m.slots)
+    m.add_plant(name='g', vc0=2, vc1=None, slots=m.slots)
 
     m.add_storage(name='phs',
                   eff=0.75,
@@ -85,15 +85,15 @@ def get_model_three(solve=True, nthreads=7):
     m_three.add_slot(name='day', load=4.5, vre=3)
     m_three.add_slot(name='night', load=5, vre=0.5)
     #
-    m_three.add_plant(name='n', vc0=1, vc1=0, slots=m_three.slots, capacity=3,
+    m_three.add_plant(name='n', vc0=1, vc1=None, slots=m_three.slots, capacity=3,
                 fcom=10,
                 cap_ret=True
                 )
-    m_three.add_plant(name='c', vc0=1, vc1=0, slots=m_three.slots, capacity=3,
+    m_three.add_plant(name='c', vc0=1, vc1=1, slots=m_three.slots, capacity=3,
                 fcom=10,
                 cap_ret=True
                 )
-    m_three.add_plant(name='g', vc0=2, vc1=0, slots=m_three.slots)
+    m_three.add_plant(name='g', vc0=2, vc1=1, slots=m_three.slots)
 
     m_three.add_storage(name='phs',
                       eff=0.75,
@@ -127,11 +127,11 @@ def get_model_three_curt(solve=True, nthreads=7):
                 fcom=10,
                 cap_ret=True
                 )
-    m_three.add_plant(name='c', vc0=1, vc1=0, slots=m_three.slots, capacity=3,
+    m_three.add_plant(name='c', vc0=1, vc1=1, slots=m_three.slots, capacity=3,
                 fcom=10,
                 cap_ret=True
                 )
-    m_three.add_plant(name='g', vc0=2, vc1=0, slots=m_three.slots)
+    m_three.add_plant(name='g', vc0=2, vc1=1, slots=m_three.slots)
 
     m_three.add_storage(name='phs',
                       eff=0.75,
@@ -157,8 +157,8 @@ def get_model_simple(solve=True, nthreads=7):
 
     m_simple.add_slot(name='day', load=4.5, vre=3)
 
-    m_simple.add_plant(name='n', vc0=1, vc1=0, slots=m_simple.slots, capacity=3)
-    m_simple.add_plant(name='g', vc0=2, vc1=0, slots=m_simple.slots)
+    m_simple.add_plant(name='n', vc0=1, vc1=None, slots=m_simple.slots, capacity=3)
+    m_simple.add_plant(name='g', vc0=2, vc1=None, slots=m_simple.slots)
 
     if solve:
         m_simple.generate_solve()
@@ -177,11 +177,11 @@ def get_model_multi_ret(solve=True, nthreads=7):
                 fcom=10,
                 cap_ret=True
                 )
-    m.add_plant(name='c', vc0=1, vc1=0, slots=m.slots, capacity=3,
+    m.add_plant(name='c', vc0=1, vc1=None, slots=m.slots, capacity=3,
                 fcom=10,
                 cap_ret=True
                 )
-    m.add_plant(name='g', vc0=2, vc1=0, slots=m.slots)
+    m.add_plant(name='g', vc0=2, vc1=None, slots=m.slots)
 
     if solve:
         m.generate_solve()
@@ -192,6 +192,7 @@ def get_model_multi_ret(solve=True, nthreads=7):
 
 def generate_all(nthreads):
 
+    get_model_multi_ret(True, nthreads)
     get_model_multi_ret(True, nthreads)
     get_model_simple(True, nthreads)
     get_model_three_curt(True, nthreads)
