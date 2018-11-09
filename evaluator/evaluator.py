@@ -297,7 +297,9 @@ class Evaluator(plotting.EvPlotting):
         self.cols_tb_supply = aql.init_table('%s_supply'%tb,
                                              self.sql_cols_supply, sc, db=db)
 
-    def evaluate_by_x(self, x, df):
+    def evaluate_by_x(self, x, df_lam):
+
+        df = df_lam.copy()
 
         t = time.time()
 
