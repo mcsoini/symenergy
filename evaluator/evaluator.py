@@ -643,7 +643,8 @@ class Evaluator(plotting.EvPlotting):
         # add load all slots
         funcs_neg += [slot.l.name for slot in self.model.slots.values()]
         # add curtailment
-        funcs_neg += [p.name for slot, p in self.model.curt.p.items()]
+        funcs_neg += [p.name for slot, p in self.model.curt.p.items()
+                      ] if hasattr(self.model, 'curt') else []
         # add charging
         funcs_neg += [p.name for store in self.model.storages.values()
                       for slot, p in store.p.items()
