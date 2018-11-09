@@ -273,8 +273,6 @@ class Model:
         return [[dict_var[str(var)] for var in x.variabs_multips]]
 
 
-
-
     def collect_component_constraints(self):
         '''
         Note: Doesn't include supply constraints, which are a model attribute.
@@ -282,7 +280,7 @@ class Model:
 
         self.constrs = {}
         for comp in self.comps.values():
-            for key, attr in comp.__dict__.items():
+            for key, attr in comp.__dict__.items(): # TODO: this is no good !!
                 if key.startswith('cstr_'):
                     for slot, cstr in attr.items():
                         self.constrs[cstr] = comp

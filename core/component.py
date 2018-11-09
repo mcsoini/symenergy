@@ -67,7 +67,7 @@ class Component():
 
         return [vv
                 for var in self.VARIABS + self.VARIABS_TIME
-                if var in self.__dict__.keys()
+                if hasattr(self, var)
                 for vv in getattr(self, var).values()]
 
 
