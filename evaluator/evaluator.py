@@ -62,10 +62,16 @@ class Evaluator(plotting.EvPlotting):
 
         self.df_x_vals = self.get_x_vals_combs()
 
+
+        if self.sql_params and 'warn_existing_tables' in self.sql_params:
+            warn_existing_tables = self.sql_params['warn_existing_tables']
+        else:
+            warn_existing_tables = True
+
         print('param_values=', self.model.param_values)
 
         if sql_params:
-            self.init_table()
+            self.init_table(warn_existing_tables)
 
     @property
     def x_vals(self):
@@ -260,7 +266,7 @@ class Evaluator(plotting.EvPlotting):
 
         return df.apply(process, axis=1)
 
-    def init_table(self):
+    def init_table(self, warn_existing_tables):
 
         sc = self.sql_params['sql_schema']
         db = self.sql_params['sql_db']
@@ -277,7 +283,8 @@ class Evaluator(plotting.EvPlotting):
                          ] + [('"%s"'%x, 'DOUBLE PRECISION')
                               for x in self.x_name]
 
-        aql.init_table(tb, self.sql_cols, sc, db=db, warn_if_exists=True)
+        aql.init_table(tb, self.sql_cols, sc, db=db,
+                       warn_if_exists=warn_existing_tables)
 
         self.sql_cols_supply = [('func', 'VARCHAR'),
                          ('const_comb', 'VARCHAR'),
@@ -329,7 +336,7 @@ class Evaluator(plotting.EvPlotting):
                     pass
 
         else:
-            df_result = df
+            df_result = df.copy()
             df_result['lambd'] = self._evaluate(df_result)
             mask_valid = self._get_mask_valid_solutions(df_result)
             df_result = df_result.join(mask_valid, on=mask_valid.index.names)
@@ -357,7 +364,6 @@ class Evaluator(plotting.EvPlotting):
 
         if __name__ == '__main__':
             x = df_x.iloc[0]
-            df = df_lam
 
         result = self.df_x_vals.apply(eval_x, axis=1)
 
