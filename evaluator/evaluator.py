@@ -581,6 +581,8 @@ class Evaluator(plotting.EvPlotting):
         Generates a table representing the supply constraint for easy plotting.
         '''
 
+        self.map_func_to_slot_sql()
+
         db = self.sql_params['sql_db']
 
         exec_strg = '''
