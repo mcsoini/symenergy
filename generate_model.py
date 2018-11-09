@@ -54,11 +54,11 @@ def get_model_lin(solve=True, nthreads=7):
     m.add_slot(name='day', load=4.5, vre=3)
     m.add_slot(name='night', load=5, vre=0.5)
 
-    m.add_plant(name='n', vc0=1, vc1=1, slots=m.slots, capacity=3,
+    m.add_plant(name='n', vc0=1, vc1=None, slots=m.slots, capacity=3,
                 fcom=10,
                 cap_ret=True
                 )
-    m.add_plant(name='g', vc0=2, vc1=0, slots=m.slots)
+    m.add_plant(name='g', vc0=2, vc1=1, slots=m.slots)
 
     m.add_storage(name='phs',
                   eff=0.75,
