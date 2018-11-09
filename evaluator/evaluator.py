@@ -276,7 +276,7 @@ class Evaluator(plotting.EvPlotting):
                          ] + [('"%s"'%x, 'DOUBLE PRECISION')
                               for x in self.x_name]
 
-        aql.init_table(tb, self.sql_cols, sc, db=db)
+        aql.init_table(tb, self.sql_cols, sc, db=db, warn_if_exists=True)
 
         self.sql_cols = [('func', 'VARCHAR'),
                          ('const_comb', 'VARCHAR'),
