@@ -98,7 +98,8 @@ class Asset(component.Component):
                 base_name = '%s_%s_cap_%s_%s'%(self.name, var_name,
                                                capacity_name, str(slot.name))
 
-                cstr = Constraint(base_name=base_name, slot=slot)
+                cstr = Constraint(base_name=base_name, slot=slot,
+                                  var_name=str(getattr(self, var_name)[slot]))
 
                 # define expression
                 var = getattr(self, var_name)[slot]
@@ -133,7 +134,8 @@ class Asset(component.Component):
 
             base_name = '%s_pos_%s_%s'%(self.name, variable, str(slot.name))
 
-            cstr = Constraint(base_name=base_name, slot=slot)
+            cstr = Constraint(base_name=base_name, slot=slot,
+                              var_name=str(getattr(self, variable)[slot]))
 
             var = getattr(self, variable)[slot]
             cstr.expr = cstr.mlt * var

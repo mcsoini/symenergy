@@ -19,16 +19,19 @@ class Constraint():
     '''
 
     def __init__(self, base_name, slot, multiplier_name='lb',
-                 is_equality_constraint=False):
+                 is_equality_constraint=False, var_name=None):
         '''
         Arguments:
             * base_name -- string
+            * var_name -- string; the name of the variable the constraint
+                          applies to, if applicable
         '''
 
         self.slot = slot
         self.is_equality_constraint = is_equality_constraint
         self.base_name = base_name
         self.multiplier_name = multiplier_name
+        self.var_name = var_name
 
         self.init_shadow_price()
         self.init_column_name()
