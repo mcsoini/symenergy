@@ -234,3 +234,12 @@ def generate_all(nthreads):
     get_model_lin(True, nthreads)
     get_model(True, nthreads)
     get_model_weights(True, nthreads)
+
+
+def generate_all_small(nthreads):
+
+    get_model_weights(True, nthreads)
+    get_model_lin(True, nthreads)
+    get_model(True, nthreads)
+    get_model_multi_ret(True, nthreads)
+    get_model_simple(True, nthreads)
