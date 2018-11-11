@@ -20,7 +20,7 @@ class Component():
         param_objs = \
                 [getattr(self, param_name)
                  for param_name in self.PARAMS_TIME + self.PARAMS
-                 if param_name in self.__dict__.keys()]
+                 if hasattr(self, param_name)]
 
         if len(attr) == 1:
             return [getattr(par, attr[0])
@@ -41,8 +41,7 @@ class Component():
         return tuple(var
                      for cap_name, var_names in self.MAP_CAPACITY.items()
                      for var_name in var_names
-                     if var_name in self.__dict__.keys()
-                         and cap_name in self.__dict__.keys()
+                     if hasattr(self, var_name) and hasattr(self, cap_name)
                      for slot, var in getattr(self, var_name).items())
 
     def get_is_positive(self):
@@ -52,7 +51,7 @@ class Component():
 
         return tuple(var
                      for var_name in self.VARIABS_POSITIVE
-                     if var_name in self.__dict__.keys()
+                     if hasattr(self, var_name)
                      for slot, var in getattr(self, var_name).items())
 
     def get_mutually_exclusive_cstrs(self):
