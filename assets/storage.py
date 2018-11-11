@@ -98,14 +98,17 @@ class Storage(asset.Asset):
         cstr_pwrerg = Constraint(name, slot=noneslot,
                                  is_equality_constraint=True)
 
-        expr = (sum(p for _, p in self.get_chgdch('chg').items())
+        expr = (sum(p * (slot.weight if slot.weight else 1)
+                    for slot, p in self.get_chgdch('chg').items())
                     * self.eff.symb
-                    - sum(p for _, p in self.get_chgdch('dch').items()))
+                    - sum(p * (slot.weight if slot.weight else 1)
+                          for slot, p in self.get_chgdch('dch').items()))
         cstr_store.expr = expr * cstr_store.mlt
         self.cstr_store = {noneslot: cstr_store}
 
         # power to energy
-        expr = (sum(p for _, p in self.get_chgdch('chg').items())
+        expr = (sum(p * (slot.weight if slot.weight else 1)
+                    for slot, p in self.get_chgdch('chg').items())
                 * self.eff.symb**(1/2)
                 - self.e[noneslot])
         cstr_pwrerg.expr = expr * cstr_pwrerg.mlt

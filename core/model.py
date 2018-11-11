@@ -264,6 +264,8 @@ class Model:
 
         for store in self.storages.values():
             sum_chg = sum(dict_var['%s_p_%s'%(store.name, chg_slot)]
+                          * (self.slots[chg_slot].weight
+                             if self.slots[chg_slot].weight else 1)
                           for chg_slot in
                           tuple(slot for slot, cd in store.slots_map.items()
                                 if cd == 'chg'))
@@ -662,6 +664,8 @@ class Model:
         Returns a unique hashed model name based on the constraint names.
         '''
 
+        list_slots = ['%s_%s'%(slot.name, str(slot.weight)) for slot in self.slots.values()]
+        list_slots.sort()
         list_cstrs = [cstr.base_name for cstr in self.constrs]
         list_cstrs.sort()
         list_param = [par.name for par in self.params]
@@ -671,7 +675,8 @@ class Model:
         list_multips = [par.name for par in self.multips]
         list_multips.sort()
 
-        m_name = '_'.join(list_cstrs + list_param + list_cstrs + list_multips)
+        m_name = '_'.join(list_cstrs + list_param + list_cstrs + list_multips
+                          + list_slots)
 
         m_name = hashlib.md5(m_name.encode('utf-8')).hexdigest()[:12].upper()
 

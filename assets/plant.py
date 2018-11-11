@@ -92,10 +92,15 @@ class Plant(asset.Asset):
         '''
 
         if hasattr(self, 'vc1'):
-            self.vc = {slot: self.vc0.symb + self.vc1.symb * self.p[slot]
+            self.vc = {slot:
+                       (self.vc0.symb + self.vc1.symb * self.p[slot])
+                       * (slot.weight if slot.weight else 1)
                        for slot in self.slots.values()}
         else:
-            self.vc = {slot: self.vc0.symb for slot in self.slots.values()}
+            self.vc = {slot:
+                       self.vc0.symb
+                       * (slot.weight if slot.weight else 1)
+                       for slot in self.slots.values()}
 
         self.cc = sum(sp.integrate(vc, self.p[slot])
                          for slot, vc in self.vc.items())
