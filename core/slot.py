@@ -25,6 +25,8 @@ class Slot(component.Component):
 
     MAP_CAPACITY = {}
 
+    MUTUALLY_EXCLUSIVE = []
+
     def __init__(self, name, load, vre):
 
         self.name = name

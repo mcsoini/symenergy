@@ -33,6 +33,10 @@ class Plant(asset.Asset):
 
     VARIABS_POSITIVE = ['p', 'C_ret', 'C_add']
 
+    # mutually exclusive constraint combinations
+    MUTUALLY_EXCLUSIVE = [('pos_C_ret', 'C_ret_cap_C'),
+                          ('pos_p', 'p_cap_C')]
+
     def __init__(self, name, vc0, vc1=None,
                  fcom=None, slots=None, capacity=False, cap_ret=False):
 

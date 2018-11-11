@@ -27,6 +27,10 @@ class Storage(asset.Asset):
 
     VARIABS_POSITIVE = ['p', 'e', 'C_ret', 'C_add']
 
+    MUTUALLY_EXCLUSIVE = [('pos_C_ret', 'C_ret_cap_C'),
+                          ('pos_p', 'p_cap_C'),
+                          ('pos_e', 'e_cap_E')]
+
     def __init__(self, name, eff, slots_map=None, slots=None,
                  capacity=False, energy_capacity=False):
 

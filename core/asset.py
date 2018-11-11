@@ -73,7 +73,7 @@ class Asset(component.Component):
         than the initially installed capacity.
         '''
 
-        if not capacity_name in self.MAP_CAPACITY.keys():
+        if not capacity_name in self.MAP_CAPACITY:
             raise UnexpectedSymbolError(capacity_name)
 
 

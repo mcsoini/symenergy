@@ -55,6 +55,29 @@ class Component():
                      if var_name in self.__dict__.keys()
                      for slot, var in getattr(self, var_name).items())
 
+    def get_mutually_exclusive_cstrs(self):
+        '''
+        This expands the pairs from the MUTUALLY_EXCLUSIVE class attribute
+        to all constraint columns.
+        '''
+
+        dict_cstrs = {key: attr for key, attr in self.__dict__.items() # TODO: this is no good !!
+                      if key.startswith('cstr_')}
+
+        mutually_exclusive = [(cstr1, cstr2) for cstr1, cstr2 in self.MUTUALLY_EXCLUSIVE
+                              if 'cstr_%s'%cstr1 in dict_cstrs
+                              and 'cstr_%s'%cstr2 in dict_cstrs]
+
+        mutually_exclusive_cols = []
+        for cstr1, cstr2 in mutually_exclusive:
+
+            for slot, cstr1_obj in dict_cstrs['cstr_%s'%cstr1].items():
+
+                cstr2_obj = dict_cstrs['cstr_%s'%cstr2][slot]
+
+                mutually_exclusive_cols.append((cstr1_obj.col, cstr2_obj.col))
+
+        return mutually_exclusive_cols
 
 
     def get_variabs(self):
