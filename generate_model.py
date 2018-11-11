@@ -155,6 +155,8 @@ def get_model_simple(solve=True, nthreads=7):
 
     m_simple = model.Model(curtailment=True, nthreads=nthreads)
 
+    self = m_simple
+
     m_simple.add_slot(name='day', load=4.5, vre=3)
 
     m_simple.add_plant(name='n', vc0=1, vc1=None, slots=m_simple.slots, capacity=3)
@@ -170,6 +172,8 @@ def get_model_simple(solve=True, nthreads=7):
 def get_model_multi_ret(solve=True, nthreads=7):
 
     m = model.Model(curtailment=False, nthreads=nthreads)
+
+    self = m
 
     m.add_slot(name='day', load=4.5, vre=3)
 
