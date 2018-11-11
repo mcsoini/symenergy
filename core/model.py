@@ -319,32 +319,10 @@ class Model:
     def remove_mutually_exclusive_combinations(self):
 
         # [(cstr_pattern1, cstr_pattern2, is_exclusive), (...)]
-        multips_mut_excl = [('pos_p', 'cap_C', True),
-                            ('cap_E', 'pos_e', True)]
-
-        cols_mut_excl_0 = []
-
-        for name_cstr1, name_cstr2, is_exclusive in multips_mut_excl:
-
-            for cstr in [cstr for cstr in self.constrs_cols_neq
-                         if name_cstr1 in cstr]:
-
-                cstr_pattern = cstr.replace(name_cstr1, '')
-
-                select_cstr = [cstr_match
-                               for cstr_match in self.constrs_cols_neq
-                               if name_cstr2 in cstr_match
-                               and cstr_pattern == cstr_match.replace(name_cstr2, '')
-                               ]
-                if len(select_cstr) > 1:
-                    raise RuntimeError(
-                            'remove_mutually_exclusive_combinations: '
-                            'select_cstr for (%s, %s) has length > 1: '
-                            %(name_cstr1, name_cstr2) + ''
-                            '%s'%str(select_cstr))
-                elif len(select_cstr) == 1:
-                    select_cstr = select_cstr[0]
-                    cols_mut_excl_0.append((cstr, select_cstr, is_exclusive))
+        cols_mut_excl_0 = [cstr_pair + (True,)
+                           for comp in self.comps.values()
+                           for cstr_pair
+                           in comp.get_mutually_exclusive_cstrs()]
 
         cols_mut_excl_0 += \
             [('act_lb_phs_pos_p_day', 'act_lb_phs_pos_p_night', False),
