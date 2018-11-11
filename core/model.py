@@ -296,6 +296,10 @@ class Model:
         self.constrs_cols_neq = [cstr.col for cstr
                                  in self.constrs_neq]
 
+        self.constrs_pos_cols_vars = {cstr.col: cstr.var_name
+                                      for cstr in self.constrs
+                                      if '_pos_' in cstr.col}
+
     def init_constraint_combinations(self):
         '''
         Gathers all non-equal component constraints,

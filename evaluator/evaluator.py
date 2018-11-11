@@ -340,6 +340,15 @@ class Evaluator(plotting.EvPlotting):
         else:
             df_result = df.copy()
             df_result['lambd'] = self._evaluate(df_result)
+
+            def sanitize_unexpected_zeros(df):
+                for col, func in self.model.constrs_pos_cols_vars.items():
+                    df.loc[(df.func == func + '_lam_plot')
+                           & (df[col] != 1) & (df['lambd'] == 0),
+                           'lambd'] = np.nan
+
+            sanitize_unexpected_zeros(df_result)
+
             mask_valid = self._get_mask_valid_solutions(df_result)
             df_result = df_result.join(mask_valid, on=mask_valid.index.names)
             df_result['is_optimum'] = self.init_cost_optimum(df_result)
@@ -409,9 +418,17 @@ class Evaluator(plotting.EvPlotting):
         '''
 
 
-        df_lam_plot = self.df_lam_plot.reset_index()[['func',
-                                                      'const_comb',
-                                                      'lambd_func']]
+        # keeping pos cols to sanitize zero equality constraints
+        constrs_cols_pos = [cstr for cstr in self.model.constrs_cols_neq
+                            if '_pos_' in cstr]
+
+        # keeping cap cols to sanitize cap equality constraints
+        constrs_cols_cap = [cstr for cstr in self.model.constrs_cols_neq
+                            if '_cap_' in cstr]
+
+        keep_cols = (['func', 'const_comb', 'lambd_func']
+                     + constrs_cols_pos + constrs_cols_cap)
+        df_lam_plot = self.df_lam_plot.reset_index()[keep_cols]
 
         df_lam_plot['lambd_func_hash'] = \
                 df_lam_plot.lambd_func.apply(lambda x: 'func_%d'%abs(hash(x)))
