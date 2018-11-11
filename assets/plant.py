@@ -100,7 +100,6 @@ class Plant(asset.Asset):
         self.cc = sum(sp.integrate(vc, self.p[slot])
                          for slot, vc in self.vc.items())
 
-
         if 'fcom' in self.__dict__:
 
             cc_fcom = self.C.symb * self.fcom.symb

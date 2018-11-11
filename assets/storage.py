@@ -50,8 +50,6 @@ class Storage(asset.Asset):
         self.init_symbol_operation('p')
         self.init_symbol_operation('e')
 
-        self.init_symbols_costs()
-#
         self.init_cstr_positive('p')
         self.init_cstr_positive('e')
 
