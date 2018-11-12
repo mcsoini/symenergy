@@ -64,6 +64,9 @@ class Evaluator(plotting.EvPlotting):
 
 
         if sql_params:
+            self.db = sql_params['sql_db']
+            self.tb = sql_params['sql_table']
+            self.sc = sql_params['sql_schema']
 
     @property
     def x_vals(self):
