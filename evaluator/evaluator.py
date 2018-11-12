@@ -63,15 +63,7 @@ class Evaluator(plotting.EvPlotting):
         self.df_x_vals = self.get_x_vals_combs()
 
 
-        if self.sql_params and 'warn_existing_tables' in self.sql_params:
-            warn_existing_tables = self.sql_params['warn_existing_tables']
-        else:
-            warn_existing_tables = True
-
-        print('param_values=', self.model.param_values)
-
         if sql_params:
-            self.init_table(warn_existing_tables)
 
     @property
     def x_vals(self):
@@ -399,6 +391,23 @@ class Evaluator(plotting.EvPlotting):
 
         return result
 
+
+
+    def after_init_table(f):
+        def wrapper(self, *args, **kwargs):
+
+            if self.sql_params and 'warn_existing_tables' in self.sql_params:
+                warn_existing_tables = self.sql_params['warn_existing_tables']
+            else:
+                warn_existing_tables = True
+
+            self.init_table(warn_existing_tables)
+
+            f(self, *args, **kwargs)
+
+        return wrapper
+
+    @after_init_table
     def expand_to_x_vals(self):
         '''
         Applies evaluate_by_x to all df_x_vals rows.
