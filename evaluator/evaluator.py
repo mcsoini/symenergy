@@ -851,3 +851,36 @@ class Evaluator(plotting.EvPlotting):
         '''.format(**self.sql_params, all_map=all_map)
         aql.exec_sql(exec_strg, db=db)
 
+
+    def get_readable_cc_dict(self):
+
+        cc_h = self.model.df_comb.set_index('const_comb')[self.model.constrs_cols_neq].copy()
+
+#        cc_h_sto = cc_h.set_index('const_comb')[[c for c in cc_h.columns if 'phs' in c and ('cap' in c or 'pos' in c)]]
+        cc_h_sto = (cc_h.act_lb_phs_pos_e_None.replace({1: 'no storage', 0: ''})
+                    + cc_h.act_lb_phs_p_cap_C_day.replace({1: 'max storage (day)', 0: ''})
+                    + cc_h.act_lb_phs_p_cap_C_night.replace({1: 'max storage (night)', 0: ''})
+                    + cc_h.act_lb_phs_e_cap_E_None.replace({1: 'max storage (e)', 0: ''}))
+
+#        cc_h_peak = cc_h.set_index('const_comb')[[c for c in cc_h.columns if '_g_' in c and ('pos' in c)]]
+        cc_h_peak = (cc_h.act_lb_g_pos_p_night.replace({0: 'peak (night)', 1: 'no peak (night)'})
+                     + cc_h.act_lb_g_pos_p_day.replace({0: 'peak (day)', 1: 'no peak (day)'})).replace({'peak (night)peak (day)': 'all peak', 'no peak (night)no peak (day)': 'no peak at all'})
+
+#        cc_h_curt = cc_h.set_index('const_comb')[[c for c in cc_h.columns if '_curt_' in c and ('pos' in c)]]
+        cc_h_curt = (cc_h.act_lb_curt_pos_p_night.replace({0: 'curt (night)', 1: ''})
+                     + cc_h.act_lb_curt_pos_p_day.replace({0: 'curt (day)', 1: ''})).replace({'curt (night)curt (day)': 'curtailment both'})
+
+#        cc_h_ret = cc_h.set_index('const_comb')[[c for c in cc_h.columns if '_C_ret_' in c]]
+        cc_h_ret = (cc_h.act_lb_n_C_ret_cap_C_None.replace({1: 'maximum retirement', 0: ''})
+                     + cc_h.act_lb_n_pos_C_ret_None.replace({1: 'no retirement', 0: ''}))
+
+#        cc_h_base = cc_h.set_index('const_comb')[[c for c in cc_h.columns if '_n_' in c and not 'C_ret' in c]]
+        cc_h_base = (cc_h.act_lb_n_pos_p_day.replace({1: 'no base (day)', 0: ''})
+                     + cc_h.act_lb_n_p_cap_C_day.replace({1: 'max base (day)', 0: ''}))
+
+        dict_cc_h = pd.concat([cc_h_sto, cc_h_peak, cc_h_curt,
+                               cc_h_ret, cc_h_base], axis=1).apply(lambda x: ' | '.join(x).replace(' |  | ', ' | '), axis=1)
+        dict_cc_h = dict_cc_h.to_dict()
+
+        return dict_cc_h
+
