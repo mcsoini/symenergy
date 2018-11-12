@@ -14,6 +14,37 @@ nthreads=7
 solve=True
 reload(model)
 
+## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+def get_model_weights(solve=True, nthreads=7):
+
+    m = model.Model(curtailment=True, nthreads=nthreads)
+
+    self = m
+
+    m.add_slot(name='day', weight=18, load=4.5, vre=3)
+    m.add_slot(name='night', weight=6, load=5, vre=0.5)
+
+    m.add_plant(name='n', vc0=1, vc1=None, slots=m.slots, capacity=3,
+                fcom=10,
+                cap_ret=True
+                )
+    m.add_plant(name='g', vc0=2, vc1=None, slots=m.slots)
+
+    m.add_storage(name='phs',
+                  eff=0.75,
+                  slots=m.slots,
+                  capacity=0.5,
+                  energy_capacity=1,
+                  slots_map={'day': 'chg',
+                             'night': 'dch'
+                             })
+    if solve:
+        m.generate_solve()
+
+    return m
+
+
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 def get_model(solve=True, nthreads=7):
@@ -202,3 +233,13 @@ def generate_all(nthreads):
     get_model_three(True, nthreads)
     get_model_lin(True, nthreads)
     get_model(True, nthreads)
+    get_model_weights(True, nthreads)
+
+
+def generate_all_small(nthreads):
+
+    get_model_weights(True, nthreads)
+    get_model_lin(True, nthreads)
+    get_model(True, nthreads)
+    get_model_multi_ret(True, nthreads)
+    get_model_simple(True, nthreads)
