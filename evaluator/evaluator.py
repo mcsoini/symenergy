@@ -156,6 +156,8 @@ class Evaluator(plotting.EvPlotting):
                                                     modules=['numpy'],
                                                     dummify=False)
 
+            print('lambdify', end='...')
+
             self.dfev[slct_eq + '_lam_plot'] = (
                             self.dfev['%s_expr_plot'%slct_eq].apply(lambdify))
             print('done.')
