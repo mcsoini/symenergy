@@ -118,7 +118,7 @@ class Evaluator(plotting.EvPlotting):
 
         return list_dep_var
 
-    def get_evaluated_lambdas(self, skip_multipliers=False):
+    def get_evaluated_lambdas(self, skip_multipliers=True):
         '''
         For each dependent variable and total cost get a lambda function
         evaluated by constant parameters. This subsequently evaluated
