@@ -136,7 +136,7 @@ class Evaluator(plotting.EvPlotting):
                      else list_dep_var[0])
         for slct_eq_0 in list_dep_var:
 
-            print('Extracting solution for %s'%slct_eq_0)
+            print('Extracting solution for %s'%slct_eq_0, end='...')
 
             slct_eq = (slct_eq_0.name
                        if not isinstance(slct_eq_0, str)
@@ -148,6 +148,7 @@ class Evaluator(plotting.EvPlotting):
                 get_func = lambda x: self._get_func_from_idx(x, slct_eq)
                 self.dfev[slct_eq] = self.dfev.apply(get_func, axis=1)
 
+            print('substituting', end='...')
             self.dfev['%s_expr_plot'%slct_eq] = \
                         self.dfev[slct_eq].apply(self._subs_param_values)
 
@@ -157,6 +158,7 @@ class Evaluator(plotting.EvPlotting):
 
             self.dfev[slct_eq + '_lam_plot'] = (
                             self.dfev['%s_expr_plot'%slct_eq].apply(lambdify))
+            print('done.')
 
         idx = list(map(str, self.model.constrs_cols_neq)) + ['const_comb']
         cols = [c for c in self.dfev.columns
