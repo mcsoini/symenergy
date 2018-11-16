@@ -180,6 +180,47 @@ def get_model_three_curt(solve=True, nthreads=7):
 
     return m_three
 
+
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+def get_model_three_curt_flat(solve=True, nthreads=7):
+
+    import time
+
+    t = time.time()
+    m_three = model.Model(curtailment=True, nthreads=nthreads)
+
+    self = m_three
+
+    m_three.add_slot(name='day', load=4.5, vre=3)
+    m_three.add_slot(name='night', load=5, vre=0.5)
+    #
+    m_three.add_plant(name='n', vc0=1, vc1=None, slots=m_three.slots, capacity=3,
+                fcom=10,
+                cap_ret=True
+                )
+    m_three.add_plant(name='c', vc0=1, vc1=None, slots=m_three.slots, capacity=3,
+                fcom=10,
+                cap_ret=True
+                )
+    m_three.add_plant(name='g', vc0=2, vc1=None, slots=m_three.slots)
+
+    m_three.add_storage(name='phs',
+                      eff=0.75,
+                      slots=m_three.slots,
+                      capacity=0.5,
+                      energy_capacity=1,
+                      slots_map={'day': 'chg',
+                                 'night': 'dch'
+                                 })
+
+    if solve:
+        m_three.generate_solve()
+
+    print('Time: ', time.time() - t)
+
+    return m_three
+
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 def get_model_simple(solve=True, nthreads=7):
