@@ -295,51 +295,53 @@ class Evaluator(plotting.EvPlotting):
         for col in self.x_name:
             df[col] = x[col]
 
+# ALTERNATIVE ATTEMPT: EVALUATE TC FIRST, THEN LOOP FROM LOWEST TC TO HIGHEST,
+# STOP WHEN FEASIBLE; DOESN'T SEEM tO BE FASTER IN ITS CURRENT FORM
+#            # evaluate total cost
+#            df_tc = df.loc[df.func == 'tc_lam_plot'].copy()
+#            df_tc['lambd'] = self._evaluate(df.loc[df.func == 'tc_lam_plot'])
+#            # drop nan
+#            df_tc = df_tc.loc[-df_tc.lambd.isnull()]
+#            # sort lowest to highest
+#            df_tc = df_tc.sort_values('lambd', ascending=True)
+#
+#            for ind, row in df_tc.iterrows():
+#                print(ind)
+#                df_cc = df.loc[(df.const_comb == row.const_comb)
+#                             & (df.func != 'tc_lam_plot')].copy()
+#
+#                df_cc['lambd'] = self._evaluate(df_cc)
+#
+#                mask_valid = self._get_mask_valid_solutions(df_cc)
+#
+#                if mask_valid.mask_valid.iloc[0]:
+#                    # we found the optimum
+#                    df_tc_slct = df_tc.loc[df_tc.const_comb == row.const_comb]
+#                    df_result = pd.concat([df_cc, df_tc_slct],
+#                                          axis=0, sort=False)
+#                    df_result['mask_valid'] = True
+#                    df_result['is_optimum'] = True
+#                    break
+#                else:
+#                    pass
+
+#        else:
+        df_result = df.copy()
+        df_result['lambd'] = self._evaluate(df_result)
+
+        def sanitize_unexpected_zeros(df):
+            for col, func in self.model.constrs_pos_cols_vars.items():
+                df.loc[(df.func == func + '_lam_plot')
+                       & (df[col] != 1) & (df['lambd'] == 0),
+                       'lambd'] = np.nan
+
+        sanitize_unexpected_zeros(df_result)
+
+        mask_valid = self._get_mask_valid_solutions(df_result)
+        df_result = df_result.join(mask_valid, on=mask_valid.index.names)
+        df_result['is_optimum'] = self.init_cost_optimum(df_result)
+
         if self.drop_non_optimum:
-
-            # evaluate total cost
-            df_tc = df.loc[df.func == 'tc_lam_plot'].copy()
-            df_tc['lambd'] = self._evaluate(df.loc[df.func == 'tc_lam_plot'])
-            # drop nan
-            df_tc = df_tc.loc[-df_tc.lambd.isnull()]
-            # sort lowest to highest
-            df_tc = df_tc.sort_values('lambd', ascending=True)
-
-            for ind, row in df_tc.iterrows():
-                print(ind)
-                df_cc = df.loc[(df.const_comb == row.const_comb)
-                             & (df.func != 'tc_lam_plot')].copy()
-
-                df_cc['lambd'] = self._evaluate(df_cc)
-
-                mask_valid = self._get_mask_valid_solutions(df_cc)
-
-                if mask_valid.mask_valid.iloc[0]:
-                    # we found the optimum
-                    df_tc_slct = df_tc.loc[df_tc.const_comb == row.const_comb]
-                    df_result = pd.concat([df_cc, df_tc_slct],
-                                          axis=0, sort=False)
-                    df_result['mask_valid'] = True
-                    df_result['is_optimum'] = True
-                    break
-                else:
-                    pass
-
-        else:
-            df_result = df.copy()
-            df_result['lambd'] = self._evaluate(df_result)
-
-            def sanitize_unexpected_zeros(df):
-                for col, func in self.model.constrs_pos_cols_vars.items():
-                    df.loc[(df.func == func + '_lam_plot')
-                           & (df[col] != 1) & (df['lambd'] == 0),
-                           'lambd'] = np.nan
-
-            sanitize_unexpected_zeros(df_result)
-
-            mask_valid = self._get_mask_valid_solutions(df_result)
-            df_result = df_result.join(mask_valid, on=mask_valid.index.names)
-            df_result['is_optimum'] = self.init_cost_optimum(df_result)
             df_result = df_result.loc[df_result.is_optimum]
 
         if self.sql_params:
