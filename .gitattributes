@@ -7,3 +7,4 @@ cache/32D92005CE77.pickle filter=lfs diff=lfs merge=lfs -text
 cache/541403C46A82.pickle filter=lfs diff=lfs merge=lfs -text
 cache/5796EF37D4C6.pickle filter=lfs diff=lfs merge=lfs -text
 cache/5D3784DB0487.pickle filter=lfs diff=lfs merge=lfs -text
+*.pickle filter=lfs diff=lfs merge=lfs -text
