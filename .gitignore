@@ -1,6 +1,4 @@
 *.csv
-*.pickle
-cache/*
 
 config_local.*
 
