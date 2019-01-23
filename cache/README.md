@@ -1,1 +1,1 @@
-**File names are model hashes, generated from constraint combination names.**
+**File names are model hashes, generated from constraint combination+variable names.**
