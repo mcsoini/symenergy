@@ -20,11 +20,8 @@ except:
     pass
 import os
 
-import string
-import random
-
 #from grimsel.auxiliary.aux_general import get_config
-import grimsel.config as config
+#import grimsel.config as config
 
 # %%
 
@@ -40,15 +37,16 @@ class sql_connector():
     connections.
     '''
 
-    def __init__(self, db, **kwargs):
+    def __init__(self, db, user='postgres', password='postgres',
+                 host='localhost', port=5432, **kwargs):
 
         self.db = db
 
         config_dict = {
-        'user': config.PSQL_USER,
-        'password': config.PSQL_PASSWORD,
-        'host': config.PSQL_HOST,
-        'port': config.PSQL_PORT
+        'user': user,
+        'password': password,
+        'host': host,
+        'port': port
         }
 
         for kw, val in config_dict.items():
@@ -1247,22 +1245,16 @@ if __name__ == '__main__':
 
 # %%
 
-def dump_by_table_sh(sc, db, target_dir):
-
-    if __name__ == '__main__':
-        sc='out_replace_basesmall'
-        db='storage2'
-        source_base='/run/user/1000/gvfs/dav:host=drive.switch.ch,ssl=true,prefix=%2Fremote.php%2Fdav/files/martin.soini@unige.ch'
-        source_dir='SQL_DUMPS/out_replace_basesmall/'
-        target_dir=os.path.join(source_base, source_dir)
+def dump_by_table_sh(sc, db, target_dir, user='postgres', password='postgres',
+                     host='localhost', port=5432):
 
     if not os.path.exists(target_dir):
         os.makedirs(target_dir)
 
-    db_format = dict(user=config.PSQL_USER,
-                     pw=config.PSQL_PASSWORD,
-                     host=config.PSQL_HOST,
-                     port=config.PSQL_PORT,
+    db_format = dict(user=user,
+                     pw=password,
+                     host=host,
+                     port=port,
                      db=db)
     dbname = 'postgresql://{user}:{pw}@{host}:{port}/{db}'.format(**db_format)
 
@@ -1279,11 +1271,6 @@ dbname = 'postgresql://postgres:postgres@localhost:5432/{db}'
 
 def dump_by_table(sc, db, target_dir='C:\\Users\\ashreeta\\Documents\\Martin\\SWITCHdrive\\SQL_DUMPS\\out_disagg_new\\'):
 
-#    if __name__ == '__main__':
-#        sc='out_nucspreadvr_ext_it'
-#        db='storage1'
-#        target_dir='C:\\Users\\ashreeta\\Documents\\Martin\\SWITCHdrive\\SQL_DUMPS\\out_nucspreadvr_ext_it\\'
-
     exe = '\"C:\\Program Files\\PostgreSQL\\9.6\\bin\\pg_dump.exe\"'
 
     for itb in get_sql_tables(sc, db=db):
@@ -1296,20 +1283,13 @@ def dump_by_table(sc, db, target_dir='C:\\Users\\ashreeta\\Documents\\Martin\\SW
         subprocess.run(run_str, shell=True, check=True)
 
 
-def read_by_table(db, sc,
+def read_by_table(db, sc, user='postgres', password='postgres',
+                  host='localhost', port=5432,
                   source_base='/run/user/1000/gvfs/dav:host=drive.switch.ch,ssl=true,prefix=%2Fremote.php%2Fdav/files/martin.soini@unige.ch',
                   source_dir='', warn_reset_schema=True,
                   patterns_only=False):
 
-#    if __name__ == '__main__':
-#        print('main')
-#        db='storage2'
-#        source_base='/run/user/1000/gvfs/dav:host=drive.switch.ch,ssl=true,prefix=%2Fremote.php%2Fdav/files/martin.soini@unige.ch'
-#        source_dir='SQL_DUMPS/out_replace_vreseries/'
-
-
     source_dir = os.path.join(source_base, source_dir)
-
 
     f = []
     for (dirpath, dirnames, filenames) in walk(source_dir):
@@ -1326,11 +1306,7 @@ def read_by_table(db, sc,
 
     reset_schema(sc, db, warn=warn_reset_schema)
 
-    db_format = dict(user=config.PSQL_USER,
-                     pw=config.PSQL_PASSWORD,
-                     host=config.PSQL_HOST,
-                     port=config.PSQL_PORT,
-                     db=db)
+    db_format = dict(user=user, pw=password, host=host, port=port, db=db)
     dbname = 'postgresql://{user}:{pw}@{host}:{port}/{db}'.format(**db_format)
 
     for file in f:
@@ -1343,14 +1319,6 @@ def read_by_table(db, sc,
 if __name__ == '__main__':
     pass
 
-#    source_dir = 'SQL_DUMPS/out_replace_emission/'
-#    sc = 'out_replace_emission'
-#    read_by_table(db, sc, source_dir=source_dir, warn_reset_schema=False,
-#                  patterns_only=['analysis_', 'def_', 'encar'])
-
-#    dump_by_table('out_marg_store', 'storage2', target_dir='C:\\Users\\ashreeta\\Documents\\Martin\\SWITCHdrive\\SQL_DUMPS\\out_marg_store_new\\')
-
-# %%
 
 
 
