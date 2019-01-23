@@ -608,10 +608,11 @@ class Evaluator(plotting.EvPlotting):
             mask_vre = df_bal.func.str.contains('vre')
             df_bal.loc[mask_vre, 'lambd'] *= df_bal.loc[mask_vre, 'vre_scale']
 
+        # negative by func_no_slot
         varpar_neg = ['l', 'curt_p']
-
         df_bal.loc[df_bal.func_no_slot.isin(varpar_neg), 'lambd'] *= -1
 
+        # negative by func
         varpar_neg = [store.name + '_p_' + slot_name + '_lam_plot'
                       for store in self.model.storages.values()
                       for slot_name, chgdch in store.slots_map.items() if chgdch == 'chg']
