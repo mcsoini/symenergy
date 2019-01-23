@@ -285,13 +285,14 @@ class Evaluator(plotting.EvPlotting):
         aql.init_table(tb, self.sql_cols, sc, db=db,
                        warn_if_exists=warn_existing_tables)
 
-    def evaluate_by_x(self, x, df_lam):
+    def evaluate_by_x(self, x, df_lam, verbose):
 
         df = df_lam.copy()
 
         t = time.time()
 
-        print('x', x)
+        if verbose:
+            print(x.name, x.to_dict(), end=' -> ')
         for col in self.x_name:
             df[col] = x[col]
 
@@ -352,10 +353,12 @@ class Evaluator(plotting.EvPlotting):
 
             aql.write_sql(df_result[cols], db, sc=sc,
                           tb=tb, if_exists='append')
-            print(time.time() - t)
+            if verbose:
+                print(time.time() - t)
             return None
         else:
-            print(time.time() - t)
+            if verbose:
+                print(time.time() - t)
             return df_result
 
 
@@ -388,9 +391,9 @@ class Evaluator(plotting.EvPlotting):
 
 
 
-    def call_evaluate_by_x(self, df_x, df_lam):
+    def call_evaluate_by_x(self, df_x, df_lam, verbose):
 
-        eval_x = lambda x: self.evaluate_by_x(x, df_lam)
+        eval_x = lambda x: self.evaluate_by_x(x, df_lam, verbose)
 
         if __name__ == '__main__':
             x = df_x.iloc[0]
@@ -417,7 +420,7 @@ class Evaluator(plotting.EvPlotting):
         return wrapper
 
     @after_init_table
-    def expand_to_x_vals(self):
+    def expand_to_x_vals(self, verbose=True):
         '''
         Applies evaluate_by_x to all df_x_vals rows.
             * by_x_vals -- if True: expand x_vals for all const_combs/func
@@ -454,7 +457,7 @@ class Evaluator(plotting.EvPlotting):
         df_x = self.df_x_vals
         df_lam = df_lam_plot
         if not self.nthreads:
-            df_exp_0 = self.call_evaluate_by_x(df_x, df_lam)
+            df_exp_0 = self.call_evaluate_by_x(df_x, df_lam, verbose)
         else:
             func = self.call_evaluate_by_x
             nthreads = self.nthreads
