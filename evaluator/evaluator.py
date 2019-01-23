@@ -13,7 +13,7 @@ import itertools
 import time
 
 import symenergy.evaluator.plotting as plotting
-import grimsel.auxiliary.aux_sql_func as aql
+import symenergy.auxiliary.sqlutils.aux_sql_func as aql
 
 from symenergy.auxiliary.parallelization import parallelize_df
 
