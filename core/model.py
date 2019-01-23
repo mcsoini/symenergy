@@ -6,6 +6,7 @@ Contains the main Model class.
 Part of symenergy. Copyright 2018 authors listed in AUTHORS.
 """
 import os
+import sys
 
 import itertools
 import pandas as pd
