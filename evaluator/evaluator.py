@@ -408,12 +408,14 @@ class Evaluator(plotting.EvPlotting):
     def after_init_table(f):
         def wrapper(self, *args, **kwargs):
 
-            if self.sql_params and 'warn_existing_tables' in self.sql_params:
-                warn_existing_tables = self.sql_params['warn_existing_tables']
-            else:
-                warn_existing_tables = True
+            if self.sql_params:
 
-            self.init_table(warn_existing_tables)
+                if 'warn_existing_tables' in self.sql_params:
+                    warn_existing_tables = self.sql_params['warn_existing_tables']
+                else:
+                    warn_existing_tables = True
+
+                self.init_table(warn_existing_tables)
 
             f(self, *args, **kwargs)
 
