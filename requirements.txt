@@ -1,3 +1,4 @@
 pandas==0.23.4
 sympy==1.2
 numpy==1.15.1
+git+git://github.com/mcsoini/pyAndy@master#egg=pyAndy
