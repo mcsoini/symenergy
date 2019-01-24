@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Contains the auxiliary functions.
+Contains auxiliary functions for parallelization.
 
 Part of symenergy. Copyright 2018 authors listed in AUTHORS.
 """

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Contains the Slot class. Provides a dummy slot object noneslot.
+Contains the Parameter class.
 
 Part of symenergy. Copyright 2018 authors listed in AUTHORS.
 """

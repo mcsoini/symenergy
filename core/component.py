@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Contains the symenergy component class.
+Contains the symenergy Component class.
 
 
 Part of symenergy. Copyright 2018 authors listed in AUTHORS.
