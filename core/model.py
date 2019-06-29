@@ -14,6 +14,7 @@ import sympy as sp
 import numpy as np
 import hashlib
 import time
+from sympy.tensor.array import derive_by_array
 
 import symenergy
 from symenergy.assets.plant import Plant
@@ -23,6 +24,7 @@ from symenergy.core.constraint import Constraint
 from symenergy.core.slot import Slot, noneslot
 from symenergy.core.parameter import Parameter
 from symenergy.auxiliary.parallelization import parallelize_df
+
 
 if __name__ == '__main__':
     sys.exit()
@@ -422,7 +424,7 @@ class Model:
         if not index % 1000:
             print(index, self.n_comb)
 
-        mat = sp.tensor.array.derive_by_array(lagrange, variabs_multips_slct)
+        mat = derive_by_array(lagrange, variabs_multips_slct)
         mat = sp.Matrix(mat).expand()
 
         A, b = sp.linear_eq_to_matrix(mat, variabs_multips_slct)
@@ -443,7 +445,7 @@ class Model:
 
     def get_matrix(self, lagrange, variabs_multips_slct):
 
-        mat = sp.tensor.array.derive_by_array(lagrange, variabs_multips_slct)
+        mat = derive_by_array(lagrange, variabs_multips_slct)
         mat = sp.Matrix(mat).expand()
 
         A, b = sp.linear_eq_to_matrix(mat, variabs_multips_slct)
