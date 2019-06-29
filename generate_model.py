@@ -75,6 +75,24 @@ def get_model(solve=True, nthreads=7):
 
     return m
 
+
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+def get_model_illustration(solve=True, nthreads=7):
+
+    m = model.Model(curtailment=False)
+
+    m.add_slot(name='day', load=6500, vre=6500)
+
+    m.add_plant(name='n', vc0=10, vc1=0.0, slots=m.slots, capacity=3500, cap_ret=False)
+    m.add_plant(name='g', vc0=90, vc1=0.0, slots=m.slots)
+
+    if solve:
+        m.generate_solve()
+
+    return m
+
+
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 def get_model_lin(solve=True, nthreads=7):
