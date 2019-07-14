@@ -29,8 +29,8 @@ class Asset(component.Component):
     '''Mixin class containing shared methods of plants and storage'''
 
     # capacity class map
-    MAP_CAPACITY = {'C': ['p', 'C_ret'],   # all power and retired capacity
-                    'E': ['e']}   # storage energy capacity
+    MAP_CAPACITY = {'C': ['p', 'pchg', 'pdch', 'C_ret'],  # all power and retired capacity
+                    'E': ['e']}  # storage energy capacity
 
     def __init__(self):
 
@@ -77,30 +77,26 @@ class Asset(component.Component):
         if not capacity_name in self.MAP_CAPACITY:
             raise UnexpectedSymbolError(capacity_name)
 
-
         list_var_names = self.MAP_CAPACITY[capacity_name]
+        list_var_names = [var for var in list_var_names if hasattr(self, var)]
 
-        list_var_names = [var for var in list_var_names
-                          if hasattr(self, var)]
+        for var_name in list_var_names:  # loop over constrained variables
 
-        for var_name in list_var_names:
-
-            if var_name in self.VARIABS_TIME:
-                slot_objs = self.slots.values()
-            elif var_name in self.VARIABS:
-                slot_objs = [noneslot]
+            slot_objs = (self.slots.values() if self.get_flag_timedep(var_name)
+                         else [noneslot])
 
             cstr_name = 'cstr_%s_cap_%s'%(var_name, capacity_name)
-            setattr(self, cstr_name, {})
+            setattr(self, cstr_name, {})  # initialize instance dict attribute
             cstr_dict = getattr(self, cstr_name)
 
-            for slot in slot_objs:
+            var_attr = getattr(self, var_name)
 
+            for slot in set(slot_objs) & set(var_attr):
                 base_name = '%s_%s_cap_%s_%s'%(self.name, var_name,
                                                capacity_name, str(slot.name))
 
                 cstr = Constraint(base_name=base_name, slot=slot,
-                                  var_name=str(getattr(self, var_name)[slot]))
+                                  var_name=str(var_attr[slot]))
 
                 # define expression
                 var = getattr(self, var_name)[slot]
@@ -121,62 +117,87 @@ class Asset(component.Component):
         Instantiates a dictionary {slot symbol: Constraint}.
         '''
 
-        if variable in self.VARIABS_TIME:
-            slot_objs = self.slots.values()
-        elif variable in self.VARIABS:
-            slot_objs = [noneslot]
-        else:
-            raise UnexpectedSymbolError(variable)
+        slot_objs = (self.slots.values() if self.get_flag_timedep(variable)
+                     else [noneslot])
 
-        setattr(self, 'cstr_pos_%s'%variable, {})
+        setattr(self, 'cstr_pos_%s'%variable, dict())
         cstr_dict = getattr(self, 'cstr_pos_%s'%variable)
 
-        for slot in slot_objs:
+        var_attr = getattr(self, variable)
+
+        for slot in set(slot_objs) & set(var_attr):
 
             base_name = '%s_pos_%s_%s'%(self.name, variable, str(slot.name))
 
             cstr = Constraint(base_name=base_name, slot=slot,
-                              var_name=str(getattr(self, variable)[slot]))
+                              var_name=str(var_attr[slot]))
 
-            var = getattr(self, variable)[slot]
+            var = var_attr[slot]
             cstr.expr = cstr.mlt * var
 
             cstr_dict[slot] = cstr
 
-    def init_is_capacity_constrained(self, capacity_name, variable):
+#    def init_is_capacity_constrained(self, capacity_name, variable):
+#
+#        self.is_capacity_constrained = (getattr(self, variable)
+#                                        if '%s_%s'%(capacity_name, self.name)
+#                                        in self.get_params_dict('name')
+#                                        else None)
+#
+#    def init_is_positive(self):
+#        ''''''
+#        self.is_positive = [var
+#                            for variab in self.VARIABS_POSITIVE
+#                            if hasattr(self, variab)
+#                            for _, var in getattr(self, variab).items()]
 
-        self.is_capacity_constrained = (getattr(self, variable)
-                                        if '%s_%s'%(capacity_name, self.name)
-                                        in self.get_params_dict('name')
-                                        else None)
 
-    def init_is_positive(self):
-        ''''''
-        self.is_positive = [var
-                            for variab in self.VARIABS_POSITIVE
-                            if hasattr(self, variab)
-                            for _, var in getattr(self, variab).items()]
+    def get_flag_timedep(self, variable):
 
-    def init_symbol_operation(self, variable):
+        if variable in set(self.VARIABS) & set(self.VARIABS_TIME):
+            # the variable is defined for all time slots only if there are
+            # two or more time slots (used for stored energy)
+
+            flag_timedep = len(self.slots) > 2
+
+        elif variable in set(self.VARIABS) | set(self.VARIABS_TIME):
+            flag_timedep = variable in self.VARIABS_TIME
+
+        else:
+            raise UnexpectedSymbolError(variable)
+
+        return flag_timedep
+
+
+    def init_symbol_operation(self, variable, slotsslct=None):
         '''
         Sets operational variables, i.e. power (generation,
         charging, discharging) and stored energy.
+
+        Parameters
+        ----------
+        variable: str
+            collective variable name to be added
+        slots: list of strings
+            list of time slot names for which the variable is to be defined;
+            defaults to all time slots
+
         '''
 
-        if variable in self.VARIABS:
-            setattr(self, variable,
-                    {noneslot: sp.symbols('%s_%s_%s'%(self.name,
-                                                  variable,
-                                                  str(None)))})
+        flag_timedep = self.get_flag_timedep(variable)
 
-        elif variable in self.VARIABS_TIME:
-            setattr(self, variable,
-                    {slot: sp.symbols('%s_%s_%s'%(self.name,
-                                                  variable,
-                                                  str(slot.name)))
-                     for slot in self.slots.values()})
+        if not flag_timedep:
+            symb = sp.symbols('%s_%s_%s'%(self.name, variable, str(None)))
+            setattr(self, variable, {noneslot: symb})
+
         else:
-            raise UnexpectedSymbolError(variable)
+            slots = ({slot_name: slot for slot_name, slot in self.slots.items()
+                      if slot_name in slotsslct}
+                     if slotsslct else self.slots)
+            var_obj = {slot: sp.symbols('%s_%s_%s'%(self.name, variable,
+                                        str(slot.name)))
+                       for slot in slots.values()}
+            setattr(self, variable, var_obj)
 
     def init_symbols_costs(self):
         ''' Overridden by children, if applicable. '''

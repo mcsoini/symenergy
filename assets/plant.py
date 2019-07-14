@@ -83,8 +83,8 @@ class Plant(asset.Asset):
 
         self.init_cost_component()
 
-        self.init_is_capacity_constrained('C', 'p')
-        self.init_is_positive()
+#        self.init_is_capacity_constrained('C', 'p')
+#        self.init_is_positive()
 
     def init_cost_component(self):
         '''

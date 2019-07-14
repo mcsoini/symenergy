@@ -43,7 +43,7 @@ class Curtailment(asset.Asset):
 
         self.init_cstr_positive('p')
 
-        self.init_is_positive()
+#        self.init_is_positive()
 
 
 if __name__ == '__main__':

@@ -159,16 +159,12 @@ class Model:
 
         slot = cstr.slot
 
-        total_chg = sum(p
-                     for store in self.storages.values()
-                     for slt, p in store.get_chgdch('chg').items()
-                     if slt in store.get_chgdch('chg').keys()
-                     and slt == slot)
-        total_dch = sum(p
-                     for store in self.storages.values()
-                     for slt, p in store.get_chgdch('dch').items()
-                     if slt in store.get_chgdch('dch').keys()
-                     and slt == slot)
+        total_chg = sum(store.pchg[slot]
+                        for store in self.storages.values()
+                        if slot in store.pchg)
+        total_dch = sum(store.pdch[slot]
+                        for store in self.storages.values()
+                        if slot in store.pdch)
 
         equ = \
         cstr.mlt * (slot.l.symb
