@@ -41,13 +41,13 @@ class Constraint():
     @property
     def expr(self):
         if not self.__expr:
-            raise ValueError('Constraint %s: expr undefined'%self.base_name)
+            raise RuntimeError('Constraint %s: expr undefined'%self.base_name)
         return self.__expr
+
 
     @expr.setter
     def expr(self, expr):
         self.__expr = expr
-
 
 
     def init_shadow_price(self):

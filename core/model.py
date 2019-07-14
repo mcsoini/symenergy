@@ -95,6 +95,7 @@ class Model:
     @update_component_list
     def add_storage(self, name, *args, **kwargs):
         ''''''
+
         self.storages.update({name: Storage(name, **kwargs)})
 
     @update_component_list
@@ -314,8 +315,6 @@ class Model:
         self.df_comb = pd.DataFrame(list_combs, columns=self.constrs_cols_neq)
 
         self.df_comb = self.combine_constraint_names(self.df_comb)
-
-
 
     def remove_mutually_exclusive_combinations(self):
 
