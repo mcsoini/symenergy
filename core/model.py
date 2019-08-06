@@ -191,9 +191,9 @@ class Model:
 
             self.init_constraint_combinations()
 
-            self.remove_mutually_exclusive_combinations()
+#            self.remove_mutually_exclusive_combinations()
 
-            self.delete_cached()
+#            self.delete_cached()
 
             self.define_problems()
 
@@ -282,10 +282,8 @@ class Model:
 
         self.constrs = {}
         for comp in self.comps.values():
-            for key, attr in comp.__dict__.items(): # TODO: this is no good !!
-                if key.startswith('cstr_'):
-                    for slot, cstr in attr.items():
-                        self.constrs[cstr] = comp
+            for cstr in comp.get_constraints(by_slot=True, names=False):
+                self.constrs[cstr] = comp
 
         # dictionary {column name: constraint object}
         self.constrs_dict = {cstr.col: cstr for cstr in self.constrs.keys()}
@@ -309,56 +307,75 @@ class Model:
         (binding, non-binding) combinations and instantiates dataframe.
         '''
 
+#
+#        list_combs = list(itertools.product(*[[False, True] for cc
+#                                              in self.constrs_neq]))
+#        self.df_comb = pd.DataFrame(list_combs,
+#                                    columns=self.constrs_cols_neq,
+#                                    dtype=bool)
 
-        list_combs = list(itertools.product(*[[0, 1] for cc
-                                              in self.constrs_neq]))
-        self.df_comb = pd.DataFrame(list_combs, columns=self.constrs_cols_neq)
+#        self.df_comb = self.combine_constraint_names(self.df_comb)
 
-        self.df_comb = self.combine_constraint_names(self.df_comb)
+#    def remove_mutually_exclusive_combinations(self):
+#
+#        # [(cstr_pattern1, cstr_pattern2, is_exclusive), (...)]
+#        cols_mut_excl_0 = [cstr_pair + (True,)
+#                           for comp in self.comps.values()
+#                           for cstr_pair
+#                           in comp.get_mutually_exclusive_cstrs()]
+#
+#        cols_mut_excl_0 += \
+#            [('act_lb_phs_pos_p_day', 'act_lb_phs_pos_p_night', False),
+#             ('act_lb_phs_pos_p_day', 'act_lb_phs_pos_e_None', False),
+#             ('act_lb_phs_pos_p_night', 'act_lb_phs_pos_e_None', False)]
+#
+#        # make sure all cols are present
+#        cols_mut_excl = []
+#        for comb in cols_mut_excl_0:
+#            print([col in self.df_comb.columns or isinstance(col, bool)
+#                    for col in comb])
+#
+#            if all([col in self.df_comb.columns or isinstance(col, bool)
+#                        for col in comb]):
+#                cols_mut_excl.append(comb)
+#
+#
+#        print('Deleting mutually exclusive constraints from '
+#              'df_comb (%s rows)'%len(self.df_comb), end=' ... ')
+#        tot_delete = 0
+#
+##        col1, col2, is_exclusive = cols_mut_excl[2]
+#        for col1, col2, is_exclusive in cols_mut_excl:
+#
+#            if is_exclusive:
+#                mask = ((self.df_comb[col1] == 1)
+#                      & (self.df_comb[col2] == 1))
+#                self.df_comb = self.df_comb.loc[-mask]
+#            else:
+#                mask = (((self.df_comb[col1] == 1) & (self.df_comb[col2] == 1))
+#                      | ((self.df_comb[col1] == 0) & (self.df_comb[col2] == 0)))
+#                self.df_comb = self.df_comb.loc[mask]
+#            print(self.df_comb.loc[mask])
+#            tot_delete += mask.sum()
+#        print('%d rows deleted, %s remaining.'%(tot_delete,
+#                                                 len(self.df_comb)))
 
-    def remove_mutually_exclusive_combinations(self):
 
-        # [(cstr_pattern1, cstr_pattern2, is_exclusive), (...)]
-        cols_mut_excl_0 = [cstr_pair + (True,)
-                           for comp in self.comps.values()
-                           for cstr_pair
-                           in comp.get_mutually_exclusive_cstrs()]
+#
+#    for comp:
 
-        cols_mut_excl_0 += \
-            [('act_lb_phs_pos_p_day', 'act_lb_phs_pos_p_night', False),
-             ('act_lb_phs_pos_p_day', 'act_lb_phs_pos_e_None', False),
-             ('act_lb_phs_pos_p_night', 'act_lb_phs_pos_e_None', False)]
+        list_dfcomb = [comp.get_constraint_combinations()
+                       for comp in self.comps.values()]
+        list_dfcomb = [df for df in list_dfcomb if not df.empty]
 
-        # make sure all cols are present
-        cols_mut_excl = []
-        for comb in cols_mut_excl_0:
-            print([col in self.df_comb.columns or isinstance(col, bool)
-                    for col in comb])
+        dfcomb = pd.DataFrame({'dummy': 1}, index=[0])
 
-            if all([col in self.df_comb.columns or isinstance(col, bool)
-                        for col in comb]):
-                cols_mut_excl.append(comb)
+        for df in list_dfcomb:
+            dfcomb = pd.merge(dfcomb, df.assign(dummy=1),
+                              on='dummy', how='outer')
 
+        self.df_comb = dfcomb.drop('dummy', axis=1)
 
-        print('Deleting mutually exclusive constraints from '
-              'df_comb (%s rows)'%len(self.df_comb), end=' ... ')
-        tot_delete = 0
-
-#        col1, col2, is_exclusive = cols_mut_excl[2]
-        for col1, col2, is_exclusive in cols_mut_excl:
-
-            if is_exclusive:
-                mask = ((self.df_comb[col1] == 1)
-                      & (self.df_comb[col2] == 1))
-                self.df_comb = self.df_comb.loc[-mask]
-            else:
-                mask = (((self.df_comb[col1] == 1) & (self.df_comb[col2] == 1))
-                      | ((self.df_comb[col1] == 0) & (self.df_comb[col2] == 0)))
-                self.df_comb = self.df_comb.loc[mask]
-            print(self.df_comb.loc[mask])
-            tot_delete += mask.sum()
-        print('%d rows deleted, %s remaining.'%(tot_delete,
-                                                 len(self.df_comb)))
 
     def get_variabs_params(self):
         '''
@@ -521,14 +538,16 @@ class Model:
         '''
         Top-level method for parallelization of construct_lagrange.
         '''
-        print('Calling call_construct_lagrange on DataFrame with length %d'%len(df))
+        print('Calling call_construct_lagrange on DataFrame '
+              'with length %d'%len(df))
         return df.apply(self.construct_lagrange, axis=1).tolist()
 
 
 
     def call_get_variabs_multips_slct(self, df):
 
-        print('Calling get_variabs_multips_slct on DataFrame with length %d'%len(df))
+        print('Calling get_variabs_multips_slct on DataFrame '
+              'with length %d'%len(df))
 
         return list(map(self.get_variabs_multips_slct, df))
 
@@ -693,25 +712,50 @@ class Model:
 
 
 
-    def delete_cached(self):
-
-        try:
-            list_infeas = pd.read_csv(self.cache_fn, header=None)
-            list_infeas = list_infeas.iloc[:, 0].tolist()
-        except:
-            print('Model cache file %s doesn\'t exist. '
-                  'Skipping.'%self.cache_fn)
-            list_infeas = None
-
-        if list_infeas:
-
-            self.df_comb = self.df_comb.loc[-self.df_comb.const_comb.isin(list_infeas)]
-
-
+#    def delete_cached(self):
+#
+#        try:
+#            list_infeas = pd.read_csv(self.cache_fn, header=None)
+#            list_infeas = list_infeas.iloc[:, 0].tolist()
+#        except:
+#            print('Model cache file %s doesn\'t exist. '
+#                  'Skipping.'%self.cache_fn)
+#            list_infeas = None
+#
+#        if list_infeas:
+#
+#            self.df_comb = self.df_comb.loc[-self.df_comb.const_comb.isin(list_infeas)]
 
     def filter_invalid_solutions(self, cache=False):
 
         mask_empty = self.get_mask_empty_solution()
+
+        #
+        smaller_combs_inf = []
+        for n in range(1, len(self.constrs_cols_neq)):
+
+            combs = [c for c in map(set, itertools.combinations(self.constrs_cols_neq, n))
+                     if not any(infc.issubset(c) for infc in smaller_combs_inf)]
+
+            for comb in combs:
+                val_combs = self.df_comb[comb].apply(tuple, axis=1).unique().tolist()
+
+                for val_comb in val_combs:
+                    mask = ~mask_empty.copy()
+                    for val, col in list(zip(val_comb, comb)):
+                        mask *= self.df_comb[col] == val
+
+                    count_feas = len(self.df_comb.loc[mask, list(comb)].drop_duplicates())
+                    if count_feas == 0:
+                        print(comb, val_comb, count_feas)
+                        smaller_combs_inf.append(comb)
+
+
+
+
+
+        self.df_comb.loc[mask_empty, self.constrs_cols_neq].iloc[:, [0, 1, 2]].drop_duplicates()
+
 
         print('The following constraint combinations have empty solutions:\n',
               self.df_comb.loc[mask_empty, self.constrs_cols_neq])
