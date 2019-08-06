@@ -6,7 +6,11 @@ Contains the symenergy Component class.
 
 Part of symenergy. Copyright 2018 authors listed in AUTHORS.
 """
+import itertools
+import pandas as pd
+#from symenergy import _get_logger
 
+#logger = _get_logger(__name__)
 
 
 class Component():
@@ -31,6 +35,44 @@ class Component():
         else:
             return param_objs
 
+    def get_constraint_combinations(self):
+        '''
+        Gathers all non-equal component constraints,
+        calculates cross-product of all
+        (binding, non-binding) combinations and instantiates dataframe.
+        '''
+
+        constrs_neq = [cstr for cstr in self.get_constraints() if not
+                       cstr.is_equality_constraint]
+        constrs_cols_neq = [cstr.col for cstr in constrs_neq]
+
+        pairs_mut_excl = self.get_mutually_exclusive_cstrs()
+        pairs_mut_excl = [comb + (True,) for comb in pairs_mut_excl]
+
+        df_comb = pd.DataFrame(itertools.product(*[[False, True] for cc
+                                              in constrs_neq]),
+                               columns=constrs_cols_neq, dtype=bool)
+
+        print(self.name, ': Deleting mutually exclusive constraints from '
+              'df_comb (%s rows)'%len(df_comb), end=' ... ')
+        tot_delete = 0
+
+        for col1, col2, is_exclusive in pairs_mut_excl:
+
+            if is_exclusive:
+                mask = ((df_comb[col1] == 1) & (df_comb[col2] == 1))
+                df_comb = df_comb.loc[-mask]
+            else:
+                mask = (((df_comb[col1] == 1) & (df_comb[col2] == 1))
+                      | ((df_comb[col1] == 0) & (df_comb[col2] == 0)))
+                df_comb = df_comb.loc[mask]
+            tot_delete += mask.sum()
+
+        print('Total deleted: ', tot_delete)
+
+        return df_comb
+
+
     def get_is_capacity_constrained(self):
         '''
         Returns a tuple of all variables defined by the MAP_CAPACITY dict.
@@ -54,14 +96,48 @@ class Component():
                      if hasattr(self, var_name)
                      for slot, var in getattr(self, var_name).items())
 
+
+    def get_constraints(self, by_slot=True, names=False):
+        '''
+        Returns
+        -------
+        list of constraint objects
+
+        '''
+
+        constrs = {} if names else []
+
+        attrs = [(key, attr) for key, attr in vars(self).items() if
+                 key.startswith('cstr_')]  # naming convention of constraint attrs
+
+        for key, attr in attrs:
+            if by_slot:
+                for slot, cstr in attr.items():
+                    if names:
+                        constrs[key] = cstr
+                    else:
+                        constrs.append(cstr)
+            else:
+                if names:
+                    constrs[key] = attr
+                else:
+                    constrs.append(attr)
+
+        return constrs
+
+
+
     def get_mutually_exclusive_cstrs(self):
         '''
         This expands the pairs from the MUTUALLY_EXCLUSIVE class attribute
         to all constraint columns.
         '''
 
-        dict_cstrs = {key: attr for key, attr in self.__dict__.items() # TODO: this is no good !!
+        dict_cstrs = {key: attr for key, attr in vars(self).items()
                       if key.startswith('cstr_')}
+
+        self.get_constraints(False, True)
+
 
         mutually_exclusive = [(cstr1, cstr2) for cstr1, cstr2 in self.MUTUALLY_EXCLUSIVE
                               if 'cstr_%s'%cstr1 in dict_cstrs
