@@ -318,8 +318,9 @@ class Evaluator(plotting.EvPlotting):
         if __name__ == '__main__':
             x = df_x.iloc[0]
 
-        result = self.df_x_vals.apply(eval_x, axis=1)
 
+        result = pd.concat([eval_x(x[1])
+                            for x in self.df_x_vals.iterrows()])
 
         return result
 
