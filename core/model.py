@@ -321,62 +321,6 @@ class Model:
         (binding, non-binding) combinations and instantiates dataframe.
         '''
 
-#
-#        list_combs = list(itertools.product(*[[False, True] for cc
-#                                              in self.constrs_neq]))
-#        self.df_comb = pd.DataFrame(list_combs,
-#                                    columns=self.constrs_cols_neq,
-#                                    dtype=bool)
-
-#        self.df_comb = self.combine_constraint_names(self.df_comb)
-
-#    def remove_mutually_exclusive_combinations(self):
-#
-#        # [(cstr_pattern1, cstr_pattern2, is_exclusive), (...)]
-#        cols_mut_excl_0 = [cstr_pair + (True,)
-#                           for comp in self.comps.values()
-#                           for cstr_pair
-#                           in comp.get_mutually_exclusive_cstrs()]
-#
-#        cols_mut_excl_0 += \
-#            [('act_lb_phs_pos_p_day', 'act_lb_phs_pos_p_night', False),
-#             ('act_lb_phs_pos_p_day', 'act_lb_phs_pos_e_None', False),
-#             ('act_lb_phs_pos_p_night', 'act_lb_phs_pos_e_None', False)]
-#
-#        # make sure all cols are present
-#        cols_mut_excl = []
-#        for comb in cols_mut_excl_0:
-#            print([col in self.df_comb.columns or isinstance(col, bool)
-#                    for col in comb])
-#
-#            if all([col in self.df_comb.columns or isinstance(col, bool)
-#                        for col in comb]):
-#                cols_mut_excl.append(comb)
-#
-#
-#        print('Deleting mutually exclusive constraints from '
-#              'df_comb (%s rows)'%len(self.df_comb), end=' ... ')
-#        tot_delete = 0
-#
-##        col1, col2, is_exclusive = cols_mut_excl[2]
-#        for col1, col2, is_exclusive in cols_mut_excl:
-#
-#            if is_exclusive:
-#                mask = ((self.df_comb[col1] == 1)
-#                      & (self.df_comb[col2] == 1))
-#                self.df_comb = self.df_comb.loc[-mask]
-#            else:
-#                mask = (((self.df_comb[col1] == 1) & (self.df_comb[col2] == 1))
-#                      | ((self.df_comb[col1] == 0) & (self.df_comb[col2] == 0)))
-#                self.df_comb = self.df_comb.loc[mask]
-#            print(self.df_comb.loc[mask])
-#            tot_delete += mask.sum()
-#        print('%d rows deleted, %s remaining.'%(tot_delete,
-#                                                 len(self.df_comb)))
-
-
-#
-#    for comp:
 
         list_dfcomb = [comp.get_constraint_combinations()
                        for comp in self.comps.values()]
@@ -464,21 +408,6 @@ class Model:
 
         logger.info('Calling call_solve_df on list with length %d'%len(df))
         return [self.solve(lag, var, idx) for lag, var, idx in df]
-
-
-    def get_matrix(self, lagrange, variabs_multips_slct):
-
-        mat = derive_by_array(lagrange, variabs_multips_slct)
-        mat = sp.Matrix(mat).expand()
-
-        A, b = sp.linear_eq_to_matrix(mat, variabs_multips_slct)
-
-        return A
-
-    def call_get_matrix_df(self, df):
-
-        print('Calling call_get_matrix_df on list with length %d'%len(df))
-        return [self.get_matrix(lag, var, idx) for lag, var, idx in df]
 
 
     def solve_all(self):
