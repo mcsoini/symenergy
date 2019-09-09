@@ -143,6 +143,10 @@ class Asset(component.Component):
 
 
     def get_flag_timedep(self, variable):
+        '''
+        TODO: The first case should depend on the chg/dch slots.
+        '''
+
 
         if variable in set(self.VARIABS) & set(self.VARIABS_TIME):
             # the variable is defined for all time slots only if there are
