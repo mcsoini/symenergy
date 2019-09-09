@@ -7,7 +7,7 @@ Part of symenergy. Copyright 2018 authors listed in AUTHORS.
 """
 
 
-import symenergy.core.component as component
+from symenergy.core import component
 from symenergy.core.parameter import Parameter
 
 class Slot(component.Component):
