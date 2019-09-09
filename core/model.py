@@ -356,6 +356,7 @@ class Model:
 
         self.df_comb = dfcomb.drop('dummy', axis=1)
 
+        logger.info('Length df_comb: %d'%len(self.df_comb))
 
     def get_variabs_params(self):
         '''
