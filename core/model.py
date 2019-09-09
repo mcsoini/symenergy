@@ -822,6 +822,14 @@ class Model:
 
         return [list_res_new]
 
+    @staticmethod
+    def delete_cached(fn):
+        if os.path.isfile(fn):
+            logger.info('Removing file %s'%os.path.abspath(fn))
+            os.remove(fn)
+        else:
+            logger.info('File doesn\'t exist. '
+                        'Could not remove %s'%os.path.abspath(fn))
 
     def __repr__(self):
 
