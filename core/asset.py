@@ -14,7 +14,9 @@ from symenergy.core.constraint import Constraint
 from symenergy.core.parameter import Parameter
 from symenergy.core.slot import noneslot
 
+from symenergy import _get_logger
 
+logger = _get_logger(__name__)
 
 class UnexpectedSymbolError(Exception):
 
@@ -167,6 +169,9 @@ class Asset(component.Component):
 
         else:
             raise UnexpectedSymbolError(variable)
+
+        logger.info('Variable %s has time dependence %s'%(variable,
+                                                          flag_timedep))
 
         return flag_timedep
 
