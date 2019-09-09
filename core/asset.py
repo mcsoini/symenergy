@@ -36,10 +36,10 @@ class Asset(component.Component):
 
     def __init__(self, name):
 
-        self.params = []
         super(Asset, self).__init__(name)
 #        self.name = name
 
+        self.params = []
 
     def get_constrained_variabs(self):
         '''
@@ -140,20 +140,6 @@ class Asset(component.Component):
             cstr.expr = cstr.mlt * var
 
             cstr_dict[slot] = cstr
-
-#    def init_is_capacity_constrained(self, capacity_name, variable):
-#
-#        self.is_capacity_constrained = (getattr(self, variable)
-#                                        if '%s_%s'%(capacity_name, self.name)
-#                                        in self.get_params_dict('name')
-#                                        else None)
-#
-#    def init_is_positive(self):
-#        ''''''
-#        self.is_positive = [var
-#                            for variab in self.VARIABS_POSITIVE
-#                            if hasattr(self, variab)
-#                            for _, var in getattr(self, variab).items()]
 
 
     def get_flag_timedep(self, variable):
