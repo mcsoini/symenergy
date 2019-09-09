@@ -136,6 +136,30 @@ class Storage(asset.Asset):
 
         self.init_cstr_storage()
 
+    @property
+    def slots_map(self):
+        return self._slots_map
+
+    @slots_map.setter
+    def slots_map(self, slots_map):
+        '''
+        Check that slots_map is a dictionary with keys *exactly* ['chg', 'dch']
+        and values lists with subsets of slots.
+        '''
+        assert set(slots_map) == {'chg', 'dch'}, \
+            'Invalid slots_map keys. Must be ["chg", "dch"]'
+
+        assert (set(itertools.chain.from_iterable(slots_map.values()))
+                    .issubset(set(self.slots))), \
+            'Invalid slots_map values. Must be subsets of slots.'
+
+#        assert (set(slots_map['chg']) == set(self.slots)
+#                or set(slots_map['dch']) == set(self.slots)), \
+#            'One of chg or dch must be defined for all slots.'
+
+        self._slots_map = slots_map
+
+
     def _init_prev_slot(self):
         '''
         Defines a dictionary with the previous slot for each time slot.
