@@ -818,6 +818,8 @@ class Model:
                 logger.info('%d'%x.idx)
                 for res, var in collect.items():
                     logger.info('     Solution for %s contained variabs %s.'%(res, var))
+        else:
+            raise ValueError('mask_res_unq must be 0 or 1')
 
         return [list_res_new]
 
