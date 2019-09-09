@@ -628,7 +628,7 @@ class Model:
                                  if var in x.variabs_multips]
                             for nres, res in enumerate(list(x.result)[0]))
 
-        res_vars = self.df_comb[['result', 'variabs_multips']].copy()
+        res_vars = self.df_comb[['result', 'variabs_multips', 'idx']].copy()
         res_vars.loc[mask_valid, 'res_vars'] = \
                 self.df_comb.loc[mask_valid].apply(get_residual_vars, axis=1)
 
