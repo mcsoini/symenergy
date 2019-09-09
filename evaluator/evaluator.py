@@ -449,19 +449,8 @@ class Evaluator(plotting.EvPlotting):
                      + constrs_cols_pos + constrs_cols_cap)
         df_lam_plot = self.df_lam_plot.reset_index()[keep_cols]
 
-        df_lam_plot['lambd_func_hash'] = \
-                df_lam_plot.lambd_func.apply(lambda x: 'func_%d'%abs(hash(x)))
-        if len(df_lam_plot.lambd_func.unique()) != len(df_lam_plot):
-            raise RuntimeError('lambd_func_hash has non-unique values.')
-
-
-        funcs = (df_lam_plot[['lambd_func_hash', 'lambd_func']]
-                            .apply(tuple, axis=1).tolist())
-        self.lambd_container = LambdContainer(funcs)
-
 
         df_lam_plot = self._init_constraints_active(df_lam_plot)
-
 
         df_x = self.df_x_vals
         df_lam = df_lam_plot
