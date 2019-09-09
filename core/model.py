@@ -412,22 +412,29 @@ class Model:
 
         idx = args[-1]
 
-    def solve(self, lagrange, variabs_multips_slct, index):
+        if not idx % 1:
+            t = time.time()
+            result = f(*args, **kwargs)
+            t = time.time() - t
             self.ema_solve = 0.7 * self.ema_solve + 0.3 * t
+        else:
+            result = f(*args, **kwargs)
 
 #        self.n_solved.increment()
 
-        mat = derive_by_array(lagrange, variabs_multips_slct)
-        mat = sp.Matrix(mat).expand()
         if not idx % 1:
             logger.info('Average solution time: {:.4f}, n=/{}'.format(self.ema_solve,
 #                                                                        self.n_solved,
                                                                         self.n_comb))
 
-        A, b = sp.linear_eq_to_matrix(mat, variabs_multips_slct)
+        return result
 
     @update_ema_time
+    def solve(self, lagrange, variabs_multips_slct, index):
 
+        mat = derive_by_array(lagrange, variabs_multips_slct)
+        mat = sp.Matrix(mat).expand()
+        A, b = sp.linear_eq_to_matrix(mat, variabs_multips_slct)
         solution = sp.linsolve((A, b), variabs_multips_slct)
 
         return None if isinstance(solution, sp.sets.EmptySet) else solution
@@ -449,6 +456,9 @@ class Model:
         self.ema_solve = 0
 #        self.n_solved = Counter()
 
+
+        if __name__ == '__main__':
+            lagrange, variabs_multips_slct, index = df[0]
 
         if not self.nthreads:
             self.df_comb['result'] = self.call_solve_df(df)
