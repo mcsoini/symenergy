@@ -285,82 +285,6 @@ class Evaluator(plotting.EvPlotting):
         aql.init_table(tb, self.sql_cols, sc, db=db,
                        warn_if_exists=warn_existing_tables)
 
-    def evaluate_by_x(self, x, df_lam, verbose):
-
-        df = df_lam.copy()
-
-        t = time.time()
-
-        if verbose:
-            print(x.name, x.to_dict(), end=' -> ')
-        for col in self.x_name:
-            df[col] = x[col]
-
-# ALTERNATIVE ATTEMPT: EVALUATE TC FIRST, THEN LOOP FROM LOWEST TC TO HIGHEST,
-# STOP WHEN FEASIBLE; DOESN'T SEEM tO BE FASTER IN ITS CURRENT FORM
-#            # evaluate total cost
-#            df_tc = df.loc[df.func == 'tc_lam_plot'].copy()
-#            df_tc['lambd'] = self._evaluate(df.loc[df.func == 'tc_lam_plot'])
-#            # drop nan
-#            df_tc = df_tc.loc[-df_tc.lambd.isnull()]
-#            # sort lowest to highest
-#            df_tc = df_tc.sort_values('lambd', ascending=True)
-#
-#            for ind, row in df_tc.iterrows():
-#                print(ind)
-#                df_cc = df.loc[(df.const_comb == row.const_comb)
-#                             & (df.func != 'tc_lam_plot')].copy()
-#
-#                df_cc['lambd'] = self._evaluate(df_cc)
-#
-#                mask_valid = self._get_mask_valid_solutions(df_cc)
-#
-#                if mask_valid.mask_valid.iloc[0]:
-#                    # we found the optimum
-#                    df_tc_slct = df_tc.loc[df_tc.const_comb == row.const_comb]
-#                    df_result = pd.concat([df_cc, df_tc_slct],
-#                                          axis=0, sort=False)
-#                    df_result['mask_valid'] = True
-#                    df_result['is_optimum'] = True
-#                    break
-#                else:
-#                    pass
-
-#        else:
-        df_result = df.copy()
-        df_result['lambd'] = self._evaluate(df_result)
-
-        def sanitize_unexpected_zeros(df):
-            for col, func in self.model.constrs_pos_cols_vars.items():
-                df.loc[(df.func == func + '_lam_plot')
-                       & (df[col] != 1) & (df['lambd'] == 0),
-                       'lambd'] = np.nan
-
-        sanitize_unexpected_zeros(df_result)
-
-        mask_valid = self._get_mask_valid_solutions(df_result)
-        df_result = df_result.join(mask_valid, on=mask_valid.index.names)
-        df_result['is_optimum'] = self.init_cost_optimum(df_result)
-
-        if self.drop_non_optimum:
-            df_result = df_result.loc[df_result.is_optimum]
-
-        if self.sql_params:
-            sc = self.sql_params['sql_schema']
-            db = self.sql_params['sql_db']
-            tb = self.sql_params['sql_table']
-            cols = [col[0].replace('"', '') for col in self.sql_cols]
-
-            aql.write_sql(df_result[cols], db, sc=sc,
-                          tb=tb, if_exists='append')
-            if verbose:
-                print(time.time() - t)
-            return None
-        else:
-            if verbose:
-                print(time.time() - t)
-            return df_result
-
 
     def _get_mask_valid_solutions(self, df):
 
@@ -403,6 +327,93 @@ class Evaluator(plotting.EvPlotting):
 
         return result
 
+
+    def call_evaluate_by_x_new(self, df_x, df_lam, verbose):
+
+        t = time.time()
+
+
+        new_index = df_x.set_index(df_x.columns.tolist()).index
+
+        def _eval(func):
+            data = func.iloc[0](*df_x.values.T)
+            if not isinstance(data, np.ndarray):
+                data = np.ones(df_x.iloc[:, 0].values.shape) * data
+            return pd.DataFrame(data, index=new_index)
+
+        df_result = df_lam.groupby(['func', 'idx']).lambd_func.apply(_eval)
+        df_result = df_result.rename(columns={0: 'lambd'})
+
+        cols = [c for c in df_lam.columns if c.startswith('act_')] + ['is_positive']
+        ind = ['func', 'idx']
+        df_result = df_result.reset_index().join(df_lam.set_index(ind)[cols], on=ind)
+
+        def sanitize_unexpected_zeros(df):
+            for col, func in self.model.constrs_pos_cols_vars.items():
+                df.loc[(df.func == func + '_lam_plot')
+                       & (df[col] != 1) & (df['lambd'] == 0),
+                       'lambd'] = np.nan
+
+        sanitize_unexpected_zeros(df_result)
+
+        mask_valid = self._get_mask_valid_solutions(df_result)
+        df_result = df_result.join(mask_valid, on=mask_valid.index.names)
+        df_result['is_optimum'] = self.init_cost_optimum(df_result)
+
+        if self.drop_non_optimum:
+            df_result = df_result.loc[df_result.is_optimum]
+
+        if verbose:
+            logger.info(time.time() - t)
+        return df_result
+
+
+    def evaluate_by_x(self, x, df_lam, verbose, new=True):
+
+        df = df_lam.copy()
+
+        t = time.time()
+
+        if verbose:
+            logger.info('Evaluating %s'%(str(x.to_dict())
+                                         if hasattr(x, 'to_dict') else str(x)))
+        logger.debug('x_name: %s'%self.x_name)
+        for col in self.x_name:
+            df[col] = x[col]
+
+        df_result = df.copy()
+        df_result['lambd'] = self._evaluate(df_result)
+
+        def sanitize_unexpected_zeros(df):
+            for col, func in self.model.constrs_pos_cols_vars.items():
+                df.loc[(df.func == func + '_lam_plot')
+                       & (df[col] != 1) & (df['lambd'] == 0),
+                       'lambd'] = np.nan
+
+        sanitize_unexpected_zeros(df_result)
+
+        mask_valid = self._get_mask_valid_solutions(df_result)
+        df_result = df_result.join(mask_valid, on=mask_valid.index.names)
+        df_result['is_optimum'] = self.init_cost_optimum(df_result)
+
+        if self.drop_non_optimum:
+            df_result = df_result.loc[df_result.is_optimum]
+
+#        if self.sql_params:
+#            sc = self.sql_params['sql_schema']
+#            db = self.sql_params['sql_db']
+#            tb = self.sql_params['sql_table']
+#            cols = [col[0].replace('"', '') for col in self.sql_cols]
+#
+#            aql.write_sql(df_result[cols], db, sc=sc,
+#                          tb=tb, if_exists='append')
+#            if verbose:
+#                logger.info(time.time() - t)
+#            return None
+#        else:
+        if verbose:
+            logger.info(time.time() - t)
+        return df_result
 
 
     def after_init_table(f):
