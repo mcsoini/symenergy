@@ -8,6 +8,7 @@ Part of symenergy. Copyright 2018 authors listed in AUTHORS.
 """
 import itertools
 import pandas as pd
+from symenergy.auxiliary.constrcomb import CstrCombBase
 from symenergy import _get_logger
 
 logger = _get_logger(__name__)
@@ -51,31 +52,33 @@ class Component():
                        cstr.is_equality_constraint]
         constrs_cols_neq = [cstr.col for cstr in constrs_neq]
 
-        pairs_mut_excl = self.get_mutually_exclusive_cstrs()
-        pairs_mut_excl = [comb + (True,) for comb in pairs_mut_excl]
+        mutually_exclusive_cols = self.get_mutually_exclusive_cstrs()
 
-        df_comb = pd.DataFrame(itertools.product(*[[False, True] for cc
-                                              in constrs_neq]),
+        ncombs = 2**len(constrs_neq)
+
+        logger.warning(('Component %s: Generating df_comb with length %d'
+                        )%(self.name, ncombs))
+
+        bools = [[False, True] for cc in constrs_neq]
+        df_comb = pd.DataFrame(itertools.product(*bools),
                                columns=constrs_cols_neq, dtype=bool)
 
         for cols in mutually_exclusive_cols:
             logger.info('Deleting constraint combination: %s'%str(cols))
 
-        for col1, col2, is_exclusive in pairs_mut_excl:
+            mask = pd.Series(True, index=df_comb.index)
 
-            if is_exclusive:
-                mask = ((df_comb[col1] == 1) & (df_comb[col2] == 1))
-                df_comb = df_comb.loc[-mask]
-            else:
-                mask = (((df_comb[col1] == 1) & (df_comb[col2] == 1))
-                      | ((df_comb[col1] == 0) & (df_comb[col2] == 0)))
-                df_comb = df_comb.loc[mask]
-            tot_delete += mask.sum()
+            for col, bool_act in cols:
+                mask = mask & (df_comb[col] == bool_act)
+
+            df_comb = df_comb.loc[~mask]
 
             ndel = mask.sum()
             logger.info(('... total deleted: %s (%s), remaining: %s'
                          )%(ndel, '{:.1f}%'.format(ndel/ncombs*100),
                             len(df_comb)))
+
+        self._df_comb = df_comb
 
         return df_comb
 
@@ -136,30 +139,27 @@ class Component():
 
     def get_mutually_exclusive_cstrs(self):
         '''
-        This expands the pairs from the MUTUALLY_EXCLUSIVE class attribute
-        to all constraint columns.
+        Time dependent mutually inclusive constraints.
         '''
 
-        dict_cstrs = {key: attr for key, attr in vars(self).items()
-                      if key.startswith('cstr_')}
+        list_col_names = []
+        for mename, me in self.MUTUALLY_EXCLUSIVE.items():
 
-        self.get_constraints(False, True)
+            ccb = CstrCombBase(mename, me, list(self.slots.values()),
+                               self.get_constraints(by_slot=False, names=True))
+
+            list_col_names.append(ccb.gen_col_combs())
 
 
-        mutually_exclusive = [(cstr1, cstr2) for cstr1, cstr2 in self.MUTUALLY_EXCLUSIVE
-                              if 'cstr_%s'%cstr1 in dict_cstrs
-                              and 'cstr_%s'%cstr2 in dict_cstrs]
+        return list(itertools.chain.from_iterable(list_col_names))
 
-        mutually_exclusive_cols = []
-        for cstr1, cstr2 in mutually_exclusive:
 
-            for slot, cstr1_obj in dict_cstrs['cstr_%s'%cstr1].items():
+    def get_mutually_inclusive_cstrs(self):
+        '''
+        Implemented in child classes
+        '''
 
-                cstr2_obj = dict_cstrs['cstr_%s'%cstr2][slot]
-
-                mutually_exclusive_cols.append((cstr1_obj.col, cstr2_obj.col))
-
-        return mutually_exclusive_cols
+        return []
 
 
     def get_variabs(self):
