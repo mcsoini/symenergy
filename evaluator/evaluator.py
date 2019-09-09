@@ -12,8 +12,6 @@ import pandas as pd
 import itertools
 import time
 
-import symenergy.auxiliary.sqlutils.aux_sql_func as aql
-
 from symenergy import _get_logger
 
 logger = _get_logger(__name__)
