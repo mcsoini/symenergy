@@ -17,6 +17,12 @@ import symenergy.auxiliary.sqlutils.aux_sql_func as aql
 
 from symenergy.auxiliary.parallelization import parallelize_df
 
+from symenergy import _get_logger
+
+logger = _get_logger(__name__)
+
+
+
 class LambdContainer():
 
     def __init__(self, funcs):
@@ -136,7 +142,7 @@ class Evaluator(plotting.EvPlotting):
                      else list_dep_var[0])
         for slct_eq_0 in list_dep_var:
 
-            print('Extracting solution for %s'%slct_eq_0, end='...')
+            logger.info('Extracting solution for %s...'%slct_eq_0)
 
             slct_eq = (slct_eq_0.name
                        if not isinstance(slct_eq_0, str)
@@ -148,7 +154,7 @@ class Evaluator(plotting.EvPlotting):
                 get_func = lambda x: self._get_func_from_idx(x, slct_eq)
                 self.dfev[slct_eq] = self.dfev.apply(get_func, axis=1)
 
-            print('substituting', end='...')
+            logger.info('substituting...')
             self.dfev['%s_expr_plot'%slct_eq] = \
                         self.dfev[slct_eq].apply(self._subs_param_values)
 
@@ -156,11 +162,11 @@ class Evaluator(plotting.EvPlotting):
                                                     modules=['numpy'],
                                                     dummify=False)
 
-            print('lambdify', end='...')
+            logger.info('lambdify...')
 
             self.dfev[slct_eq + '_lam_plot'] = (
                             self.dfev['%s_expr_plot'%slct_eq].apply(lambdify))
-            print('done.')
+            logger.info('done.')
 
         idx = list(map(str, self.model.constrs_cols_neq)) + ['const_comb']
         cols = [c for c in self.dfev.columns
