@@ -787,9 +787,8 @@ class Model:
 
     def fix_linear_dependencies(self, x):
         '''
-        Linear solutions
-
-        All solutions showing linear dependencies are set to zero.
+        All solutions showing linear dependencies are set to zero. See doc
+        of symenergy.core.model.Model.get_mask_linear_dependencies
         '''
 
         if __name__ == '__main__':
