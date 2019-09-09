@@ -153,6 +153,31 @@ class Storage(asset.Asset):
             self.VARIABS = copy(self.VARIABS) + ['e']
 
 
+    def get_mutually_exclusive_cstrs(self):
+        '''
+        This overwrites the symenergy.core.component method; CstrCombBase
+        is initialized with self._dict_prev_slot instead of self.slots.
+        '''
+
+        list_col_names = []
+
+        mename, me = list(self.MUTUALLY_EXCLUSIVE.items())[0]
+        for mename, me in self.MUTUALLY_EXCLUSIVE.items():
+
+            list_cstrs = me
+            slots_def = self._dict_prev_slot
+            dict_cstrs = self.get_constraints(by_slot=False, names=True)
+
+            ccb = CstrCombBase(mename, list_cstrs, slots_def, dict_cstrs)
+
+            list_col_names.append(ccb.gen_col_combs())
+
+        list_col_names = list(itertools.chain.from_iterable(list_col_names))
+        list_col_names = [cols for cols in list_col_names if cols]
+
+        return list_col_names
+
+
     def init_cstr_storage(self):
         '''
         Initialize storage constraints.
