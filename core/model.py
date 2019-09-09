@@ -636,8 +636,11 @@ class Model:
             x = res_vars.iloc[1]
 
         # add solution variable itself to all non-empty lists
-        add_solution_var = \
-            lambda x: tuple(x.res_vars[nres_vars]
+        def add_solution_var(x):
+            if x.idx%100 == 0:
+                logger.info(x.idx)
+
+            return tuple(x.res_vars[nres_vars]
                                 + [x.variabs_multips[nres_vars]]
                             if res_vars else []
                             for nres_vars, res_vars in enumerate(x.res_vars))
