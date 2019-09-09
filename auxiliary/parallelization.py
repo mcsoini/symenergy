@@ -21,7 +21,7 @@ except Exception as e: logger.info(e)
 
 class Counter():
     def __init__(self):
-        self.val = Value('i', 0)
+        self.val = Value('f', 0)
         self.lock = Lock()
 
     def reset(self):
@@ -32,14 +32,23 @@ class Counter():
         with self.lock:
             self.val.value += 1
 
+    def update_ema(self, newval):
+        with self.lock:
+            if self.val.value == 0:  # first run
+                self.val.value = newval
+            else:
+                self.val.value = self.val.value * 0.99 + 0.01 * newval
+
     def value(self):
         with self.lock:
             return self.val.value
 
 MP_COUNTER = Counter()
+MP_EMA = Counter()
 
 def parallelize_df(df, func, nthreads, use_pathos=False, **kwargs):
     MP_COUNTER.reset()
+    MP_EMA.reset()
 
     nthreads = min(nthreads, len(df))
     nchunks = min(nthreads * 6, len(df))

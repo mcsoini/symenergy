@@ -27,7 +27,7 @@ from symenergy.core.constraint import Constraint
 from symenergy.core.slot import Slot, noneslot
 from symenergy.core.parameter import Parameter
 from symenergy.auxiliary.parallelization import parallelize_df
-from symenergy.auxiliary.parallelization import MP_COUNTER
+from symenergy.auxiliary.parallelization import MP_COUNTER, MP_EMA
 from symenergy import _get_logger
 from symenergy.patches.sympy_linsolve import linsolve
 
@@ -64,7 +64,6 @@ class Model:
         self.ncomb = None  # determined through construction of self.df_comb
         self.nress = None  # number of valid results
 
-        self.ema_solve = 0  # exponentially moving average of solving time
 
     def update_component_list(f):
         def wrapper(self, *args, **kwargs):
@@ -389,38 +388,6 @@ class Model:
         return [ss for ss in lfs if ss in self.variabs or ss in self.multips]
 
 
-
-#    def print_row(self, index, matrix_dim):
-#
-#        matrix_dim = 'Matrix %s'%'x'.join(map(str, matrix_dim))
-#
-#        strg = 'Constr. comb. %d out of %d: %s.'%(index, self.n_comb,
-#                                                     matrix_dim)
-#
-#        logger.info(strg)
-
-
-    @wrapt.decorator
-    def update_ema_time(f, self, args, kwargs):
-
-        idx = args[-1]
-
-        if not idx % 1:
-            t = time.time()
-            result = f(*args, **kwargs)
-            t = time.time() - t
-            self.ema_solve = 0.7 * self.ema_solve + 0.3 * t
-        else:
-            result = f(*args, **kwargs)
-
-        if not idx % 100:
-            logger.info('Average solution time: {:.4f}, n=/{}'.format(self.ema_solve,
-#                                                                        self.n_solved,
-                                                                        self.n_comb))
-
-        return result
-
-    @update_ema_time
     def solve(self, lagrange, variabs_multips_slct, index):
 
         mat = derive_by_array(lagrange, variabs_multips_slct)
@@ -436,12 +403,17 @@ class Model:
     def call_solve_df(self, df):
         ''' Applies to dataframe. '''
 
+        t = time.time()
         res = [self.solve(lag, var, idx) for lag, var, idx in df]
+        t = (time.time() - t)  / len(df)
 
-        vals = (MP_COUNTER.value(), self.ncomb,
+        MP_EMA.update_ema(t)
+#
+        vals = (int(MP_COUNTER.value()), self.ncomb,
                 MP_COUNTER.value()/self.ncomb * 100,
-                len(df))
-        logger.info(('Solving: {}/{} ({:.1f}%), chunksize {}').format(*vals))
+                len(df), MP_EMA.value()/len(df)*1000, t*1000)
+        logger.info(('Solving: {}/{} ({:.1f}%), chunksize {}, '
+                     'tavg={:.1f}ms, tcur={:.1f}ms').format(*vals))
 
         return res
 
@@ -451,8 +423,6 @@ class Model:
         df = list(zip(self.df_comb.lagrange,
                       self.df_comb.variabs_multips,
                       self.df_comb.idx))
-
-        self.ema_solve = 0
 
         if __name__ == '__main__':
             lagrange, variabs_multips_slct, index = df[0]
