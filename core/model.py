@@ -692,56 +692,46 @@ class Model:
 
         return m_name
 
-    def cache(self, list_infeas):
+
+    def filter_invalid_solutions(self):
         '''
-        Saves list of infeasible constraint combinations to file on disk.
         '''
 
-        if not os.path.isfile(self.cache_fn):
-            list_infeas.to_csv(self.cache_fn, index=False)
 
-
-
-
-
-
-#    def delete_cached(self):
+#        #
+#        smaller_combs_inf = []
+#        for n in range(1, len(self.constrs_cols_neq)):
 #
-#        try:
-#            list_infeas = pd.read_csv(self.cache_fn, header=None)
-#            list_infeas = list_infeas.iloc[:, 0].tolist()
-#        except:
-#            print('Model cache file %s doesn\'t exist. '
-#                  'Skipping.'%self.cache_fn)
-#            list_infeas = None
+#            combs = [c for c in map(set, itertools.combinations(self.constrs_cols_neq, n))
+#                     if not any(infc.issubset(c) for infc in smaller_combs_inf)]
 #
-#        if list_infeas:
+#            for comb in combs:
+#                val_combs = self.df_comb[comb].apply(tuple, axis=1).unique().tolist()
 #
-#            self.df_comb = self.df_comb.loc[-self.df_comb.const_comb.isin(list_infeas)]
+#                for val_comb in val_combs:
+#                    mask = ~mask_empty.copy()
+#                    for val, col in list(zip(val_comb, comb)):
+#                        mask *= self.df_comb[col] == val
+#
+#                    count_feas = len(self.df_comb.loc[mask, list(comb)].drop_duplicates())
+#                    if count_feas == 0:
+#                        print(comb, val_comb, count_feas)
+#                        smaller_combs_inf.append(comb)
+#
+#
+#
+#
+#
+#        self.df_comb.loc[mask_empty, self.constrs_cols_neq].iloc[:, [0, 1, 2]].drop_duplicates()
+#
+#
+#        print('The following constraint combinations have empty solutions:\n',
+#              self.df_comb.loc[mask_empty, self.constrs_cols_neq])
+#
+#        list_infeas = self.df_comb.loc[mask_empty, 'const_comb']
 
-    def filter_invalid_solutions(self, cache=False):
 
         mask_empty = self.get_mask_empty_solution()
-
-        #
-        smaller_combs_inf = []
-        for n in range(1, len(self.constrs_cols_neq)):
-
-            combs = [c for c in map(set, itertools.combinations(self.constrs_cols_neq, n))
-                     if not any(infc.issubset(c) for infc in smaller_combs_inf)]
-
-            for comb in combs:
-                val_combs = self.df_comb[comb].apply(tuple, axis=1).unique().tolist()
-
-                for val_comb in val_combs:
-                    mask = ~mask_empty.copy()
-                    for val, col in list(zip(val_comb, comb)):
-                        mask *= self.df_comb[col] == val
-
-                    count_feas = len(self.df_comb.loc[mask, list(comb)].drop_duplicates())
-                    if count_feas == 0:
-                        print(comb, val_comb, count_feas)
-                        smaller_combs_inf.append(comb)
 
         ncomb0 = len(self.df_comb)
         nempty = mask_empty.sum()
@@ -749,19 +739,14 @@ class Model:
         logger.info('Number of empty solutions: '
                     '{:d} ({:.1f}%)'.format(nempty, shareempty))
 
+        # keep empty solutions constraint combinations for post-analysis
+        self.df_comb_invalid = self.df_comb.loc[mask_empty,
+                                                self.constrs_cols_neq]
 
-
-
-        self.df_comb.loc[mask_empty, self.constrs_cols_neq].iloc[:, [0, 1, 2]].drop_duplicates()
-
-
-        print('The following constraint combinations have empty solutions:\n',
-              self.df_comb.loc[mask_empty, self.constrs_cols_neq])
-
-        list_infeas = self.df_comb.loc[mask_empty, 'const_comb']
-
+        # remove invalid constraint combinations
         self.df_comb = self.df_comb.loc[-mask_empty]
 
+        # get info on linear combinations
         mask_lindep = self.get_mask_linear_dependencies()
 
         nkey1, nkey2 = (mask_lindep == 1).sum(), (mask_lindep == 2).sum()
@@ -773,14 +758,11 @@ class Model:
         self.df_comb = pd.concat([self.df_comb, mask_lindep], axis=1)
         self.df_comb = self.df_comb.loc[-(mask_lindep > 1)]
 
-
+        # adjust results for single-component linear dependencies
         self.df_comb['result'] = \
                 self.df_comb.apply(self.fix_linear_dependencies, axis=1)
 
-
-        # arguably obsolete
-#        if cache:
-#            self.cache(list_infeas)
+        self.nress = len(self.df_comb)
 
 
     def fix_linear_dependencies(self, x):
