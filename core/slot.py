@@ -27,7 +27,7 @@ class Slot(component.Component):
 
     MUTUALLY_EXCLUSIVE = {}
 
-    def __init__(self, name, load, vre, weight=None):
+    def __init__(self, name, load, vre, weight=1):
 
         self.name = name
 
@@ -38,7 +38,7 @@ class Slot(component.Component):
 
     def __repr__(self):
 
-        return 'Slot %s'%str(self.name) + (', weight %s'%self.weight if self.weight else '')
+        return 'Slot %s'%str(self.name) + (', weight %s'%self.weight)
 
 class NoneSlot():
     
