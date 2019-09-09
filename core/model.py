@@ -108,11 +108,10 @@ class Model:
 
     def init_cache_pickle_filename(self):
 
-        fn = '%s.csv'%self.get_name()
+        fn = '%s.pickle'%self.get_name()
         fn = os.path.join(list(symenergy.__path__)[0], 'cache', fn)
 
         self.cache_fn = fn
-        self.pickle_fn = fn.replace('.csv', '.pickle')
 
 
     @property
@@ -213,7 +212,6 @@ class Model:
 
     def generate_solve(self):
 
-            self.df_comb = pd.read_pickle(self.pickle_fn)
         if os.path.isfile(self.cache_fn):
             log_str1 = 'Loading from pickle file %s.'%self.cache_fn
             log_str2 = 'Please delete this file to re-solve model.'
@@ -223,6 +221,7 @@ class Model:
             logger.info(log_str2)
             logger.info('*'*max(len(log_str1), len(log_str2)))
             logger.info('*'*max(len(log_str1), len(log_str2)))
+            self.df_comb = pd.read_pickle(self.cache_fn)
 
         else:
 
@@ -241,8 +240,7 @@ class Model:
             self.generate_total_costs()
 
             self.fix_stored_energy()
-
-            self.df_comb.to_pickle(self.pickle_fn)
+            self.df_comb.to_pickle(self.cache_fn)
 
 
     def generate_total_costs(self):
