@@ -620,8 +620,11 @@ class Model:
         mask_valid = self.df_comb.result.apply(not_empty)
 
         # for each individual solution, get residual variables/multipliers
-        get_residual_vars = \
-            lambda x: tuple([var for var in res.free_symbols
+        def get_residual_vars(x):
+            if x.idx%100 == 0:
+                logger.info(x.idx)
+
+            return tuple([var for var in res.free_symbols
                                  if var in x.variabs_multips]
                             for nres, res in enumerate(list(x.result)[0]))
 
