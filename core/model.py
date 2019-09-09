@@ -16,6 +16,7 @@ import hashlib
 import time
 from sympy.tensor.array import derive_by_array
 
+
 import symenergy
 from symenergy.assets.plant import Plant
 from symenergy.assets.storage import Storage
@@ -24,6 +25,13 @@ from symenergy.core.constraint import Constraint
 from symenergy.core.slot import Slot, noneslot
 from symenergy.core.parameter import Parameter
 from symenergy.auxiliary.parallelization import parallelize_df
+from symenergy import _get_logger
+
+
+
+logger = _get_logger(__name__)
+
+logger.warning('!!! Monkey-patching sympy.linsolve !!!')
 
 
 if __name__ == '__main__':
@@ -182,10 +190,16 @@ class Model:
 
     def generate_solve(self):
 
-        if os.path.isfile(self.pickle_fn):
-
-            print('Loading from pickle file %s.'%self.pickle_fn)
             self.df_comb = pd.read_pickle(self.pickle_fn)
+        if os.path.isfile(self.cache_fn):
+            log_str1 = 'Loading from pickle file %s.'%self.cache_fn
+            log_str2 = 'Please delete this file to re-solve model.'
+            logger.info('*'*max(len(log_str1), len(log_str2)))
+            logger.info('*'*max(len(log_str1), len(log_str2)))
+            logger.info(log_str1)
+            logger.info(log_str2)
+            logger.info('*'*max(len(log_str1), len(log_str2)))
+            logger.info('*'*max(len(log_str1), len(log_str2)))
 
         else:
 
@@ -429,19 +443,16 @@ class Model:
         strg = 'Constr. comb. %d out of %d: %s.'%(index, self.n_comb,
                                                      matrix_dim)
 
-        print(strg)
 
     def solve(self, lagrange, variabs_multips_slct, index):
 
-        if not index % 1000:
-            print(index, self.n_comb)
+#        self.n_solved.increment()
 
         mat = derive_by_array(lagrange, variabs_multips_slct)
         mat = sp.Matrix(mat).expand()
 
         A, b = sp.linear_eq_to_matrix(mat, variabs_multips_slct)
 
-#        self.print_row(index, (A.rows, A.cols))
 
         solution = sp.linsolve((A, b), variabs_multips_slct)
 
@@ -451,7 +462,7 @@ class Model:
     def call_solve_df(self, df):
         ''' Applies to dataframe. '''
 
-        print('Calling call_solve_df on list with length %d'%len(df))
+        logger.info('Calling call_solve_df on list with length %d'%len(df))
         return [self.solve(lag, var, idx) for lag, var, idx in df]
 
 
@@ -490,8 +501,9 @@ class Model:
         This expresses the total cost as a function of the parameters.
         '''
 
-        if not idx % 1:
-            print(idx)
+        if not idx % 10:
+            logger.info('Substituting parameters into total '
+                        'cost %d/%d'%(idx, self.nress))
 
         dict_var = {var: list(result)[0][ivar]
                     if not isinstance(result, sp.sets.EmptySet)
@@ -503,7 +515,7 @@ class Model:
 
     def call_subs_tc(self, df):
 
-        print('Calling call_subs_tc on list with length %d'%len(df))
+        logger.info('Calling call_subs_tc on list with length %d'%len(df))
         return [self.subs_total_cost(res, var, idx) for res, var, idx in df]
 
 
@@ -538,7 +550,7 @@ class Model:
         '''
         Top-level method for parallelization of construct_lagrange.
         '''
-        print('Calling call_construct_lagrange on DataFrame '
+        logger.info('Calling call_construct_lagrange on DataFrame '
               'with length %d'%len(df))
         return df.apply(self.construct_lagrange, axis=1).tolist()
 
@@ -546,7 +558,7 @@ class Model:
 
     def call_get_variabs_multips_slct(self, df):
 
-        print('Calling get_variabs_multips_slct on DataFrame '
+        logger.info('Calling get_variabs_multips_slct on DataFrame '
               'with length %d'%len(df))
 
         return list(map(self.get_variabs_multips_slct, df))
@@ -557,7 +569,7 @@ class Model:
         and the variables.
         '''
 
-        print('Defining lagrangians...')
+        logger.info('Defining lagrangians...')
         if not self.nthreads:
             df = self.df_comb[self.constrs_cols_neq]
             self.df_comb['lagrange'] = self.call_construct_lagrange(df)
@@ -569,7 +581,7 @@ class Model:
 
 
 
-        print('Getting selected variables/multipliers...')
+        logger.info('Getting selected variables/multipliers...')
         df = self.df_comb.lagrange
         self.list_variabs_multips = self.call_get_variabs_multips_slct(df)
         self.df_comb['variabs_multips'] = self.list_variabs_multips
@@ -750,6 +762,11 @@ class Model:
                         print(comb, val_comb, count_feas)
                         smaller_combs_inf.append(comb)
 
+        ncomb0 = len(self.df_comb)
+        nempty = mask_empty.sum()
+        shareempty = nempty / ncomb0 * 100
+        logger.info('Number of empty solutions: '
+                    '{:d} ({:.1f}%)'.format(nempty, shareempty))
 
 
 
@@ -766,14 +783,11 @@ class Model:
 
         mask_lindep = self.get_mask_linear_dependencies()
 
-        print('The following constraint combinations '
-              'have mixed residual interdependencies of variables '
-              'and are removed:\n',
-              self.df_comb.loc[(mask_lindep > 1), self.constrs_cols_neq])
-
-        list_infeas = pd.concat([list_infeas,
-                        self.df_comb.loc[mask_lindep > 1,
-                                          'const_comb']], axis=0)
+        nkey1, nkey2 = (mask_lindep == 1).sum(), (mask_lindep == 2).sum()
+        logger.warning(('Number of solutions with linear dependencies: '
+                       'Key 1: {:d} ({:.1f}%), Key 2: {:d} ({:.1f}%)'
+                       ).format(nkey1, nkey1/ncomb0*100,
+                                nkey2, nkey2/ncomb0*100))
 
         self.df_comb = pd.concat([self.df_comb, mask_lindep], axis=1)
         self.df_comb = self.df_comb.loc[-(mask_lindep > 1)]
@@ -819,9 +833,9 @@ class Model:
                     collect[list_var[nres]] = ', '.join(map(str, free_symbs))
 
             if collect:
-                print('%s'%x[self.constrs_cols_neq])
+                logger.info('%d'%x.idx)
                 for res, var in collect.items():
-                    print('     Solution for %s contained variabs %s.'%(res, var))
+                    logger.info('     Solution for %s contained variabs %s.'%(res, var))
 
         return [list_res_new]
 

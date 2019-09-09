@@ -8,9 +8,10 @@ Part of symenergy. Copyright 2018 authors listed in AUTHORS.
 """
 import itertools
 import pandas as pd
-#from symenergy import _get_logger
+from symenergy import _get_logger
 
-#logger = _get_logger(__name__)
+logger = _get_logger(__name__)
+
 
 
 class Component():
@@ -53,9 +54,8 @@ class Component():
                                               in constrs_neq]),
                                columns=constrs_cols_neq, dtype=bool)
 
-        print(self.name, ': Deleting mutually exclusive constraints from '
-              'df_comb (%s rows)'%len(df_comb), end=' ... ')
-        tot_delete = 0
+        for cols in mutually_exclusive_cols:
+            logger.info('Deleting constraint combination: %s'%str(cols))
 
         for col1, col2, is_exclusive in pairs_mut_excl:
 
@@ -68,7 +68,10 @@ class Component():
                 df_comb = df_comb.loc[mask]
             tot_delete += mask.sum()
 
-        print('Total deleted: ', tot_delete)
+            ndel = mask.sum()
+            logger.info(('... total deleted: %s (%s), remaining: %s'
+                         )%(ndel, '{:.1f}%'.format(ndel/ncombs*100),
+                            len(df_comb)))
 
         return df_comb
 

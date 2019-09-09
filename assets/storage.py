@@ -13,6 +13,11 @@ from symenergy.core.constraint import Constraint
 from symenergy.core.slot import Slot, noneslot
 from symenergy.core.parameter import Parameter
 
+from symenergy import _get_logger
+
+logger = _get_logger(__name__)
+
+
 class Storage(asset.Asset):
     '''
     For simplicity, storage is modelled with fixed time slots for
