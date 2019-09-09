@@ -13,8 +13,6 @@ from symenergy import _get_logger
 
 logger = _get_logger(__name__)
 
-
-
 class Component():
     '''
     Make sure that all children implement PARAMS, VARIABS AND MULTIPS
@@ -112,6 +110,8 @@ class Component():
         Returns
         -------
         list of constraint objects
+
+        TODO: names=True only keeps single time slot
 
         '''
 
