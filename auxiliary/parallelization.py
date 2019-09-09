@@ -10,9 +10,13 @@ import multiprocessing
 import numpy
 import pandas as pd
 import itertools
+from symenergy import _get_logger
+
+logger = _get_logger(__name__)
+
 try:
     from pathos.multiprocessing import ProcessingPool as Pool
-except Exception as e: print(e)
+except Exception as e: logger.info(e)
 
 def parallelize_df(df, func, nthreads, use_pathos=False, **kwargs):
     nthreads = min(nthreads, len(df))
@@ -30,12 +34,12 @@ def parallelize_df(df, func, nthreads, use_pathos=False, **kwargs):
     if use_pathos:
         pool.clear()
         pool.restart()
-    print('parallelize_df: concatenating', end=' ... ')
+    logger.info('parallelize_df: concatenating ... ')
     if isinstance(results[0], (list, tuple)):
         result = list(itertools.chain.from_iterable(results))
     else:
         result = pd.concat(results)
-    print('done.')
+    logger.info('done.')
     return result
 
 
