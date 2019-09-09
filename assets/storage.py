@@ -42,12 +42,54 @@ class Storage(asset.Asset):
     VARIABS = ['e']
     VARIABS_TIME = ['pchg', 'pdch', 'e']
 
-    VARIABS_POSITIVE = ['p', 'e', 'C_ret', 'C_add']
+    VARIABS_POSITIVE = ['p', 'e', 'C_ret', 'C_add', 'pchg', 'pdch']
 
-    MUTUALLY_EXCLUSIVE = [('pos_C_ret', 'C_ret_cap_C'),
-                          ('pos_pchg', 'pchg_cap_C'),
-                          ('pos_pdch', 'pdch_cap_C'),
-                          ('pos_e', 'e_cap_E')]
+    MUTUALLY_EXCLUSIVE = {
+        'Empty storage stays empty w/o charging_0':
+            (('pos_e', 'last', True), ('pos_pchg', 'this', True), ('pos_e', 'this', False)),
+        'Empty storage stays empty w/o charging_1':
+            (('pos_e', 'last', True), ('pos_pchg', 'this', False), ('pos_e', 'this', True)),
+#        'Empty storage stays empty w/o charging_2':  # << this combination is wrong and deletes valid solutions
+#            (('pos_e', 'last', False), ('pos_pchg', 'this', True), ('pos_e', 'this', True)),
+
+        'Full storage stays full w/o discharging_0':
+            (('e_cap_E', 'last', True), ('pos_pdch', 'this', True), ('e_cap_E', 'this', False)),
+        'Full storage stays full w/o discharging_1':
+            (('e_cap_E', 'last', True), ('pos_pdch', 'this', False), ('e_cap_E', 'this', True)),
+#        'Full storage stays full w/o discharging_2':  # << this combination is wrong and deletes valid solutions
+#            (('e_cap_E', 'last', False), ('pos_pdch', 'this', True), ('e_cap_E', 'this', True)),
+
+        'Full storage can`t charge':
+            (('e_cap_E', 'last', True), ('pos_pchg', 'this', False)),
+        'Empty storage can`t discharge':
+            (('pos_e', 'last', True), ('pos_pdch', 'this', False)),
+
+        'No simultaneous non-zero charging and non-zero discharging':
+            (('pos_pchg', 'this', False), ('pos_pdch', 'this', False)),
+        'No simultaneous full-power charging and full-power discharging':
+            (('pchg_cap_C', 'this', True), ('pdch_cap_C', 'this', True)),
+
+        'Storage energy not simult. full and empty':
+            (('pos_e', 'this', True), ('e_cap_E', 'this', True)),
+        'Storage charging not simult. max end zero':
+            (('pos_pchg', 'this', True), ('pchg_cap_C', 'this', True)),
+        'Storage discharging not simult. max end zero':
+            (('pos_pdch', 'this', True), ('pdch_cap_C', 'this', True)),
+
+        'All charging zero -> each discharging cannot be non-zero':
+            (('pos_pchg', 'all', True), ('pos_pdch', 'this', False)),
+        'All charging zero -> each energy cannot be non-zero':
+            (('pos_pchg', 'all', True), ('pos_e', 'this', False)),
+        'All discharging zero -> each energy cannot be non-zero':
+            (('pos_dchg', 'all', True), ('pos_e', 'this', False)),
+        'All discharging zero -> each charging cannot be non-zero':
+            (('pos_dchg', 'all', True), ('pos_pchg', 'this', False)),
+        'All energy zero -> each charging cannot be non-zero':
+            (('pos_e', 'all', True), ('pos_pchg', 'this', False)),
+        'All energy zero -> each discharging cannot be non-zero':
+            (('pos_e', 'all', True), ('pos_pdch', 'this', False)),
+
+        }
 
     def __init__(self, name, eff, slots_map=None, slots=None,
                  capacity=False, energy_capacity=False):

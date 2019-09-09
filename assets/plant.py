@@ -34,8 +34,12 @@ class Plant(asset.Asset):
     VARIABS_POSITIVE = ['p', 'C_ret', 'C_add']
 
     # mutually exclusive constraint combinations
-    MUTUALLY_EXCLUSIVE = [('pos_C_ret', 'C_ret_cap_C'),
-                          ('pos_p', 'p_cap_C')]
+    MUTUALLY_EXCLUSIVE = {
+        'Power plant retirement not simult. max end zero':
+            (('pos_C_ret', 'this', True), ('C_ret_cap_C', 'this', True)),
+        'Power plant output not simult. max end zero':
+            (('pos_p', 'this', True), ('p_cap_C', 'this', True))
+        }
 
     def __init__(self, name, vc0, vc1=None,
                  fcom=None, slots=None, capacity=False, cap_ret=False):

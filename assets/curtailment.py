@@ -19,7 +19,7 @@ class Curtailment(asset.Asset):
 
     VARIABS_POSITIVE = ['p']
 
-    MUTUALLY_EXCLUSIVE = []
+    MUTUALLY_EXCLUSIVE = {}
 
     def __init__(self, name, slots=None):
 
