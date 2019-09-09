@@ -584,11 +584,16 @@ class Evaluator(plotting.EvPlotting):
         df_bal = df.loc[df.is_optimum].copy()
 
         # base dataframe: all operational variables
-        drop = ['tc', 'pi_', 'lb_']
+        drop = ['tc_', 'pi_', 'lb_']
         df_bal = df_bal.loc[-df_bal.func.str.contains('|'.join(drop))]
 
         df_bal = df_bal[['func', 'idx', 'func_no_slot',
                          'slot', 'lambd'] + self.x_name]
+
+        # map to pwr/erg
+        list_erg_var = [var_e.name for store in self.model.storages.values() for var_e in store.e.values()]
+        list_erg_func = [f for f in df_bal.func.unique() if any(f.startswith(var_e) for var_e in list_erg_var)]
+        df_bal['pwrerg'] = df_bal.assign(pwrerg='erg').pwrerg.where(df_bal.func.isin(list_erg_func), 'pwr')
 
         # add parameters
         par_add = ['l', 'vre']
@@ -603,6 +608,7 @@ class Evaluator(plotting.EvPlotting):
         df_bal_add = df_bal_add.rename(columns={'level_%d'%(1 + len(self.x_name)): 'func'})
         df_bal_add['func_no_slot'] = df_bal_add.func.apply(lambda x: '_'.join(x.split('_')[:-1]))
         df_bal_add['slot'] = df_bal_add.func.apply(lambda x: x.split('_')[-1])
+        df_bal_add['pwrerg'] = 'pwr'
 #        map_const_comb = df_bal[self.x_name + ['const_comb']].drop_duplicates()
 #        df_bal_add = df_bal_add.join(map_const_comb.set_index(self.x_name)['const_comb'], on=self.x_name)
 
@@ -619,9 +625,10 @@ class Evaluator(plotting.EvPlotting):
         df_bal.loc[df_bal.func_no_slot.isin(varpar_neg), 'lambd'] *= -1
 
         # negative by func
-        varpar_neg = [store.name + '_p_' + slot_name + '_lam_plot'
+        varpar_neg = [store.name + '_p' + chgdch + '_' + slot_name + '_lam_plot'
                       for store in self.model.storages.values()
-                      for slot_name, chgdch in store.slots_map.items() if chgdch == 'chg']
+                      for chgdch, slots_names in store.slots_map.items()
+                      for slot_name in slots_names if chgdch == 'chg']
 
         df_bal.loc[df_bal.func.isin(varpar_neg), 'lambd'] *= -1
 
