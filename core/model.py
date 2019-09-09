@@ -7,7 +7,9 @@ Part of symenergy. Copyright 2018 authors listed in AUTHORS.
 """
 import os
 import sys
+import wrapt
 
+from pathlib import Path
 import itertools
 import pandas as pd
 import sympy as sp
