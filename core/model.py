@@ -607,9 +607,9 @@ class Model:
 
         '''
 
-        check_vars_left = lambda x: any(var in x.result.free_symbols
-                                        for var in x.variabs_multips)
-        mask_lindep = self.df_comb.apply(check_vars_left, axis=1)
+#        check_vars_left = lambda x: any(var in x.result.free_symbols
+#                                        for var in x.variabs_multips)
+#        mask_lindep = self.df_comb.apply(check_vars_left, axis=1)
 
         # get residual variables
         if __name__ == '__main__':
