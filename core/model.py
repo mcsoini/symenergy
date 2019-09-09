@@ -27,9 +27,9 @@ from symenergy.core.constraint import Constraint
 from symenergy.core.slot import Slot, noneslot
 from symenergy.core.parameter import Parameter
 from symenergy.auxiliary.parallelization import parallelize_df
+from symenergy.auxiliary.parallelization import MP_COUNTER
 from symenergy import _get_logger
 from symenergy.patches.sympy_linsolve import linsolve
-
 
 
 logger = _get_logger(__name__)
@@ -40,21 +40,6 @@ sp.linsolve = linsolve
 
 if __name__ == '__main__':
     sys.exit()
-
-
-import multiprocessing
-
-class Counter():
-    def __init__(self):
-        self.val = multiprocessing.Value('i', 0)
-
-    def increment(self, n=1):
-        with self.val.get_lock():
-            self.val.value += n
-
-    @property
-    def value(self):
-        return self.val.value
 
 
 class Model:
@@ -327,7 +312,6 @@ class Model:
 
         # list of constraint columns
         self.constrs_cols = [cstr.col for cstr in self.constrs.keys()]
-
         self.constrs_neq = [cstr for cstr in self.constrs
                             if not cstr.is_equality_constraint]
         self.constrs_cols_neq = [cstr.col for cstr
@@ -357,8 +341,9 @@ class Model:
                               on='dummy', how='outer')
 
         self.df_comb = dfcomb.drop('dummy', axis=1)
+        self.ncomb = len(self.df_comb)
 
-        logger.info('Length df_comb: %d'%len(self.df_comb))
+        logger.info('Length df_comb: %d'%self.ncomb)
 
     def get_variabs_params(self):
         '''
@@ -428,9 +413,7 @@ class Model:
         else:
             result = f(*args, **kwargs)
 
-#        self.n_solved.increment()
-
-        if not idx % 1:
+        if not idx % 100:
             logger.info('Average solution time: {:.4f}, n=/{}'.format(self.ema_solve,
 #                                                                        self.n_solved,
                                                                         self.n_comb))
@@ -445,14 +428,22 @@ class Model:
         A, b = sp.linear_eq_to_matrix(mat, variabs_multips_slct)
         solution = sp.linsolve((A, b), variabs_multips_slct)
 
+        MP_COUNTER.increment()
+
         return None if isinstance(solution, sp.sets.EmptySet) else solution
 
 
     def call_solve_df(self, df):
         ''' Applies to dataframe. '''
 
-        logger.info('Calling call_solve_df on list with length %d'%len(df))
-        return [self.solve(lag, var, idx) for lag, var, idx in df]
+        res = [self.solve(lag, var, idx) for lag, var, idx in df]
+
+        vals = (MP_COUNTER.value(), self.ncomb,
+                MP_COUNTER.value()/self.ncomb * 100,
+                len(df))
+        logger.info(('Solving: {}/{} ({:.1f}%), chunksize {}').format(*vals))
+
+        return res
 
 
     def solve_all(self):
@@ -462,8 +453,6 @@ class Model:
                       self.df_comb.idx))
 
         self.ema_solve = 0
-#        self.n_solved = Counter()
-
 
         if __name__ == '__main__':
             lagrange, variabs_multips_slct, index = df[0]
@@ -495,8 +484,14 @@ class Model:
 
     def call_subs_tc(self, df):
 
-        logger.info('Calling call_subs_tc on list with length %d'%len(df))
-        return [self.subs_total_cost(res, var, idx) for res, var, idx in df]
+        res = [self.subs_total_cost(res, var, idx) for res, var, idx in df]
+
+        vals = (MP_COUNTER.value(), self.ncomb,
+                MP_COUNTER.value()/self.ncomb * 100)
+        logger.info(('Total cost substitution: {}/{} '
+                     '({:.1f}%)').format(*vals))
+
+        return res
 
 
     def combine_constraint_names(self, df):
@@ -513,35 +508,39 @@ class Model:
 
     def construct_lagrange(self, row):
 
-        if not row.name % 1000:
-            print(row.name)
-
         lagrange = self.lagrange_0
 
         active_cstrs = row[row == 1].index.values
         lagrange += sum(self.constrs_dict[cstr_name].expr
                         for cstr_name in active_cstrs)
+        MP_COUNTER.increment()
 
         return lagrange
-
 
 
     def call_construct_lagrange(self, df):
         '''
         Top-level method for parallelization of construct_lagrange.
         '''
-        logger.info('Calling call_construct_lagrange on DataFrame '
-              'with length %d'%len(df))
-        return df.apply(self.construct_lagrange, axis=1).tolist()
 
+        res = df.apply(self.construct_lagrange, axis=1).tolist()
 
+        vals = (MP_COUNTER.value(), self.ncomb,
+                MP_COUNTER.value()/self.ncomb * 100)
+        logger.info(('Construct lagrange: {}/{} ({:.1f}%)').format(*vals))
+
+        return res
 
     def call_get_variabs_multips_slct(self, df):
 
-        logger.info('Calling get_variabs_multips_slct on DataFrame '
-              'with length %d'%len(df))
+        res = list(map(self.get_variabs_multips_slct, df))
 
-        return list(map(self.get_variabs_multips_slct, df))
+        vals = (MP_COUNTER.value(), self.ncomb,
+                MP_COUNTER.value()/self.ncomb * 100)
+        logger.info(('Get variabs/multipliers: '
+                     'done {}/{} ({:.1f}%)').format(*vals))
+
+        return res
 
     def define_problems(self):
         '''

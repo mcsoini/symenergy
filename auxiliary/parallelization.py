@@ -7,6 +7,7 @@ Part of symenergy. Copyright 2018 authors listed in AUTHORS.
 """
 
 import multiprocessing
+from multiprocessing import Process, Value, Lock
 import numpy
 import pandas as pd
 import itertools
@@ -18,9 +19,30 @@ try:
     from pathos.multiprocessing import ProcessingPool as Pool
 except Exception as e: logger.info(e)
 
+class Counter():
+    def __init__(self):
+        self.val = Value('i', 0)
+        self.lock = Lock()
+
+    def reset(self):
+        with self.lock:
+            self.val.value = 0
+
+    def increment(self):
+        with self.lock:
+            self.val.value += 1
+
+    def value(self):
+        with self.lock:
+            return self.val.value
+
+MP_COUNTER = Counter()
+
 def parallelize_df(df, func, nthreads, use_pathos=False, **kwargs):
+    MP_COUNTER.reset()
+
     nthreads = min(nthreads, len(df))
-    nchunks = min(nthreads * 2, len(df))
+    nchunks = min(nthreads * 6, len(df))
 
     df_split = numpy.array_split(df, nchunks)
     if use_pathos:
