@@ -38,10 +38,7 @@ class Curtailment(asset.Asset):
 
         self.slots = slots if slots else {'0': Slot('0', 0, 0)}
         self.init_symbol_operation('p')
-
         self.init_cstr_positive('p')
-
-#        self.init_is_positive()
 
 
 if __name__ == '__main__':
