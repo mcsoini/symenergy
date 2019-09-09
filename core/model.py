@@ -649,7 +649,11 @@ class Model:
         comp_dict_varmtp = self.multips.copy()
         comp_dict_varmtp.update(self.variabs)
 
-        get_comps = lambda x: tuple((list(set([comp_dict_varmtp[var]
+        def get_comps(x):
+            if x.idx%100 == 0:
+                logger.info(x.idx)
+
+            return tuple((list(set([comp_dict_varmtp[var]
                                               for var in res_vars])))
                                     for res_vars in x.res_vars
                                     if res_vars)
