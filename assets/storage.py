@@ -44,7 +44,7 @@ class Storage(asset.Asset):
 
     PARAMS = ['eff', 'C', 'E']
     PARAMS_TIME = []
-    VARIABS = ['e']
+    VARIABS = []
     VARIABS_TIME = ['pchg', 'pdch', 'e']
 
     VARIABS_POSITIVE = ['p', 'e', 'C_ret', 'C_add', 'pchg', 'pdch']
@@ -108,6 +108,7 @@ class Storage(asset.Asset):
                                 'dch': list(self.slots.keys())})
 
         self.name = name
+        self._update_class_attrs()
 
         # only one power for each slot, ... charging or discharging is
         # determined in the constraints depending on the specification in
@@ -133,6 +134,24 @@ class Storage(asset.Asset):
             self.init_cstr_capacity('E')
 
         self.init_cstr_storage()
+
+
+    def _update_class_attrs(self):
+        '''
+        Update instances VARIABS class attribute in dependence on time slot.
+        '''
+
+        if (len(self.slots) == 1
+            or len(self.slots_map['chg']) == 1
+            or len(self.slots_map['dch']) == 1):
+
+            logger.warning(('%s: Moving variable e from VARIABS_TIME '
+                           'to VARIABS')%self.name)
+
+            self.VARIABS_TIME = copy(self.VARIABS_TIME)  # copy class attr
+            self.VARIABS_TIME.remove('e')
+            self.VARIABS = copy(self.VARIABS) + ['e']
+
 
     def init_cstr_storage(self):
         '''
