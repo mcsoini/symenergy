@@ -9,6 +9,8 @@ Created on Mon Sep  2 21:01:01 2019
 import wrapt
 import itertools
 
+chain = itertools.chain.from_iterable
+
 #from symenergy.core.slot import noneslot
 from symenergy import _get_logger
 
@@ -97,9 +99,8 @@ class CstrCombBase():
         dict_cstrs = self.get_cstr_objs()
 
         # mixes of None and other slots don't make sense
-        found_slots = set([list(cstr.keys())[0] for cstr in dict_cstrs])
-        flag_mix_none = (any(slot.name == 'None' for slot in found_slots) and
-                         any(slot.name != 'None' for slot in found_slots))
+        set_slot_names = set(slot.name for slot in chain(dict_cstrs))
+        flag_mix_none = 'None' in set_slot_names and len(set_slot_names) > 1
 
         if flag_mix_none:
             logger.warning('Found invalid combination of noneslot and other '
@@ -120,27 +121,46 @@ class CstrCombBase():
         if 'all' in list_code_rel_slot:
             for slot in list_slots:
                 list_col_names_slot = []
+                c, dict_slot_cstr = list(zip(self.list_cstrs, dict_cstrs))[0]
                 for c, dict_slot_cstr in zip(self.list_cstrs, dict_cstrs):
                     dict_slotcode_cols = {'all': [(dict_slot_cstr[slot].col, c[-1])
-                                                   for slot in list_slots],
-                                         'this': [(dict_slot_cstr[slot].col, c[-1])]}
+                                                   for slot in list_slots
+                                                   if slot in dict_slot_cstr],
+                                         'this': [(dict_slot_cstr[slot].col, c[-1])]
+                                                  if slot in dict_slot_cstr else []}
                     list_col_names_slot.append(dict_slotcode_cols[c[1]])
 
-                list_col_names.append(tuple(itertools.chain.from_iterable(list_col_names_slot)))
+                list_col_names.append(tuple(chain(list_col_names_slot)))
+
+            list_col_names = [cstr_comb for cstr_comb in list_col_names
+                              if len(cstr_comb) >= len(self.list_cstrs)]
+            return list_col_names
 
         else:
             # no need to loop over time slots
             list_col_names = []
             for c, dict_slot_cstr in zip(self.list_cstrs, dict_cstrs):
 
-                dict_slotcode_cols = {'this': [(dict_slot_cstr[slot].col, c[-1]) for slot
-                                               in self.dict_prev_slot.keys()],
-                                      'last': [(dict_slot_cstr[slot].col, c[-1]) for slot
-                                               in self.dict_prev_slot.values()]}
+                dict_code_slots = dict(zip(['this', 'last'],
+                                           zip(*self.dict_prev_slot.items())))
+                dict_code_slots = {kk: [(dict_slot_cstr[slot].col, c[-1])
+                                        for slot in slots
+                                        if slot in dict_slot_cstr]
+                                   for kk, slots in dict_code_slots.items()}
 
-                list_col_names.append(dict_slotcode_cols[c[1]])
+                list_col_names.append(dict_code_slots[c[1]])
 
-            # here, slots are done in parallel. need to zip to get cstr combs
-            list_col_names = list(zip(*list_col_names))
+            # if not all slot lists have the same length, the whole
+            # constraint combination is invalid. This happens e.g. if the
+            # slots map is used to define charging/discharging slots
+            if len(set(len(cstr) for cstr in list_col_names)) != 1:
+                return list_col_names
+            else:
+                # here, slots are done in parallel. need to zip to get cstr combs
+                return list(zip(*list_col_names))
 
-        return list_col_names
+
+
+
+
+
