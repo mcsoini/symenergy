@@ -454,23 +454,12 @@ class Evaluator(plotting.EvPlotting):
 
         df_x = self.df_x_vals
         df_lam = df_lam_plot
-        if not self.nthreads:
-            df_exp_0 = self.call_evaluate_by_x(df_x, df_lam, verbose)
-        else:
-            func = self.call_evaluate_by_x
-            nthreads = self.nthreads
-            df_exp_0 = parallelize_df(df_x, func, nthreads, df_lam=df_lam)
+        df_exp_0 = self.call_evaluate_by_x_new(df_x, df_lam, verbose)
+        df_exp_0 = df_exp_0.reset_index(drop=True)
 
-        if not self.sql_params:
-            df_exp_0 = pd.concat(df_exp_0.tolist())
-
-            df_exp_0 = df_exp_0.reset_index(drop=True)
-
-            self.df_exp = df_exp_0
-
-            self.const_comb_opt = (self.df_exp.loc[self.df_exp.is_optimum,
-                                                   'const_comb'].unique().tolist())
-
+        self.df_exp = df_exp_0
+        self.const_comb_opt = self.df_exp.loc[self.df_exp.is_optimum, 'idx'
+                                             ].unique().tolist()
 
 
     def _init_constraints_active(self, df):
