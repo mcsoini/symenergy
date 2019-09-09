@@ -6,12 +6,18 @@ Contains the Storage class.
 Part of symenergy. Copyright 2018 authors listed in AUTHORS.
 """
 
+import wrapt
 import numpy as np
+import itertools
+from copy import copy
 
 import symenergy.core.asset as asset
 from symenergy.core.constraint import Constraint
 from symenergy.core.slot import Slot, noneslot
 from symenergy.core.parameter import Parameter
+from symenergy.auxiliary.constrcomb import CstrCombBase
+
+from symenergy.core.slot import noneslot
 
 from symenergy import _get_logger
 
@@ -101,13 +107,13 @@ class Storage(asset.Asset):
 
         super().__init__()
 
+        self.name = name
         self.slots = slots
 
         self.slots_map = (slots_map if slots_map
                           else {'chg': list(self.slots.keys()),
                                 'dch': list(self.slots.keys())})
 
-        self.name = name
         self._update_class_attrs()
         self._init_prev_slot()
 
