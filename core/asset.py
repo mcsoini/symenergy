@@ -152,7 +152,7 @@ class Asset(component.Component):
             # the variable is defined for all time slots only if there are
             # two or more time slots (used for stored energy)
 
-            flag_timedep = len(self.slots) > 2
+            flag_timedep = len(self.slots) >= 2
 
         elif variable in set(self.VARIABS) | set(self.VARIABS_TIME):
             flag_timedep = variable in self.VARIABS_TIME
