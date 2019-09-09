@@ -37,6 +37,22 @@ logger.warning('!!! Monkey-patching sympy.linsolve !!!')
 if __name__ == '__main__':
     sys.exit()
 
+
+import multiprocessing
+
+class Counter():
+    def __init__(self):
+        self.val = multiprocessing.Value('i', 0)
+
+    def increment(self, n=1):
+        with self.val.get_lock():
+            self.val.value += n
+
+    @property
+    def value(self):
+        return self.val.value
+
+
 class Model:
 
     def __init__(self, nthreads=None, curtailment=False):
@@ -55,6 +71,11 @@ class Model:
         self.noneslot = noneslot
 
         self.curtailment = curtailment
+
+        self.ncomb = None  # determined through construction of self.df_comb
+        self.nress = None  # number of valid results
+
+        self.ema_solve = 0  # exponentially moving average of solving time
 
     def update_component_list(f):
         def wrapper(self, *args, **kwargs):
@@ -386,17 +407,26 @@ class Model:
 
         strg = 'Constr. comb. %d out of %d: %s.'%(index, self.n_comb,
                                                      matrix_dim)
+    @wrapt.decorator
+    def update_ema_time(f, self, args, kwargs):
 
+        idx = args[-1]
 
     def solve(self, lagrange, variabs_multips_slct, index):
+            self.ema_solve = 0.7 * self.ema_solve + 0.3 * t
 
 #        self.n_solved.increment()
 
         mat = derive_by_array(lagrange, variabs_multips_slct)
         mat = sp.Matrix(mat).expand()
+        if not idx % 1:
+            logger.info('Average solution time: {:.4f}, n=/{}'.format(self.ema_solve,
+#                                                                        self.n_solved,
+                                                                        self.n_comb))
 
         A, b = sp.linear_eq_to_matrix(mat, variabs_multips_slct)
 
+    @update_ema_time
 
         solution = sp.linsolve((A, b), variabs_multips_slct)
 
@@ -415,6 +445,9 @@ class Model:
         df = list(zip(self.df_comb.lagrange,
                       self.df_comb.variabs_multips,
                       self.df_comb.idx))
+
+        self.ema_solve = 0
+#        self.n_solved = Counter()
 
 
         if not self.nthreads:
