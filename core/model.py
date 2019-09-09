@@ -26,12 +26,14 @@ from symenergy.core.slot import Slot, noneslot
 from symenergy.core.parameter import Parameter
 from symenergy.auxiliary.parallelization import parallelize_df
 from symenergy import _get_logger
+from symenergy.patches.sympy_linsolve import linsolve
 
 
 
 logger = _get_logger(__name__)
 
 logger.warning('!!! Monkey-patching sympy.linsolve !!!')
+sp.linsolve = linsolve
 
 
 if __name__ == '__main__':
