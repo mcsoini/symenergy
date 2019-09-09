@@ -280,8 +280,18 @@ class Model:
 
     def fix_stored_energy(self):
 
-        self.df_comb['result'] = self.df_comb.apply(self._fix_stored_energy,
-                                            axis=1)
+        if __name__ == '__main__':
+            x = self.df_comb.iloc[0]
+            row = x
+
+        if self.storages:
+            logger.info('Recalculating stored energy.')
+            self.df_comb['result'] = self.df_comb.apply(
+                                        self._fix_stored_energy, axis=1)
+        else:
+            logger.warning('Skipping stored energy recalculation. '
+                           'Model does not contain storage assets.')
+
 
     def _fix_stored_energy(self, x):
         '''
