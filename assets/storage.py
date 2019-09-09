@@ -109,6 +109,7 @@ class Storage(asset.Asset):
 
         self.name = name
         self._update_class_attrs()
+        self._init_prev_slot()
 
         # only one power for each slot, ... charging or discharging is
         # determined in the constraints depending on the specification in
@@ -135,6 +136,28 @@ class Storage(asset.Asset):
 
         self.init_cstr_storage()
 
+    def _init_prev_slot(self):
+        '''
+        Defines a dictionary with the previous slot for each time slot.
+        Default case: All
+        '''
+
+        shifted_slots = np.roll(np.array(list(self.slots.values())), 1)
+        dict_prev_slot = dict(zip(self.slots.values(), shifted_slots))
+
+        # expand to all combinations of 'chg', 'dch', 'e':
+#        dict_prev_slot = {(var1, var2, sthis): sprev
+#                          for sprev, sthis in dict_prev_slot.items()
+#                          for var1, var2
+#                          in itertools.product(*[['chg', 'dch', 'e']] * 2)}
+#
+#        # modify if 'e' is only defined for the None slot
+#        if len(self.e) == 1 and list(self.e.keys())[0] is noneslot:
+#
+#        self.variabs['e']
+#
+
+        self._dict_prev_slot = dict_prev_slot
 
     def _update_class_attrs(self):
         '''
@@ -203,8 +226,6 @@ class Storage(asset.Asset):
             # e_t = e_t-1 + sqrt(eta) * pchg_t - 1 / sqrt(eta) * pdch_t
 
             # select time slot
-            shifted_slots = np.roll(np.array(list(self.slots.values())), 1)
-            dict_prev_slot = dict(zip(self.slots.values(), shifted_slots))
 
             self.cstr_pwrerg = {}
 
@@ -217,7 +238,7 @@ class Storage(asset.Asset):
                 pchg = self.pchg[slot] if slot in self.pchg else 0
                 pdch = self.pdch[slot] if slot in self.pdch else 0
                 e = self.e[slot]
-                e_prev = self.e[dict_prev_slot[slot]]
+                e_prev = self.e[self._dict_prev_slot[slot]]
 
                 slot_w = (slot.weight if slot.weight else 1)
                 expr = (e_prev
