@@ -763,29 +763,38 @@ class Evaluator(plotting.EvPlotting):
 #        df['lambd'] = self._evaluate(df)
 
 
-    def init_cost_optimum(self, df):
+    def init_cost_optimum(self, df_result):
         ''' Adds cost optimum column to the expanded dataframe. '''
 
-        tc = df.loc[(df.func == 'tc_lam_plot') & df.mask_valid].copy()
+        cols = ['lambd', 'idx'] + self.x_name
+        tc = df_result.loc[(df_result.func == 'tc_lam_plot')
+                           & df_result.mask_valid, cols].copy()
 
         if not tc.empty:
 
             tc_min = (tc.groupby(self.x_name, as_index=0)
                         .apply(lambda x: x.nsmallest(1, 'lambd')))
 
-            tc_min['is_optimum'] = True
-            tc_min = tc_min.set_index(['const_comb'] + self.x_name)
+            def get_cost_optimum_single(df):
+                df = df.sort_values('lambd')
+                df['is_optimum'] = False
+                df.iloc[0, -1] = True
+                return df[['is_optimum']]
 
-            df = df[[c for c in df.columns if not c == 'is_optimum']]
-            df = df.join(tc_min['is_optimum'], on=tc_min.index.names)
+            mask_is_opt = (tc.set_index('idx')
+                             .groupby(self.x_name)
+                             .apply(get_cost_optimum_single))
 
-            df['is_optimum'] = df.is_optimum.fillna(False)
+            df_result = df_result.join(mask_is_opt, on=mask_is_opt.index.names)
+
+            # mask_valid == False have is_optimum == NaN at this point
+            df_result.is_optimum.fillna(False, inplace=True)
 
         else:
 
-            df['is_optimum'] = False
+            df_result['is_optimum'] = False
 
-        return df.is_optimum
+        return df_result.is_optimum
 
     def drop_non_optimal_combinations(self):
         '''
