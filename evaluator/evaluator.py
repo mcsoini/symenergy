@@ -12,10 +12,7 @@ import pandas as pd
 import itertools
 import time
 
-import symenergy.evaluator.plotting as plotting
 import symenergy.auxiliary.sqlutils.aux_sql_func as aql
-
-from symenergy.auxiliary.parallelization import parallelize_df
 
 from symenergy import _get_logger
 
@@ -34,7 +31,7 @@ class LambdContainer():
             setattr(self, func_name, func)
 
 
-class Evaluator(plotting.EvPlotting):
+class Evaluator():
     '''
     Evaluates model results for selected
     '''
