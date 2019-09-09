@@ -43,7 +43,6 @@ class Plant(asset.Asset):
 
     def __init__(self, name, vc0, vc1=None,
                  fcom=None, slots=None, capacity=False, cap_ret=False):
-
         '''
         Params:
             * name --
@@ -57,10 +56,10 @@ class Plant(asset.Asset):
         TODO: Make vc1 optional.
         '''
 
-        self.slots = slots if slots else {'0': Slot('0', 0, 0)}
         super().__init__(name)
 #        self.name = name
 
+        self.slots = slots if slots else {'0': Slot('0', 0, 0)}
 
         self.init_symbol_operation('p')
 
