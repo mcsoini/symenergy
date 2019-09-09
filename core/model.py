@@ -352,9 +352,10 @@ class Model:
         (binding, non-binding) combinations and instantiates dataframe.
         '''
 
+        list_dfcomb = []
+        for comp in self.comps.values():
+            list_dfcomb.append(comp.get_constraint_combinations())
 
-        list_dfcomb = [comp.get_constraint_combinations()
-                       for comp in self.comps.values()]
         list_dfcomb = [df for df in list_dfcomb if not df.empty]
 
         dfcomb = pd.DataFrame({'dummy': 1}, index=[0])
