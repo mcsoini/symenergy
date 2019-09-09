@@ -224,21 +224,11 @@ class Model:
             self.df_comb = pd.read_pickle(self.cache_fn)
 
         else:
-
             self.init_constraint_combinations()
-
-#            self.remove_mutually_exclusive_combinations()
-
-#            self.delete_cached()
-
             self.define_problems()
-
             self.solve_all()
-
             self.filter_invalid_solutions()
-
             self.generate_total_costs()
-
             self.fix_stored_energy()
             self.df_comb.to_pickle(self.cache_fn)
 
