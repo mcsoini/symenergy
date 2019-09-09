@@ -162,12 +162,11 @@ class Evaluator(plotting.EvPlotting):
                             self.dfev['%s_expr_plot'%slct_eq].apply(lambdify))
             logger.info('done.')
 
-        idx = list(map(str, self.model.constrs_cols_neq)) + ['const_comb']
+        idx = self.model.constrs_cols_neq + ['idx']
         cols = [c for c in self.dfev.columns
                 if isinstance(c, str)
                 and '_lam_plot' in c]
         df_lam_plot = self.dfev.set_index(idx).copy()[cols]
-
 
         col_names = {'level_%d'%(len(self.model.constrs_cols_neq) + 1): 'func',
                      0: 'lambd_func'}
@@ -176,7 +175,7 @@ class Evaluator(plotting.EvPlotting):
         df_lam_plot = (df_lam_plot.reset_index(drop=True)
                                   .reset_index())
         df_lam_plot = df_lam_plot.set_index(self.model.constrs_cols_neq
-                                            + ['const_comb', 'func'])
+                                            + ['func', 'idx'])
 
         self.df_lam_plot = df_lam_plot
 
@@ -304,7 +303,7 @@ class Evaluator(plotting.EvPlotting):
         df['mask_valid'] = mask_valid
 
         # consolidate mask by constraint combination and x values
-        index = self.x_name + ['const_comb']
+        index = self.x_name + ['idx']
         mask_valid = df.pivot_table(index=index,
                                     values='mask_valid',
                                     aggfunc=min)
@@ -445,7 +444,7 @@ class Evaluator(plotting.EvPlotting):
         constrs_cols_cap = [cstr for cstr in self.model.constrs_cols_neq
                             if '_cap_' in cstr]
 
-        keep_cols = (['func', 'const_comb', 'lambd_func']
+        keep_cols = (['func', 'lambd_func', 'idx']
                      + constrs_cols_pos + constrs_cols_cap)
         df_lam_plot = self.df_lam_plot.reset_index()[keep_cols]
 
@@ -588,7 +587,7 @@ class Evaluator(plotting.EvPlotting):
         drop = ['tc', 'pi_', 'lb_']
         df_bal = df_bal.loc[-df_bal.func.str.contains('|'.join(drop))]
 
-        df_bal = df_bal[['func', 'const_comb', 'func_no_slot',
+        df_bal = df_bal[['func', 'idx', 'func_no_slot',
                          'slot', 'lambd'] + self.x_name]
 
         # add parameters
@@ -596,11 +595,11 @@ class Evaluator(plotting.EvPlotting):
         pars = [getattr(slot, var) for var in par_add
                for slot in self.model.slots.values() if hasattr(slot, var)]
 
-        df_bal_add = pd.DataFrame(df_bal[self.x_name + ['const_comb']].drop_duplicates())
+        df_bal_add = pd.DataFrame(df_bal[self.x_name + ['idx']].drop_duplicates())
         for par in pars:
             df_bal_add[par.name] = par.value
 
-        df_bal_add = df_bal_add.set_index(self.x_name + ['const_comb']).stack().rename('lambd').reset_index()
+        df_bal_add = df_bal_add.set_index(self.x_name + ['idx']).stack().rename('lambd').reset_index()
         df_bal_add = df_bal_add.rename(columns={'level_%d'%(1 + len(self.x_name)): 'func'})
         df_bal_add['func_no_slot'] = df_bal_add.func.apply(lambda x: '_'.join(x.split('_')[:-1]))
         df_bal_add['slot'] = df_bal_add.func.apply(lambda x: x.split('_')[-1])
