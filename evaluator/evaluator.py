@@ -68,12 +68,6 @@ class Evaluator(plotting.EvPlotting):
 
         self.df_x_vals = self.get_x_vals_combs()
 
-
-        if sql_params:
-            self.db = sql_params['sql_db']
-            self.tb = sql_params['sql_table']
-            self.sc = sql_params['sql_schema']
-
     @property
     def x_vals(self):
         return self._x_vals
@@ -294,12 +288,10 @@ class Evaluator(plotting.EvPlotting):
 
     def _get_mask_valid_solutions(self, df):
 
-
         if __name__ == '__main__':
             df = df_result.copy()
         else:
             df = df.copy() # this is important, otherwise we change the x_vals
-
 
         mask_valid = pd.Series(True, index=df.index)
 
@@ -318,7 +310,6 @@ class Evaluator(plotting.EvPlotting):
                                     aggfunc=min)
 
         return mask_valid
-
 
 
     def call_evaluate_by_x(self, df_x, df_lam, verbose):
@@ -445,7 +436,6 @@ class Evaluator(plotting.EvPlotting):
             * by_x_vals -- if True: expand x_vals for all const_combs/func
                            if False: expand const_combs/func for all x_vals
         '''
-
 
         # keeping pos cols to sanitize zero equality constraints
         constrs_cols_pos = [cstr for cstr in self.model.constrs_cols_neq
@@ -641,6 +631,8 @@ class Evaluator(plotting.EvPlotting):
     def build_supply_table_sql(self, df=None):
         '''
         Generates a table representing the supply constraint for easy plotting.
+
+        Largely obsolete.
         '''
 
         self.map_func_to_slot_sql()
@@ -810,6 +802,7 @@ class Evaluator(plotting.EvPlotting):
         mask_opt = self.df_exp.const_comb.isin(constrs_opt)
         self.df_exp_opt = self.df_exp.loc[mask_opt].copy()
 
+
     def map_func_to_slot(self):
 
         print('map_func_to_slot')
@@ -826,62 +819,11 @@ class Evaluator(plotting.EvPlotting):
         func_map = {func: func_new[:-1] if func_new.endswith('_') else func_new
                     for func, func_new in func_map.items()}
 
-
         slot_map = {func: slot if not slot == '' else 'global'
                     for func, slot in slot_map.items()}
 
         self.df_exp['slot'] = self.df_exp['func'].replace(slot_map)
         self.df_exp['func_no_slot'] = self.df_exp['func'].replace(func_map)
-
-
-
-    def map_func_to_slot_sql(self):
-
-        print('map_func_to_slot')
-
-        tb = self.sql_params['sql_table']
-        sc = self.sql_params['sql_schema']
-        db = self.sql_params['sql_db']
-
-        func_list = aql.read_sql(db, sc, tb, keep=['func'], distinct=True)
-        func_list = func_list['func'].tolist()
-
-        slot_name_list = list(self.model.slots.keys())
-
-        slot_map = {func: '+'.join([ss for ss in slot_name_list
-                                    if ss in func])
-                    for func in func_list}
-
-        func_map = {func: func.replace('_None', '').replace(slot + '_lam_plot', '')
-                    for func, slot in slot_map.items()}
-        func_map = {func: func_new[:-1] if func_new.endswith('_') else func_new
-                    for func, func_new in func_map.items()}
-
-
-        slot_map = {func: slot if not slot == '' else 'global'
-                    for func, slot in slot_map.items()}
-
-
-        all_map = ', '.join([str((func, slot_map[func], func_map[func])) for func in slot_map])
-
-        exec_strg = '''
-        ALTER TABLE {sql_schema}.{sql_table}
-        ADD COLUMN IF NOT EXISTS slot VARCHAR,
-        ADD COLUMN IF NOT EXISTS func_no_slot VARCHAR;
-        '''.format(**self.sql_params)
-        aql.exec_sql(exec_strg, db=db)
-
-        exec_strg = '''
-        UPDATE {sql_schema}.{sql_table} AS tb
-        SET func_no_slot = map.func_no_slot,
-            slot = map.slot
-        FROM (
-            WITH temp (func, slot, func_no_slot) AS (VALUES {all_map})
-            SELECT * FROM temp
-        ) AS map
-        WHERE tb.func = map.func
-        '''.format(**self.sql_params, all_map=all_map)
-        aql.exec_sql(exec_strg, db=db)
 
 
     def get_readable_cc_dict(self):
