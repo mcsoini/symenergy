@@ -412,12 +412,16 @@ class Model:
 
 
 
-    def print_row(self, index, matrix_dim):
+#    def print_row(self, index, matrix_dim):
+#
+#        matrix_dim = 'Matrix %s'%'x'.join(map(str, matrix_dim))
+#
+#        strg = 'Constr. comb. %d out of %d: %s.'%(index, self.n_comb,
+#                                                     matrix_dim)
+#
+#        logger.info(strg)
 
-        matrix_dim = 'Matrix %s'%'x'.join(map(str, matrix_dim))
 
-        strg = 'Constr. comb. %d out of %d: %s.'%(index, self.n_comb,
-                                                     matrix_dim)
     @wrapt.decorator
     def update_ema_time(f, self, args, kwargs):
 
