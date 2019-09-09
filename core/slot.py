@@ -29,7 +29,8 @@ class Slot(component.Component):
 
     def __init__(self, name, load, vre, weight=1):
 
-        self.name = name
+        super().__init__(name)
+#        self.name = name
 
         self.l = Parameter('l_%s'%self.name, self, load)
         self.vre = Parameter('vre_%s'%self.name, self, vre)

@@ -33,12 +33,10 @@ class Curtailment(asset.Asset):
             * capacity --
             * cap_ret -- boolean, capacity can be retired True/False
         '''
-        super().__init__()
+        super(Curtailment, self).__init__(name)
+#        self.name = name
 
         self.slots = slots if slots else {'0': Slot('0', 0, 0)}
-
-        self.name = name
-
         self.init_symbol_operation('p')
 
         self.init_cstr_positive('p')

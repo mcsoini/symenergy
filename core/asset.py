@@ -32,9 +32,11 @@ class Asset(component.Component):
     MAP_CAPACITY = {'C': ['p', 'pchg', 'pdch', 'C_ret'],  # all power and retired capacity
                     'E': ['e']}  # storage energy capacity
 
-    def __init__(self):
+    def __init__(self, name):
 
         self.params = []
+        super(Asset, self).__init__(name)
+#        self.name = name
 
 
     def get_constrained_variabs(self):

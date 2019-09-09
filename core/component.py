@@ -18,6 +18,10 @@ class Component():
     '''
     Make sure that all children implement PARAMS, VARIABS AND MULTIPS
     '''
+    def __init__(self, name):
+
+        self.name = name
+
     def get_params_dict(self, attr=tuple()):
 
         attr = tuple(attr) if isinstance(attr, str) else attr

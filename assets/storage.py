@@ -105,9 +105,8 @@ class Storage(asset.Asset):
     def __init__(self, name, eff, slots_map=None, slots=None,
                  capacity=False, energy_capacity=False):
 
-        super().__init__()
-
-        self.name = name
+        super().__init__(name)
+#        self.name = name
         self.slots = slots
 
         self.slots_map = (slots_map if slots_map
