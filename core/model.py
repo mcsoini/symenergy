@@ -42,6 +42,32 @@ if __name__ == '__main__':
     sys.exit()
 
 
+def log_time_progress(f):
+    '''
+    Decorator for progress logging.
+    Note: Due to multiprocessing, this can't be used as an actual decorator.
+    https://stackoverflow.com/questions/9336646/python-decorator-with-multiprocessing-fails
+    Using explicit wrappers instead.
+    '''
+
+    def wrapper(self, df, name, ntot, *args):
+        t = time.time()
+        res = f(df, *args)
+        t = (time.time() - t)  / len(df)
+
+        MP_EMA.update_ema(t)
+
+        vals = (name, int(MP_COUNTER.value()), ntot,
+                MP_COUNTER.value()/ntot * 100,
+                len(df), MP_EMA.value()/len(df)*1000, t*1000 / len(df))
+        logger.info(('{}: {}/{} ({:.1f}%), chunksize {}, '
+                     'tavg={:.1f}ms, tcur={:.1f}ms').format(*vals))
+
+        return res
+    return wrapper
+
+
+
 class Model:
 
     def __init__(self, nthreads=None, curtailment=False):
@@ -344,6 +370,7 @@ class Model:
 
         logger.info('Length df_comb: %d'%self.ncomb)
 
+
     def get_variabs_params(self):
         '''
         Generate lists of parameters and variables.
@@ -369,7 +396,7 @@ class Model:
 
     def get_variabs_multips_slct(self, lagrange):
         '''
-        Returns all relevant variables and multipliers for this model.
+        Returns all relevant variables and multipliers fcall_subs_tcor this model.
 
         Starting from the complete set of variables and multipliers, they are
         filtered depending on whether they occur in a specific lagrange
@@ -388,6 +415,10 @@ class Model:
         return [ss for ss in lfs if ss in self.variabs or ss in self.multips]
 
 
+# =============================================================================
+#     Various solver-related methods
+# =============================================================================
+
     def solve(self, lagrange, variabs_multips_slct, index):
 
         mat = derive_by_array(lagrange, variabs_multips_slct)
@@ -400,22 +431,17 @@ class Model:
         return None if isinstance(solution, sp.sets.EmptySet) else solution
 
 
+    def wrapper_call_solve_df(self, df, *args):
+
+        name = 'Solve'
+        ntot = self.ncomb
+        return log_time_progress(self.call_solve_df)(self, df, name, ntot)
+
+
     def call_solve_df(self, df):
         ''' Applies to dataframe. '''
 
-        t = time.time()
-        res = [self.solve(lag, var, idx) for lag, var, idx in df]
-        t = (time.time() - t)  / len(df)
-
-        MP_EMA.update_ema(t)
-#
-        vals = (int(MP_COUNTER.value()), self.ncomb,
-                MP_COUNTER.value()/self.ncomb * 100,
-                len(df), MP_EMA.value()/len(df)*1000, t*1000)
-        logger.info(('Solving: {}/{} ({:.1f}%), chunksize {}, '
-                     'tavg={:.1f}ms, tcur={:.1f}ms').format(*vals))
-
-        return res
+        return [self.solve(lag, var, idx) for lag, var, idx in df]
 
 
     def solve_all(self):
@@ -430,19 +456,33 @@ class Model:
         if not self.nthreads:
             self.df_comb['result'] = self.call_solve_df(df)
         else:
-            func = self.call_solve_df
-            nthreads = self.nthreads
-            self.df_comb['result'] = parallelize_df(df, func, nthreads)
+            func = self.wrapper_call_solve_df
+            self.df_comb['result'] = parallelize_df(df, func, self.nthreads)
+
+# =============================================================================
+#
+# =============================================================================
+
+    def generate_total_costs(self):
+        '''
+        Substitute result variable expressions into total costs
+        '''
+
+        df = list(zip(self.df_comb.result,
+                      self.df_comb.variabs_multips,
+                      self.df_comb.idx))
+
+        if not self.nthreads:
+            self.df_comb['tc'] = self.call_subs_tc(df)
+        else:
+            func = self.wrapper_call_subs_tc
+            self.df_comb['tc'] = parallelize_df(df, func, self.nthreads)
 
     def subs_total_cost(self, result, var_mlt_slct, idx):
         '''
         Substitutes solution into TC variables.
         This expresses the total cost as a function of the parameters.
         '''
-
-        if not idx % 10:
-            logger.info('Substituting parameters into total '
-                        'cost %d/%d'%(idx, self.nress))
 
         dict_var = {var: list(result)[0][ivar]
                     if not isinstance(result, sp.sets.EmptySet)
@@ -454,15 +494,18 @@ class Model:
 
     def call_subs_tc(self, df):
 
-        res = [self.subs_total_cost(res, var, idx) for res, var, idx in df]
+        return [self.subs_total_cost(res, var, idx) for res, var, idx in df]
 
-        vals = (MP_COUNTER.value(), self.ncomb,
-                MP_COUNTER.value()/self.ncomb * 100)
-        logger.info(('Total cost substitution: {}/{} '
-                     '({:.1f}%)').format(*vals))
+    def wrapper_call_subs_tc(self, df, *args):
 
-        return res
+        name = 'Substituting total cost'
+        ntot = self.nress
+        return log_time_progress(self.call_subs_tc)(self, df, name, ntot)
 
+
+# =============================================================================
+#
+# =============================================================================
 
     def combine_constraint_names(self, df):
 
