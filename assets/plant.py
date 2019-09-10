@@ -35,10 +35,15 @@ class Plant(asset.Asset):
 
     # mutually exclusive constraint combinations
     MUTUALLY_EXCLUSIVE = {
-        'Power plant retirement not simult. max end zero':
-            (('pos_C_ret', 'this', True), ('C_ret_cap_C', 'this', True)),
+# =============================================================================
+# This needs to be fixed: C_ret defined for Noneslot
+#         'Power plant retirement not simult. max end zero':
+#             (('pos_C_ret', 'this', True), ('C_ret_cap_C', 'this', True)),
+# =============================================================================
         'Power plant output not simult. max end zero':
             (('pos_p', 'this', True), ('p_cap_C', 'this', True))
+
+        # C_ret max --> no output
         }
 
     def __init__(self, name, vc0, vc1=None,
