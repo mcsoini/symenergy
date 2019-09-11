@@ -54,12 +54,14 @@ class Component():
 
         ncombs = 2**len(constrs_neq)
 
-        logger.warning(('Component %s: Generating df_comb with length %d'
-                        )%(self.name, ncombs))
 
+        logger.info('*'*30 + self.name + '*'*30)
+        logger.info(('Component %s: Generating df_comb with length %d...'
+                        )%(self.name, ncombs))
         bools = [[False, True] for cc in constrs_neq]
         df_comb = pd.DataFrame(itertools.product(*bools),
                                columns=constrs_cols_neq, dtype=bool)
+        logger.info('...done.')
 
         for cols in mutually_exclusive_cols:
             logger.info('Deleting constraint combination: %s'%str(cols))

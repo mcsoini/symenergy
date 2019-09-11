@@ -39,7 +39,7 @@ class Slot(component.Component):
 
     def __repr__(self):
 
-        return 'Slot %s'%str(self.name) + (', weight %s'%self.weight)
+        return 'Slot %s'%str(self.name)# + (', weight %s'%self.weight)
 
 class NoneSlot():
     
