@@ -8,6 +8,7 @@ Created on Mon Sep  2 21:01:01 2019
 
 import wrapt
 import itertools
+import numpy as np
 
 chain = itertools.chain.from_iterable
 
@@ -153,6 +154,7 @@ class CstrCombBase():
                     list_combs.append(list_comb)
 
         return list_combs
+
     def expand_slots_last_this(self):
 
         dict_cstrs = self.get_cstr_objs()

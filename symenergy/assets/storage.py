@@ -57,19 +57,19 @@ class Storage(asset.Asset):
 
     MUTUALLY_EXCLUSIVE = {
         'Empty storage stays empty w/o charging_0':
-            (('pos_e', 'last', True), ('pos_pchg', 'this', True), ('pos_e', 'this', False)),
+            (('pos_e', 'anyprev', True), ('pos_pchg', 'lasts', True), ('pos_e', 'this', False)),
         'Empty storage stays empty w/o charging_1':
-            (('pos_e', 'last', True), ('pos_pchg', 'this', False), ('pos_e', 'this', True)),
 #        'Empty storage stays empty w/o charging_2':  # << this combination is wrong and deletes valid solutions
 #            (('pos_e', 'last', False), ('pos_pchg', 'this', True), ('pos_e', 'this', True)),
 
+            (('pos_e', 'anyprev', True), ('pos_pchg', 'lasts', False), ('pos_e', 'this', True)),
         'Full storage stays full w/o discharging_0':
-            (('e_cap_E', 'last', True), ('pos_pdch', 'this', True), ('e_cap_E', 'this', False)),
+            (('e_cap_E', 'anyprev', True), ('pos_pdch', 'lasts', True), ('e_cap_E', 'this', False)),
         'Full storage stays full w/o discharging_1':
-            (('e_cap_E', 'last', True), ('pos_pdch', 'this', False), ('e_cap_E', 'this', True)),
 #        'Full storage stays full w/o discharging_2':  # << this combination is wrong and deletes valid solutions
 #            (('e_cap_E', 'last', False), ('pos_pdch', 'this', True), ('e_cap_E', 'this', True)),
 
+            (('e_cap_E', 'anyprev', True), ('pos_pdch', 'lasts', False), ('e_cap_E', 'this', True)),
         'Full storage can`t charge':
             (('e_cap_E', 'last', True), ('pos_pchg', 'this', False)),
         'Empty storage can`t discharge':
