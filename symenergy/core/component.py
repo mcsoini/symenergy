@@ -137,10 +137,9 @@ class Component():
             ccb = CstrCombBase(mename, me, list(self.slots.values()),
                                self.get_constraints(by_slot=False, names=True))
 
-            list_col_names.append(ccb.gen_col_combs())
+            list_col_names += ccb.gen_col_combs()
 
-
-        return list(itertools.chain.from_iterable(list_col_names))
+        return list_col_names
 
 
     def get_mutually_inclusive_cstrs(self):
