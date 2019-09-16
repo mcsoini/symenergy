@@ -48,19 +48,17 @@ class Component():
         (binding, non-binding) combinations and instantiates dataframe.
         '''
 
-        constrs_neq = [cstr for cstr in self.get_constraints() if not
+        constrs_cols_neq = [cstr.col for cstr in self.get_constraints() if not
                        cstr.is_equality_constraint]
-        constrs_cols_neq = [cstr.col for cstr in constrs_neq]
 
-        mutually_exclusive_cols = self.get_mutually_exclusive_cstrs()
+        mut_excl_cols = self.get_mutually_exclusive_cstrs()
 
-        ncombs = 2**len(constrs_neq)
-
+        ncombs = 2**len(constrs_cols_neq)
 
         logger.info('*'*30 + self.name + '*'*30)
         logger.info(('Component %s: Generating df_comb with length %d...'
                         )%(self.name, ncombs))
-        bools = [[False, True] for cc in constrs_neq]
+        bools = [[False, True] for cc in constrs_cols_neq]
         df_comb = pd.DataFrame(itertools.product(*bools),
                                columns=constrs_cols_neq, dtype=bool)
         logger.info('...done.')
