@@ -179,6 +179,53 @@ class CstrCombBase():
 
         return list_combs
 
+    def expand_slots_all_this(self):
+        '''
+        Note: Returns [] if the storage energy variable e is defined only for
+        the noneslot.
+        TODO: Implement separate case which covers e being defined for the
+        noneslot only.
+        '''
+
+        dict_cstrs = self.get_cstr_objs()
+        # dictionary constraint spec from const comb --> constraint dict by slot
+        map_constr = dict(zip(self.list_cstrs, dict_cstrs))
+
+        ar_slots = np.array(list(self.dict_prev_slot))
+        nslots = len(ar_slots)
+
+        # setup basic slot-slot index map
+        rngs = [range(nslots)] * 2
+        map_0 = np.mod(np.diff(np.array(np.meshgrid(*rngs)), axis=0)[0], nslots)
+
+        list_combs = []
+        nlasts = nslots
+
+        map_lasts = map_0[:, :nlasts]
+
+        for n_this in range(nslots):  # loop over all slot indices (shift loop)
+
+            dict_slots = {'all': ar_slots[map_lasts[n_this]],
+                          'this': np.array([ar_slots[n_this]])}
+
+            self._remove_nonexistent_slots(dict_slots, map_constr)
+
+            # only proceed if constraint combination is valid given
+            # remaining slots
+            flag_valid = all(val.size > 0 for val in dict_slots.values())
+
+            if flag_valid:
+
+                list_comb = []
+                for comb, cstr in map_constr.items():
+
+                    comb_slots_slct = dict_slots[comb[1]]
+                    list_comb += tuple((cstr[slot].col, comb[-1]) for slot in comb_slots_slct)
+
+                list_combs.append(list_comb)
+
+        return list_combs
+
     def expand_slots_last_this(self):
 
         dict_cstrs = self.get_cstr_objs()
@@ -246,6 +293,9 @@ class CstrCombBase():
 
             list_col_names = self.expand_slots_anyprev_lasts_this()
 
+        elif list_code_rel_slot == {'all', 'this'}:
+
+            list_col_names = self.expand_slots_all_this()
 
         elif list_code_rel_slot == {'last', 'this'}:
 
