@@ -904,3 +904,29 @@ class Model:
                              for var in comp.get_is_positive()]
 
         return is_positive_comps
+    def draw_slots(self, graphwidth=70):
+
+        slotlist = [(slotname, slot.l.value, slot.vre.value)
+                    for slotname, slot in self.slots.items()]
+        maxlen = len(max([slot[0] for slot in slotlist], key=len))
+        maxpwr = max(itertools.chain.from_iterable(slot[1:]
+                                                   for slot in slotlist))
+
+        ljust_all = lambda lst, newlen: [(x[0].ljust(newlen),) + x[1:]
+                                         for x in lst]
+
+        slotlist = ljust_all(slotlist, maxlen + 1)
+        slotlist = [(slotname,
+                     round(l / maxpwr * graphwidth),
+                     round(vre / maxpwr * graphwidth))
+                    for slotname, l, vre in slotlist]
+        bar = lambda l, vre: ((l - vre) * "\u2588"  + vre * "\u2591")
+        slotlist = [(name, bar(l, vre).ljust(graphwidth))
+                    for name, l, vre in slotlist]
+
+        for slotbar, slotobj in zip(slotlist, self.slots.values()):
+            slot, bar = slotbar
+            data = 'l={:.1f}/vre={:.1f}'.format(slotobj.l.value, slotobj.vre.value)
+            print(slot, bar, data, sep=' | ', end='\n')
+
+
