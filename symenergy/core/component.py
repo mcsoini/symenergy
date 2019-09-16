@@ -9,6 +9,7 @@ Part of symenergy. Copyright 2018 authors listed in AUTHORS.
 import itertools
 import pandas as pd
 from symenergy.auxiliary.constrcomb import CstrCombBase
+from symenergy.auxiliary.constrcomb import filter_constraint_combinations
 from symenergy import _get_logger
 
 logger = _get_logger(__name__)
@@ -64,22 +65,7 @@ class Component():
                                columns=constrs_cols_neq, dtype=bool)
         logger.info('...done.')
 
-        for cols in mutually_exclusive_cols:
-            logger.info('Deleting constraint combination: %s'%str(cols))
-
-            mask = pd.Series(True, index=df_comb.index)
-
-            for col, bool_act in cols:
-                mask = mask & (df_comb[col] == bool_act)
-
-            df_comb = df_comb.loc[~mask]
-
-            ndel = mask.sum()
-            logger.info(('... total deleted: %s (%s), remaining: %s'
-                         )%(ndel, '{:.1f}%'.format(ndel/ncombs*100),
-                            len(df_comb)))
-
-        self._df_comb = df_comb
+        df_comb = filter_constraint_combinations(df_comb, mut_excl_cols)
 
         return df_comb
 

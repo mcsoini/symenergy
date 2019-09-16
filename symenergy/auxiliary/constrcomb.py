@@ -9,6 +9,7 @@ Created on Mon Sep  2 21:01:01 2019
 import wrapt
 import itertools
 import numpy as np
+import pandas as pd
 
 chain = itertools.chain.from_iterable
 
@@ -16,6 +17,29 @@ chain = itertools.chain.from_iterable
 from symenergy import _get_logger
 
 logger = _get_logger(__name__)
+
+
+def filter_constraint_combinations(df, mutually_exclusive_cols):
+
+    ncombs = len(df)
+
+    for cols in mutually_exclusive_cols:
+        logger.info('Deleting constraint combination: %s'%str(cols))
+
+        mask = pd.Series(True, index=df.index)
+
+        for col, bool_act in cols:
+            mask = mask & (df[col] == bool_act)
+
+        df = df.loc[~mask]
+
+        ndel = mask.sum()
+        logger.info(('... total deleted: %s (%s), remaining: %s'
+                     )%(ndel, '{:.1f}%'.format(ndel/ncombs*100),
+                        len(df)))
+
+    return df
+
 
 class CstrCombBase():
 
