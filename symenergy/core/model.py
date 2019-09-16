@@ -904,6 +904,45 @@ class Model:
                              for var in comp.get_is_positive()]
 
         return is_positive_comps
+
+
+    def print_mutually_exclusive_post(self, logging=False):
+
+        print_func = logger.info if logging else print
+
+        dfiv = self.df_comb_invalid
+        dfvl = self.df_comb[self.df_comb_invalid.columns]
+
+        tot_list_excl = []
+
+        ncols = 3
+        for ncols in range(2, len(dfvl.columns)):
+            print_func('ncols=%d'%ncols)
+            for slct_cols in tuple(itertools.combinations(dfvl.columns, ncols)):
+
+                get_combs = lambda df: (df[list(slct_cols)].drop_duplicates()
+                                                .apply(tuple, axis=1).tolist())
+                vals_dfiv_slct = get_combs(dfiv)
+                vals_dfvl_slct = get_combs(dfvl)
+
+                # any in dfvl
+                vals_remain = [comb for comb in vals_dfiv_slct
+                               if not comb in vals_dfvl_slct]
+
+                if vals_remain:
+                    list_exc = [tuple(zip(*colvals)) for colvals
+                                in list(zip([slct_cols] * ncols, vals_remain))]
+
+                    # check not superset of tot_list_excl elements
+                    list_exc = [comb  for comb in list_exc
+                                 if not any(set(comb_old).issubset(set(comb))
+                                 for comb_old in tot_list_excl)]
+
+                    if list_exc:
+                        print_func(list_exc)
+
+                    tot_list_excl += list_exc
+
     def draw_slots(self, graphwidth=70):
 
         slotlist = [(slotname, slot.l.value, slot.vre.value)
