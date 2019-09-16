@@ -94,7 +94,7 @@ class Component():
                      for slot, var in getattr(self, var_name).items())
 
 
-    def get_constraints(self, by_slot=True, names=False):
+    def get_constraints(self, by_slot=True, names=False, comp_names=False):
         '''
         Returns
         -------
@@ -110,6 +110,7 @@ class Component():
                  key.startswith('cstr_')]  # naming convention of constraint attrs
 
         for key, attr in attrs:
+            key = (self.name, key) if comp_names else key
             if by_slot:
                 for slot, cstr in attr.items():
                     if names:
