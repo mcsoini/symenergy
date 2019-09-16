@@ -451,25 +451,6 @@ class Model:
         self.multips.update({cstr.mlt: slot
                              for cstr, slot in self.cstr_supply.items()})
 
-    def get_variabs_multips_slct(self, lagrange):
-        '''
-        Returns all relevant variables and multipliers fcall_subs_tcor this model.
-
-        Starting from the complete set of variables and multipliers, they are
-        filtered depending on whether they occur in a specific lagrange
-        function.
-
-        Parameters:
-            * lagrange -- sympy expression; lagrange function
-
-        Return values:
-            * variabs_slct --
-            * variabs_time_slct --
-            * multips_slct --
-        '''
-
-        lfs = lagrange.free_symbols
-        return [ss for ss in lfs if ss in self.variabs or ss in self.multips]
 
 
 # =============================================================================
@@ -589,24 +570,56 @@ class Model:
         Top-level method for parallelization of construct_lagrange.
         '''
 
-        res = df.apply(self.construct_lagrange, axis=1).tolist()
+        return df.apply(self.construct_lagrange, axis=1).tolist()
 
-        vals = (MP_COUNTER.value(), self.ncomb,
-                MP_COUNTER.value()/self.ncomb * 100)
-        logger.info(('Construct lagrange: {}/{} ({:.1f}%)').format(*vals))
+    def wrapper_call_construct_lagrange(self, df, *args):
 
-        return res
+        name = 'Construct lagrange'
+        ntot = self.ncomb
+        return log_time_progress(self.call_construct_lagrange)(self, df, name, ntot)
+
+
+# =============================================================================
+# =============================================================================
+
+    def get_variabs_multips_slct(self, lagrange):
+        '''
+        Returns all relevant variables and multipliers fcall_subs_tcor this model.
+
+        Starting from the complete set of variables and multipliers, they are
+        filtered depending on whether they occur in a specific lagrange
+        function.
+
+        Parameters:
+            * lagrange -- sympy expression; lagrange function
+
+        Return values:
+            * variabs_slct --
+            * variabs_time_slct --
+            * multips_slct --
+        '''
+
+        lfs = lagrange.free_symbols
+        MP_COUNTER.increment()
+        return [ss for ss in lfs if ss in self.variabs or ss in self.multips]
+
 
     def call_get_variabs_multips_slct(self, df):
 
         res = list(map(self.get_variabs_multips_slct, df))
 
-        vals = (MP_COUNTER.value(), self.ncomb,
-                MP_COUNTER.value()/self.ncomb * 100)
-        logger.info(('Get variabs/multipliers: '
-                     'done {}/{} ({:.1f}%)').format(*vals))
-
         return res
+
+    def wrapper_call_get_variabs_multips_slct(self, df, *args):
+
+        name = 'Get variabs/multipliers'
+        ntot = self.ncomb
+        func = self.call_get_variabs_multips_slct
+        return log_time_progress(func)(self, df, name, ntot)
+
+# =============================================================================
+# =============================================================================
+
 
     def define_problems(self):
         '''
@@ -615,21 +628,25 @@ class Model:
         '''
 
         logger.info('Defining lagrangians...')
+        df = self.df_comb[self.constrs_cols_neq]
         if not self.nthreads:
-            df = self.df_comb[self.constrs_cols_neq]
             self.df_comb['lagrange'] = self.call_construct_lagrange(df)
         else:
-            df = self.df_comb[self.constrs_cols_neq]
-            func = self.call_construct_lagrange
+            func = self.wrapper_call_construct_lagrange
             nthreads = self.nthreads
             self.df_comb['lagrange'] = parallelize_df(df, func, nthreads)
 
         logger.info('Getting selected variables/multipliers...')
         df = self.df_comb.lagrange
-        self.list_variabs_multips = self.call_get_variabs_multips_slct(df)
-        self.df_comb['variabs_multips'] = self.list_variabs_multips
+        if not self.nthreads:
+            self.list_variabs_multips = self.call_get_variabs_multips_slct(df)
+            self.df_comb['variabs_multips'] = self.list_variabs_multips
+        else:
+            func = self.wrapper_call_get_variabs_multips_slct
+            nthreads = self.nthreads
+            self.df_comb['variabs_multips'] = parallelize_df(df, func, nthreads)
 
-        # get index for reporting
+        # get index
         self.df_comb = self.df_comb[[c for c in self.df_comb.columns
                                      if not c == 'idx']].reset_index()
         self.df_comb = self.df_comb.rename(columns={'index': 'idx'})
