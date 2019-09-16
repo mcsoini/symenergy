@@ -30,6 +30,7 @@ from symenergy.auxiliary.parallelization import parallelize_df
 from symenergy.auxiliary.parallelization import MP_COUNTER, MP_EMA
 from symenergy import _get_logger
 from symenergy.patches.sympy_linsolve import linsolve
+from symenergy.auxiliary.constrcomb import filter_constraint_combinations
 
 logger = _get_logger(__name__)
 
@@ -68,6 +69,13 @@ def log_time_progress(f):
 
 
 class Model:
+
+    MUTUALLY_EXCLUSIVE = {
+        'No power production when curtailing':
+                (('pos_p', 'this', False), ('curt_pos_p', 'this', False)),
+        'No discharging when curtailing':
+                (('pos_pdch', 'this', False), ('curt_pos_p', 'this', False))
+         }
 
     def __init__(self, nthreads=None, curtailment=False):
 
@@ -330,6 +338,65 @@ class Model:
                                       for cstr in self.constrs
                                       if '_pos_' in cstr.col}
 
+
+    def get_model_mutually_exclusive_cols(self):
+        '''
+        Expand model MUTUALLY_EXCLUSIVE to plants and time slots.
+
+        The initial list of constraint combinations is filtered only according
+        to constraint combinations within each component separately. Here,
+        additional constraint combinations from different components are
+        removed.
+
+        Assuming only `'this'` as slottype.
+
+        TODO: Integrate with constrcomb.CstrCombBase or derived class thereof.
+        '''
+
+        list_col_names = []
+        for mename, me in self.MUTUALLY_EXCLUSIVE.items():
+
+            # identify relevant constraints of all components
+            cstrs_all = [comp.get_constraints(False, True, True)
+                         for comp in self.comps.values()]
+            cstrs_all = dict(pair for d in cstrs_all for pair in d.items())
+            cstrs_all = {(key[0], '{}_{}'.format(key[0],
+                                        key[1].replace('cstr_', ''))): val
+                         for key, val in cstrs_all.items()}
+
+            # expand to all components
+            me_exp = [tuple((cstrs, name_cstr[0], me_slct[-1])
+                       for name_cstr, cstrs in cstrs_all.items()
+                       if name_cstr[1].endswith(me_slct[0]))
+                      for me_slct in me]
+            # all components of the combination's two constraints
+            me_exp = list(itertools.product(*me_exp))
+
+            # remove double components, also: remove component names
+            me_exp = [tuple((cstr[0], cstr[2]) for cstr in cstrs)
+                      for cstrs in me_exp
+                      if not cstrs[0][1] == cstrs[1][1]]
+
+            me_exp = [tuple({slot: (cstr, cstrs[1])
+                                  for slot, cstr in cstrs[0].items()}
+                            for cstrs in cstr_comb)
+                      for cstr_comb in me_exp]
+
+            # split by time slots for existing time slots
+            me_exp = [(cstr_comb[0][slot], cstr_comb[1][slot])
+                      for cstr_comb in me_exp
+                      for slot in self.slots.values()
+                      if all(slot in cc for cc in cstr_comb)]
+
+            # switch from constraint objects to column names
+            me_exp = [tuple((cstr[0].col, cstr[1])
+                      for cstr in cstrs) for cstrs in me_exp]
+
+            list_col_names += me_exp
+
+        return list_col_names
+
+
     def init_constraint_combinations(self):
         '''
         Gathers all non-equal component constraints,
@@ -349,10 +416,16 @@ class Model:
             dfcomb = pd.merge(dfcomb, df.assign(dummy=1),
                               on='dummy', how='outer')
 
+        logger.info('Length of merged df_comb: %d'%len(dfcomb))
+
+        # filter according to model MUTUALLY_EXCLUSIVE
+        logger.info('*'*30 + 'model filtering' + '*'*30)
+        model_mut_excl_cols = self.get_model_mutually_exclusive_cols()
+        dfcomb = filter_constraint_combinations(dfcomb, model_mut_excl_cols)
+
         self.df_comb = dfcomb.drop('dummy', axis=1)
         self.ncomb = len(self.df_comb)
 
-        logger.info('Length df_comb: %d'%self.ncomb)
 
 
     def get_variabs_params(self):
