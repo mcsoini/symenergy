@@ -244,18 +244,22 @@ class CstrCombBase():
 
         if list_code_rel_slot == {'anyprev', 'lasts', 'this'}:
 
-            return self.expand_slots_anyprev_lasts_this()
+            list_col_names = self.expand_slots_anyprev_lasts_this()
+
 
         elif list_code_rel_slot == {'last', 'this'}:
 
-            return self.expand_slots_last_this()
+            list_col_names = self.expand_slots_last_this()
 
         elif list_code_rel_slot == {'this'}:
 
-            return self.expand_slots_this()
+            list_col_names = self.expand_slots_this()
 
         else:
             raise ValueError('Not implemented: list_code_rel_slot='
                              '%s'%list_code_rel_slot)
 
+        logger.info('... expanded to '
+                    '%s column combinations.'%len(list_col_names))
 
+        return list_col_names
