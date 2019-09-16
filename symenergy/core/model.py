@@ -31,7 +31,6 @@ from symenergy.auxiliary.parallelization import MP_COUNTER, MP_EMA
 from symenergy import _get_logger
 from symenergy.patches.sympy_linsolve import linsolve
 
-
 logger = _get_logger(__name__)
 
 logger.warning('!!! Monkey-patching sympy.linsolve !!!')
@@ -445,7 +444,6 @@ class Model:
             self.df_comb['result'] = parallelize_df(df, func, self.nthreads)
 
 # =============================================================================
-#
 # =============================================================================
 
     def generate_total_costs(self):
@@ -487,9 +485,7 @@ class Model:
         ntot = self.nress
         return log_time_progress(self.call_subs_tc)(self, df, name, ntot)
 
-
 # =============================================================================
-#
 # =============================================================================
 
     def combine_constraint_names(self, df):
@@ -555,8 +551,6 @@ class Model:
             func = self.call_construct_lagrange
             nthreads = self.nthreads
             self.df_comb['lagrange'] = parallelize_df(df, func, nthreads)
-
-
 
         logger.info('Getting selected variables/multipliers...')
         df = self.df_comb.lagrange

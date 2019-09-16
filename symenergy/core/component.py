@@ -39,6 +39,7 @@ class Component():
         else:
             return param_objs
 
+
     def get_constraint_combinations(self):
         '''
         Gathers all non-equal component constraints,

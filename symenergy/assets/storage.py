@@ -89,12 +89,16 @@ class Storage(asset.Asset):
 
         'All charging zero -> each discharging cannot be non-zero':
             (('pos_pchg', 'all', True), ('pos_pdch', 'this', False)),
+
         'All charging zero -> each energy cannot be non-zero':
             (('pos_pchg', 'all', True), ('pos_e', 'this', False)),
+
         'All discharging zero -> each energy cannot be non-zero':
-            (('pos_dchg', 'all', True), ('pos_e', 'this', False)),
+            (('pos_pdch', 'all', True), ('pos_e', 'this', False)),
+
         'All discharging zero -> each charging cannot be non-zero':
-            (('pos_dchg', 'all', True), ('pos_pchg', 'this', False)),
+            (('pos_pdch', 'all', True), ('pos_pchg', 'this', False)),
+
         'All energy zero -> each charging cannot be non-zero':
             (('pos_e', 'all', True), ('pos_pchg', 'this', False)),
         'All energy zero -> each discharging cannot be non-zero':
