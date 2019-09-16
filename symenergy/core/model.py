@@ -128,7 +128,7 @@ class Model:
     def init_cache_pickle_filename(self):
 
         fn = '%s.pickle'%self.get_name()
-        fn = os.path.join(list(symenergy.__path__)[0], 'cache', fn)
+        fn = os.path.join(list(symenergy.__path__)[0], '..', 'cache', fn)
 
         self.cache_fn = fn
 
