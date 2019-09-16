@@ -483,6 +483,8 @@ class Model:
 
     def solve_all(self):
 
+        logger.info('Solving')
+
         df = list(zip(self.df_comb.lagrange,
                       self.df_comb.variabs_multips,
                       self.df_comb.idx))
@@ -525,6 +527,8 @@ class Model:
                     else np.nan for ivar, var
                     in enumerate(var_mlt_slct)}
 
+        MP_COUNTER.increment()
+
         return self.tc.copy().subs(dict_var)
 
 
@@ -541,17 +545,6 @@ class Model:
 # =============================================================================
 # =============================================================================
 
-    def combine_constraint_names(self, df):
-
-        constr_name = pd.DataFrame(index=df.index)
-        for const in self.constrs_cols_neq:
-
-            constr_name[const] = const + '=' + df[const].astype(str)
-
-        join = lambda x: ', '.join(x)
-        df['const_comb'] = constr_name.apply(join, axis=1)
-
-        return df
 
     def construct_lagrange(self, row):
 
@@ -663,6 +656,20 @@ class Model:
         mask_empty = self.df_comb.result.isnull()
 
         return mask_empty
+
+
+#    def combine_constraint_names(self, df):
+#
+#        constr_name = pd.DataFrame(index=df.index)
+#        for const in self.constrs_cols_neq:
+#
+#            constr_name[const] = const + '=' + df[const].astype(str)
+#
+#        join = lambda x: ', '.join(x)
+#        df['const_comb'] = constr_name.apply(join, axis=1)
+#
+#        return df
+
 
     def get_mask_linear_dependencies(self):
         '''
