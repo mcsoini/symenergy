@@ -417,8 +417,7 @@ class Model:
 
     def wrapper_call_solve_df(self, df, *args):
 
-        name = 'Solve'
-        ntot = self.ncomb
+        name, ntot = 'Solve', self.ncomb
         return log_time_progress(self.call_solve_df)(self, df, name, ntot)
 
 

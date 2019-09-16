@@ -98,7 +98,7 @@ class CstrCombBase():
         '''
 
         return tuple(cstr for cstr in self.get_flat(True)
-                if cstr not in self.dict_cstrs)
+                     if cstr not in self.dict_cstrs)
 
     @wrapt.decorator
     def none_if_invalid(wrapped, self, args, kwargs):
