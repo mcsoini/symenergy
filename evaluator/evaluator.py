@@ -523,7 +523,7 @@ class Evaluator():
                     if func_C_addret:
                         mask_addret = (df.func.str.contains(func_C_addret))
                         df_C = df.loc[mask_addret].copy()
-                        df_C = df_C.set_index(['const_comb'] + self.x_name)['lambd'].rename('_C_%s'%addret)
+                        df_C = df_C.set_index(['idx'] + self.x_name)['lambd'].rename('_C_%s'%addret)
                         df = df.join(df_C, on=df_C.index.names)
 
                         # doesn't apply to itself, hence -mask_addret
