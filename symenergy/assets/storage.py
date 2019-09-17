@@ -247,8 +247,8 @@ class Storage(asset.Asset):
                 cstr_pwrerg = Constraint(name, slot=noneslot,
                                          is_equality_constraint=True)
 
-                expr = (sgn * sum(p * (slot.weight if slot.weight else 1)
-                            for slot, p in self.pchg.items())
+                expr = (sum(p * (slot.weight if slot.weight else 1)
+                            for slot, p in getattr(self, 'p%s'%cd).items())
                         * self.eff.symb**(sgn * 1/2)
                         - self.e[noneslot])
                 cstr_pwrerg.expr = expr * cstr_pwrerg.mlt
