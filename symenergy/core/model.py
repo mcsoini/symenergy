@@ -302,12 +302,11 @@ class Model:
         dict_var = self.get_result_dict(x, True)
 
         for store in self.storages.values():
-            sum_chg = sum(dict_var['%s_p_%s'%(store.name, chg_slot)]
+            sum_chg = sum(dict_var['%s_pchg_%s'%(store.name, chg_slot)]
                           * (self.slots[chg_slot].weight
                              if self.slots[chg_slot].weight else 1)
                           for chg_slot in
-                          tuple(slot for slot, cd in store.slots_map.items()
-                                if cd == 'chg'))
+                          tuple(slots for slots in store.slots_map['chg']))
 
             dict_var['%s_e_None'%store.name] = sum_chg * store.eff.symb**0.5
 
