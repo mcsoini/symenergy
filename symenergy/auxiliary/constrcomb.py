@@ -308,7 +308,8 @@ class CstrCombBase():
             raise ValueError('Not implemented: list_code_rel_slot='
                              '%s'%list_code_rel_slot)
 
-        logger.info('... expanded to '
-                    '%s column combinations.'%len(list_col_names))
+        kw_format = dict(ncols=len(list_col_names), cols=str(list_col_names))
+        logger.info(('... expanded to {ncols} column combinations: {cols}'
+                     ).format(**kw_format))
 
         return list_col_names
