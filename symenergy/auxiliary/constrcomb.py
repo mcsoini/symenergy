@@ -269,20 +269,19 @@ class CstrCombBase():
 
         dict_cstrs = self.get_cstr_objs()
 
-        # no need to loop over time slots
-        list_col_names = []
-        for c, dict_slot_cstr in zip(self.list_cstrs, dict_cstrs):
+        list_slots = list(self.dict_prev_slot)
 
-            dict_code_slots = dict(zip(['this', 'last'],
-                                       zip(*self.dict_prev_slot.items())))
-            dict_code_slots = {kk: [(dict_slot_cstr[slot].col, c[-1])
-                                    for slot in slots
-                                    if slot in dict_slot_cstr]
-                               for kk, slots in dict_code_slots.items()}
+        list_col_names = [tuple((dict_cstr[slot].col, c[-1])
+                                for c, dict_cstr
+                                in list(zip(self.list_cstrs, dict_cstrs))
+                                if slot in dict_cstr)
+                          for slot in list_slots]
 
-            list_col_names.append(dict_code_slots[c[1]])
+        # check if all slots are contained in the list
+        list_col_names = [c for c in list_col_names
+                          if len(c) == len(self.list_cstrs)]
 
-        return list(zip(*list_col_names))
+        return list_col_names
 
     @none_if_invalid
     def gen_col_combs(self):
