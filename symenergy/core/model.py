@@ -297,6 +297,7 @@ class Model:
             * name -- storage object name
 
         TODO: Should be done by storage class.
+        TODO: Doesn't work for free storage (not slots_map constraint).
         '''
 
         dict_var = self.get_result_dict(x, True)
