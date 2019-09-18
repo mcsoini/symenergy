@@ -51,7 +51,7 @@ def parallelize_df(df, func, nthreads, use_pathos=False, **kwargs):
     MP_EMA.reset()
 
     nthreads = min(nthreads, len(df))
-    nchunks = min(nthreads * 6, len(df))
+    nchunks = min(nthreads * 2, len(df))
 
     df_split = numpy.array_split(df, nchunks)
     if use_pathos:
