@@ -164,7 +164,9 @@ class Model:
 
     def init_total_cost(self):
 
-        self.tc = sum(p.cc for p in self.plants.values())
+        self.tc = sum(p.cc for p in
+                      list(self.plants.values())
+                           + list(self.storages.values()))
         self.lagrange_0 = (self.tc
                            + sum([cstr.expr for cstr in self.cstr_supply]))
         self.lagrange_0 += sum([cstr.expr for cstr in self.constrs
@@ -228,7 +230,7 @@ class Model:
             self.solve_all()
             self.filter_invalid_solutions()
             self.generate_total_costs()
-            self.fix_stored_energy()
+#            self.fix_stored_energy()
             self.cache.write(self.df_comb)
 
 
@@ -262,6 +264,19 @@ class Model:
         else:
             logger.warning('Skipping stored energy recalculation. '
                            'Model does not contain storage assets.')
+
+
+#
+    def _fix_stored_energy_full(self, x):
+#
+#        x = self.df_comb.loc[]
+
+        dict_var = self.get_result_dict(x, True)
+#
+#        store = self.comps['phs']
+#
+#        store.pchg
+
 
 
     def _fix_stored_energy(self, x):

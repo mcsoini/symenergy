@@ -145,6 +145,8 @@ class Storage(asset.Asset):
 
         self.init_cstr_storage()
 
+        self.init_cost_component()
+
     @property
     def slots_map(self):
         return self._slots_map
@@ -283,6 +285,12 @@ class Storage(asset.Asset):
 
                 self.cstr_pwrerg[slot] = cstr
 
+    def init_cost_component(self):
+        '''
+        Set constant and linear components of variable costs.
+        '''
+
+        self.cc = 1e-3 * sum(self.e.values())
 
 
 
