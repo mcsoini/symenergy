@@ -82,7 +82,7 @@ pygments_style = 'sphinx'
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = "alabaster"
+html_theme = "haiku"
 
 html_theme_options = {
         "extra_nav_links": {
@@ -211,7 +211,8 @@ epub_exclude_files = ['search.html']
 # -- Options for intersphinx extension ---------------------------------------
 
 # Example configuration for intersphinx: refer to the Python standard library.
-intersphinx_mapping = {'https://docs.python.org/': None}
+intersphinx_mapping = {'https://docs.python.org/': None,
+			'https://pandas.pydata.org/pandas-docs/stable/': None}
 
 # -- Options for todo extension ----------------------------------------------
 
