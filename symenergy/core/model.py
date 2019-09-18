@@ -670,16 +670,18 @@ class Model:
         In case of linear dependencies SymPy returns solutions containing
         variables which we are actually solving for. To fix this, we
         differentiate between two cases:
-            1. All corresponding solutions belong to the same component.
-               Overspecification occurs if the variables of the same component
-               depend on each other but are all zero. E.g. charging,
-               discharging, and stored energy in the case of storage.
-               They are set to zero.
-            2. Linear dependent variables belonging to different components.
-               This occurs if the model is underspecified, e.g. if it doesn't
-               matter which component power is used. Then the solution can
-               be discarded without loss of generality. All cases will still
-               be captured by other constraint combinations.
+
+
+        1. All corresponding solutions belong to the same component. Overspecification
+           occurs if the variables of the same component
+           depend on each other but are all zero. E.g. charging,
+           discharging, and stored energy in the case of storage.
+           They are set to zero.
+        2. Linear dependent variables belonging to different components.
+           This occurs if the model is underspecified, e.g. if it doesn't
+           matter which component power is used. Then the solution can
+           be discarded without loss of generality. All cases will still
+           be captured by other constraint combinations.
 
         Returns:
             * Series mask with values: 0 -> no variables in solutions; 1 ->
