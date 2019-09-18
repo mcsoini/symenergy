@@ -40,18 +40,28 @@ class Cache():
         '''
 
         self.fn = self.get_name(m)
+        self.fn_name = 'symenergy/cache/' + os.path.basename(self.fn)
 
     def load(self):
-            fn_name = 'symenergy/cache/' + os.path.basename(self.fn)
-            log_str1 = 'Loading from pickle file %s.'%fn_name
-            log_str2 = 'Please delete this file to re-solve model.'
-            logger.info('*'*max(len(log_str1), len(log_str2)))
-            logger.info('*'*max(len(log_str1), len(log_str2)))
-            logger.info(log_str1)
-            logger.info(log_str2)
-            logger.info('*'*max(len(log_str1), len(log_str2)))
-            logger.info('*'*max(len(log_str1), len(log_str2)))
-            return pd.read_pickle(self.fn)
+        '''
+        Load model results from cache file.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Dataframe containing model results.
+        '''
+
+        log_str1 = 'Loading from pickle file %s.'%self.fn_name
+        log_str2 = 'Please delete this file to re-solve model.'
+        logger.info('*'*max(len(log_str1), len(log_str2)))
+        logger.info('*'*max(len(log_str1), len(log_str2)))
+        logger.info(log_str1)
+        logger.info(log_str2)
+        logger.info('*'*max(len(log_str1), len(log_str2)))
+        logger.info('*'*max(len(log_str1), len(log_str2)))
+
+        return pd.read_pickle(self.fn)
 
 
     def write(self, df):
@@ -88,7 +98,7 @@ class Cache():
             os.remove(self.fn)
         else:
             logger.info('File doesn\'t exist. '
-                        'Could not remove %s'%os.path.abspath(fn))
+                        'Could not remove %s'%self.fn_name)
 
     def get_name(self, m):
         '''
