@@ -31,6 +31,7 @@ from symenergy.auxiliary.parallelization import MP_COUNTER, MP_EMA
 from symenergy import _get_logger
 from symenergy.patches.sympy_linsolve import linsolve
 from symenergy.auxiliary.constrcomb import filter_constraint_combinations
+from symenergy.auxiliary import io
 
 logger = _get_logger(__name__)
 
@@ -115,7 +116,7 @@ class Model:
 
             self.init_supply_constraints()
 
-            self.init_cache_pickle_filename()
+            self.cache = io.Cache(self)
 
         return wrapper
 
@@ -124,14 +125,6 @@ class Model:
         if self.curtailment:
             self.curt = Curtailment('curt', self.slots)
             self.comps['curt'] = self.curt
-
-    def init_cache_pickle_filename(self):
-
-        fn = '%s.pickle'%self.get_name()
-        fn = os.path.join(list(symenergy.__path__)[0], '..', 'cache', fn)
-
-        self.cache_fn = fn
-
 
     @property
     def df_comb(self):
@@ -231,17 +224,8 @@ class Model:
 
     def generate_solve(self):
 
-        if os.path.isfile(self.cache_fn):
-            log_str1 = 'Loading from pickle file %s.'%self.cache_fn
-            log_str2 = 'Please delete this file to re-solve model.'
-            logger.info('*'*max(len(log_str1), len(log_str2)))
-            logger.info('*'*max(len(log_str1), len(log_str2)))
-            logger.info(log_str1)
-            logger.info(log_str2)
-            logger.info('*'*max(len(log_str1), len(log_str2)))
-            logger.info('*'*max(len(log_str1), len(log_str2)))
-            self.df_comb = pd.read_pickle(self.cache_fn)
-
+        if self.cache.file_exists:
+            self.df_comb = self.cache.load()
         else:
             self.init_constraint_combinations()
             self.define_problems()
@@ -249,10 +233,7 @@ class Model:
             self.filter_invalid_solutions()
             self.generate_total_costs()
             self.fix_stored_energy()
-            self.df_comb.to_pickle(self.cache_fn)
-
-
-
+            self.cache.write(self.df_comb)
 
 
     def get_result_dict(self, row, string_keys=False):
@@ -764,31 +745,6 @@ class Model:
         return res_vars.mask_res_unq
 
 
-
-    def get_name(self):
-        '''
-        Returns a unique hashed model name based on the constraint names.
-        '''
-
-        list_slots = ['%s_%s'%(slot.name, str(slot.weight)) for slot in self.slots.values()]
-        list_slots.sort()
-        list_cstrs = [cstr.base_name for cstr in self.constrs]
-        list_cstrs.sort()
-        list_param = [par.name for par in self.params]
-        list_param.sort()
-        list_cstrs = [par.name for par in self.variabs]
-        list_cstrs.sort()
-        list_multips = [par.name for par in self.multips]
-        list_multips.sort()
-
-        m_name = '_'.join(list_cstrs + list_param + list_cstrs + list_multips
-                          + list_slots)
-
-        m_name = hashlib.md5(m_name.encode('utf-8')).hexdigest()[:12].upper()
-
-        return m_name
-
-
     def filter_invalid_solutions(self):
         '''
         '''
@@ -898,15 +854,6 @@ class Model:
             raise ValueError('mask_res_unq must be 0 or 1')
 
         return [list_res_new]
-
-    @staticmethod
-    def delete_cached(fn):
-        if os.path.isfile(fn):
-            logger.info('Removing file %s'%os.path.abspath(fn))
-            os.remove(fn)
-        else:
-            logger.info('File doesn\'t exist. '
-                        'Could not remove %s'%os.path.abspath(fn))
 
     def __repr__(self):
 
