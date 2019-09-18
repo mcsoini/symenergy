@@ -565,14 +565,18 @@ class Evaluator():
                          'slot', 'lambd'] + self.x_name]
 
         # map to pwr/erg
-        list_erg_var = [var_e.name for store in self.model.storages.values() for var_e in store.e.values()]
-        list_erg_func = [f for f in df_bal.func.unique() if any(f.startswith(var_e) for var_e in list_erg_var)]
+        list_erg_var = [var_e.name for store in self.model.storages.values()
+                        for var_e in store.e.values()]
+        list_erg_func = [f for f in df_bal.func.unique()
+                         if any(f.startswith(var_e)
+                                for var_e in list_erg_var)]
         df_bal['pwrerg'] = df_bal.assign(pwrerg='erg').pwrerg.where(df_bal.func.isin(list_erg_func), 'pwr')
 
         # add parameters
         par_add = ['l', 'vre']
         pars = [getattr(slot, var) for var in par_add
                for slot in self.model.slots.values() if hasattr(slot, var)]
+        pars = [p for p in pars if not p.name in self.x_name]
 
         df_bal_add = pd.DataFrame(df_bal[self.x_name + ['idx']].drop_duplicates())
         for par in pars:
@@ -590,7 +594,7 @@ class Evaluator():
         df_bal = pd.concat([df_bal, df_bal_add], axis=0, sort=True)
 
         # if ev.select_x == m.scale_vre: join to df_bal and adjust all vre
-        if self.model.vre_scale in self.x_vals.keys():
+        if self.model.vre_scale in self.x_vals:
             mask_vre = df_bal.func.str.contains('vre')
             df_bal.loc[mask_vre, 'lambd'] *= df_bal.loc[mask_vre, 'vre_scale']
 
