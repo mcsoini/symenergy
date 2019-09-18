@@ -79,11 +79,13 @@ class Cache():
 
         return os.path.isfile(self.fn)
 
-    @staticmethod
-    def delete_cached(fn):
-        if os.path.isfile(fn):
-            logger.info('Removing file %s'%os.path.abspath(fn))
-            os.remove(fn)
+    def delete_cached(self):
+        ''' Deletes cache file.
+        '''
+
+        if os.path.isfile(self.fn):
+            logger.info('Removing file %s'%self.fn_name)
+            os.remove(self.fn)
         else:
             logger.info('File doesn\'t exist. '
                         'Could not remove %s'%os.path.abspath(fn))
