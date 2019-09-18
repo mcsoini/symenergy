@@ -21,6 +21,7 @@ Symbolic modelling of energy systems, based on SymPy.
 
    example_constant
    doc_core_model
+   doc_auxiliary_io
 
 Indices and tables
 ==================
