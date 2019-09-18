@@ -950,6 +950,6 @@ class Model:
         for slotbar, slotobj in zip(slotlist, self.slots.values()):
             slot, bar = slotbar
             data = 'l={:.1f}/vre={:.1f}'.format(slotobj.l.value, slotobj.vre.value)
-            print(slot, bar, data, sep=' | ', end='\n')
+            print(slot, bar, data, sep=' | ', end='\n', flush=True)
 
 
