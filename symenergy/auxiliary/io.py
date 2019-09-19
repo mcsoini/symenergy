@@ -52,14 +52,12 @@ class Cache():
             Dataframe containing model results.
         '''
 
-        log_str1 = 'Loading from pickle file %s.'%self.fn_name
-        log_str2 = 'Please delete this file to re-solve model.'
-        logger.info('*'*max(len(log_str1), len(log_str2)))
-        logger.info('*'*max(len(log_str1), len(log_str2)))
-        logger.info(log_str1)
-        logger.info(log_str2)
-        logger.info('*'*max(len(log_str1), len(log_str2)))
-        logger.info('*'*max(len(log_str1), len(log_str2)))
+        log_str = ('Loading from cache file %s.'%self.fn_name,
+                   ('Please delete this file to re-solve model: '
+                   'Model.cache.delete_cached()'))
+        smax = len(max(log_str, key=len))
+        sep_str = ('*' * smax,) * 2
+        [logger.info(st) for st in sep_str + log_str + sep_str]
 
         return pd.read_pickle(self.fn)
 

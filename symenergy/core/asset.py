@@ -37,7 +37,7 @@ class Asset(component.Component):
 
     def __init__(self, name):
 
-        super(Asset, self).__init__(name)
+        super().__init__(name)
 #        self.name = name
 
         self.params = []
