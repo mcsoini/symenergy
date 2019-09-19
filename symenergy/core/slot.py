@@ -6,9 +6,15 @@ Contains the Slot class. Provides a dummy slot object noneslot.
 Part of symenergy. Copyright 2018 authors listed in AUTHORS.
 """
 
+from hashlib import md5
+
 
 from symenergy.core import component
 from symenergy.core.parameter import Parameter
+
+from symenergy import _get_logger
+
+logger = _get_logger(__name__)
 
 class Slot(component.Component):
     '''
@@ -40,6 +46,15 @@ class Slot(component.Component):
     def __repr__(self):
 
         return 'Slot %s'%str(self.name)# + (', weight %s'%self.weight)
+
+    def get_component_hash_name(self):
+
+        hash_name_0 = super().get_component_hash_name()
+        hash_input = ['{:.20f}'.format(self.weight)]
+
+        logger.debug('Generating time slot hash.')
+
+        return md5(str(hash_input + [hash_name_0]).encode('utf-8')).hexdigest()
 
 class NoneSlot():
     

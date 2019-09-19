@@ -5,7 +5,7 @@
 """
 
 import os
-import hashlib
+from hashlib import md5
 import pandas as pd
 from symenergy import _get_logger
 import symenergy
@@ -22,14 +22,14 @@ class Cache():
     the model solution process.
     '''
 
-    def __init__(self, m):
+    def __init__(self, m_name):
         '''
         Cache instances take the model instance as input. It is solely used
         to generate the hashed filename.
 
         Parameters
         ----------
-        m : model
+        m_name : str
 
         Attributes
         ----------
@@ -39,7 +39,7 @@ class Cache():
             Shorter cache file name for logging.
         '''
 
-        self.fn = self.get_name(m)
+        self.fn = self.get_name(m_name)
         self.fn_name = 'symenergy/cache/' + os.path.basename(self.fn)
 
     def load(self):
@@ -100,7 +100,7 @@ class Cache():
             logger.info('File doesn\'t exist. '
                         'Could not remove %s'%self.fn_name)
 
-    def get_name(self, m):
+    def get_name(self, m_name):
         '''
         Returns a unique hashed model name based on the constraint,
         variable, multiplier, and parameter names.
@@ -111,22 +111,7 @@ class Cache():
            SymEnergy model instance
         '''
 
-        list_slots = ['%s_%s'%(slot.name, str(slot.weight))
-                      for slot in m.slots.values()]
-        list_slots.sort()
-        list_cstrs = [cstr.base_name for cstr in m.constrs]
-        list_cstrs.sort()
-        list_param = [par.name for par in m.params]
-        list_param.sort()
-        list_cstrs = [par.name for par in m.variabs]
-        list_cstrs.sort()
-        list_multips = [par.name for par in m.multips]
-        list_multips.sort()
-
-        m_name = '_'.join(list_cstrs + list_param + list_cstrs + list_multips
-                          + list_slots)
-
-        m_name = hashlib.md5(m_name.encode('utf-8')).hexdigest()[:12].upper()
+        m_name = m_name[:12].upper()
 
         fn = '%s.pickle'%m_name
         fn = os.path.join(list(symenergy.__path__)[0], '..', 'cache', fn)

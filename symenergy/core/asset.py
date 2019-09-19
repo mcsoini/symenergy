@@ -8,6 +8,7 @@ Part of symenergy. Copyright 2018 authors listed in AUTHORS.
 
 
 import sympy as sp
+from hashlib import md5
 
 import symenergy.core.component as component
 from symenergy.core.constraint import Constraint
@@ -208,4 +209,15 @@ class Asset(component.Component):
 
         return '%s %s'%(self.__class__, str(self.name))
 
+
+    def get_component_hash_name(self):
+
+        hash_name_0 = super().get_component_hash_name()
+        # adding slots
+        hash_input = list(map(lambda x: '%s_%s'%(x.name, x.weight),
+                              self.slots.values()))
+
+        logger.debug('Generating asset hash.')
+
+        return md5(str(hash_input + [hash_name_0]).encode('utf-8')).hexdigest()
 

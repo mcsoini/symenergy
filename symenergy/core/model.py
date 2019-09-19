@@ -13,6 +13,7 @@ import pandas as pd
 import sympy as sp
 import numpy as np
 import time
+from hashlib import md5
 from sympy.tensor.array import derive_by_array
 
 
@@ -112,7 +113,7 @@ class Model:
 
             self.init_supply_constraints()
 
-            self.cache = io.Cache(self)
+            self.cache = io.Cache(self.get_model_hash_name())
 
         return wrapper
 
@@ -952,4 +953,8 @@ class Model:
             data = 'l={:.1f}/vre={:.1f}'.format(slotobj.l.value, slotobj.vre.value)
             print(slot, bar, data, sep=' | ', end='\n', flush=True)
 
+    def get_model_hash_name(self):
 
+        hash_input = ''.join(comp.get_component_hash_name()
+                             for comp in self.comps.values())
+        return md5(hash_input.encode('utf-8')).hexdigest()

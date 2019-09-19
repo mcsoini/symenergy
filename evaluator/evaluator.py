@@ -35,7 +35,7 @@ class Evaluator():
     '''
 
     def __init__(self, model, x_vals, drop_non_optimum=False,
-                 eval_accuracy=1e-9, nthreads=None, sql_params=None):
+                 eval_accuracy=1e-9, nthreads=None):
         '''
         Keyword arguments:
             * model -- symenergy model
@@ -48,7 +48,6 @@ class Evaluator():
         self.model = model
 
         self.nthreads = nthreads
-        self.sql_params = sql_params
 
         self.drop_non_optimum = drop_non_optimum
 
@@ -259,26 +258,6 @@ class Evaluator():
 
         return df.apply(process, axis=1)
 
-    def init_table(self, warn_existing_tables):
-
-        sc = self.sql_params['sql_schema']
-        db = self.sql_params['sql_db']
-        tb = self.sql_params['sql_table']
-
-        aql.exec_sql('CREATE SCHEMA IF NOT EXISTS %s'%(sc), db=db)
-
-        self.sql_cols = [('func', 'VARCHAR'),
-                         ('const_comb', 'VARCHAR'),
-                         ('is_positive', 'SMALLINT'),
-                         ('lambd', 'DOUBLE PRECISION'),
-                         ('mask_valid', 'BOOLEAN'),
-                         ('is_optimum', 'BOOLEAN'),
-                         ] + [('"%s"'%x, 'DOUBLE PRECISION')
-                              for x in self.x_name]
-
-        aql.init_table(tb, self.sql_cols, sc, db=db,
-                       warn_if_exists=warn_existing_tables)
-
 
     def _get_mask_valid_solutions(self, df):
 
@@ -391,40 +370,28 @@ class Evaluator():
         if self.drop_non_optimum:
             df_result = df_result.loc[df_result.is_optimum]
 
-#        if self.sql_params:
-#            sc = self.sql_params['sql_schema']
-#            db = self.sql_params['sql_db']
-#            tb = self.sql_params['sql_table']
-#            cols = [col[0].replace('"', '') for col in self.sql_cols]
-#
-#            aql.write_sql(df_result[cols], db, sc=sc,
-#                          tb=tb, if_exists='append')
-#            if verbose:
-#                logger.info(time.time() - t)
-#            return None
-#        else:
         if verbose:
             logger.info(time.time() - t)
         return df_result
 
 
-    def after_init_table(f):
-        def wrapper(self, *args, **kwargs):
+#    def after_init_table(f):
+#        def wrapper(self, *args, **kwargs):
+#
+#            if self.sql_params:
+#
+#                if 'warn_existing_tables' in self.sql_params:
+#                    warn_existing_tables = self.sql_params['warn_existing_tables']
+#                else:
+#                    warn_existing_tables = True
+#
+#                self.init_table(warn_existing_tables)
+#
+#            f(self, *args, **kwargs)
+#
+#        return wrapper
 
-            if self.sql_params:
-
-                if 'warn_existing_tables' in self.sql_params:
-                    warn_existing_tables = self.sql_params['warn_existing_tables']
-                else:
-                    warn_existing_tables = True
-
-                self.init_table(warn_existing_tables)
-
-            f(self, *args, **kwargs)
-
-        return wrapper
-
-    @after_init_table
+#    @after_init_table
     def expand_to_x_vals(self, verbose=True):
         '''
         Applies evaluate_by_x to all df_x_vals rows.
@@ -462,8 +429,6 @@ class Evaluator():
         Create binary columns depending on whether the plant constraints
         are active or not.
         '''
-
-        # the following lists are attributes just so they can be getattr'd
 
         get_var = lambda x: x.split('_lam_')[0]
         set_constr = lambda x, lst: (1 if x in map(str, getattr(self, lst))
@@ -570,26 +535,31 @@ class Evaluator():
         list_erg_func = [f for f in df_bal.func.unique()
                          if any(f.startswith(var_e)
                                 for var_e in list_erg_var)]
-        df_bal['pwrerg'] = df_bal.assign(pwrerg='erg').pwrerg.where(df_bal.func.isin(list_erg_func), 'pwr')
+        df_bal['pwrerg'] = (df_bal.assign(pwrerg='erg').pwrerg
+                                  .where(df_bal.func.isin(list_erg_func),
+                                         'pwr'))
 
         # add parameters
         par_add = ['l', 'vre']
         pars = [getattr(slot, var) for var in par_add
                for slot in self.model.slots.values() if hasattr(slot, var)]
+        pars_x = [p for p in pars if p.name in self.x_name]
         pars = [p for p in pars if not p.name in self.x_name]
 
-        df_bal_add = pd.DataFrame(df_bal[self.x_name + ['idx']].drop_duplicates())
+        df_bal_add = pd.DataFrame(df_bal[self.x_name + ['idx']]
+                                    .drop_duplicates())
         for par in pars:
             df_bal_add[par.name] = par.value
 
+        for par in pars_x:
+            df_bal_add['y_' + par.name] = df_bal_add[par.name]
+
         df_bal_add = df_bal_add.set_index(self.x_name + ['idx']).stack().rename('lambd').reset_index()
         df_bal_add = df_bal_add.rename(columns={'level_%d'%(1 + len(self.x_name)): 'func'})
+        df_bal_add.func = df_bal_add.func.apply(lambda x: x.replace('y_', ''))
         df_bal_add['func_no_slot'] = df_bal_add.func.apply(lambda x: '_'.join(x.split('_')[:-1]))
         df_bal_add['slot'] = df_bal_add.func.apply(lambda x: x.split('_')[-1])
         df_bal_add['pwrerg'] = 'pwr'
-#        map_const_comb = df_bal[self.x_name + ['const_comb']].drop_duplicates()
-#        df_bal_add = df_bal_add.join(map_const_comb.set_index(self.x_name)['const_comb'], on=self.x_name)
-
 
         df_bal = pd.concat([df_bal, df_bal_add], axis=0, sort=True)
 
@@ -611,141 +581,6 @@ class Evaluator():
         df_bal.loc[df_bal.func.isin(varpar_neg), 'lambd'] *= -1
 
         self.df_bal = df_bal
-
-    def build_supply_table_sql(self, df=None):
-        '''
-        Generates a table representing the supply constraint for easy plotting.
-
-        Largely obsolete.
-        '''
-
-        self.map_func_to_slot_sql()
-
-
-
-        self.sql_cols_supply = [('func', 'VARCHAR'),
-                         ('const_comb', 'VARCHAR'),
-                         ('func_no_slot', 'VARCHAR'),
-                         ('slot', 'VARCHAR'),
-                         ('lambd', 'DOUBLE PRECISION'),
-                         ] + [('"%s"'%x, 'DOUBLE PRECISION')
-                              for x in self.x_name]
-
-        self.cols_tb_supply = aql.init_table('%s_supply'%self.tb,
-                                             self.sql_cols_supply, self.sc,
-                                             db=self.db)
-
-        db = self.sql_params['sql_db']
-
-        exec_strg = '''
-        INSERT INTO {sql_schema}.{sql_table}_supply ({cols})
-        SELECT {cols}
-        FROM {sql_schema}.{sql_table}
-        WHERE is_optimum = True
-            AND NOT (func LIKE 'tc%' or func LIKE 'pi_%' OR func LIKE 'lb_%');
-        '''.format(**self.sql_params, cols=self.cols_tb_supply)
-        aql.exec_sql(exec_strg, db=db)
-
-        # add parameters
-        par_add = ['l', 'vre']
-        pars = [getattr(slot, var) for var in par_add
-               for slot in self.model.slots.values() if hasattr(slot, var)]
-
-        for par in pars:
-
-            par_name = par.name
-            slot_name = par.slot.name
-            par_name_no_slot = par_name.replace('_' + slot_name, '')
-            par_val = par.value
-
-            exec_strg = '''
-            WITH tb_raw AS (
-              SELECT DISTINCT const_comb, {cols_x}
-              FROM {sql_schema}.{sql_table}_supply
-            )
-            INSERT INTO {sql_schema}.{sql_table}_supply ({cols})
-            SELECT
-                '{par_name}'::VARCHAR AS func,
-                const_comb,
-                '{par_name_no_slot}'::VARCHAR AS func_no_slot,
-                '{slot_name}'::VARCHAR AS slot,
-                {par_val}::DOUBLE PRECISION AS lambd, {cols_x}
-            FROM tb_raw
-            '''.format(**self.sql_params,
-                       cols=self.cols_tb_supply,
-                       cols_x = ', '.join('"%s"'%x for x in self.x_name),
-                       par_name=par_name,
-                       par_val=par_val,
-                       par_name_no_slot=par_name_no_slot,
-                       slot_name=slot_name)
-            aql.exec_sql(exec_strg, db=db)
-
-        # if ev.select_x == m.scale_vre: join to df_bal and adjust all vre
-        if self.model.vre_scale in self.x_vals:
-            exec_strg = '''
-            UPDATE {sql_schema}.{sql_table}_supply
-            SET lambd = lambd * vre_scale
-            WHERE func LIKE '%vre%';
-            '''.format(**self.sql_params)
-            aql.exec_sql(exec_strg, db=db)
-
-
-
-
-
-        funcs_neg = []
-        # add load all slots
-        funcs_neg += [slot.l.name for slot in self.model.slots.values()]
-        # add curtailment
-        funcs_neg += [p.name for slot, p in self.model.curt.p.items()
-                      ] if hasattr(self.model, 'curt') else []
-        # add charging
-        funcs_neg += [p.name for store in self.model.storages.values()
-                      for slot, p in store.p.items()
-                      if store.slots_map[slot.name] == 'chg']
-
-        funcs_neg = ' OR func LIKE '.join("'{}%'".format(ff)
-                                          for ff in funcs_neg)
-
-        exec_strg = '''
-        UPDATE {sql_schema}.{sql_table}_supply
-        SET lambd = lambd * -1
-        WHERE func LIKE {funcs_neg};
-        '''.format(**self.sql_params, funcs_neg=funcs_neg)
-        aql.exec_sql(exec_strg, db=db)
-
-
-        self.df_bal = aql.read_sql(self.sql_params['sql_db'],
-                                   self.sql_params['sql_schema'],
-                                   self.sql_params['sql_table'])
-
-#    def enforce_constraints(self):
-#        '''
-#        Discard solutions which violate any of the
-#            * positive
-#            * capacity
-#        constraints.
-#        TODO: Ideally this would be modular and part of the components.
-#        '''
-#
-#        self.df_exp = self._init_constraints_active(self.df_exp)
-#
-#        mask_valid = self._get_mask_valid_solutions(self.df_exp)
-#
-#        self.df_exp = self.df_exp.join(mask_valid, on=mask_valid.index.names)
-#
-#        self.df_exp.loc[self.df_exp.mask_valid == 0, 'lambd'] = np.nan
-
-#    def evaluate_all(self):
-#
-#        df_lam_plot = self.df_lam_plot.reset_index()[['func',
-#                                                      'const_comb',
-#                                                      'lambd_func']]
-#
-#        df = pd.merge(self.df_x_vals.assign(key=1),
-#                      df_lam_plot.assign(key=1), on='key')
-#
-#        df['lambd'] = self._evaluate(df)
 
 
     def init_cost_optimum(self, df_result):

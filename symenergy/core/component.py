@@ -7,6 +7,7 @@ Contains the symenergy Component class.
 Part of symenergy. Copyright 2018 authors listed in AUTHORS.
 """
 import itertools
+from hashlib import md5
 import pandas as pd
 from symenergy.auxiliary.constrcomb import CstrCombBase
 from symenergy.auxiliary.constrcomb import filter_constraint_combinations
@@ -22,14 +23,18 @@ class Component():
 
         self.name = name
 
+    def get_params(self):
+
+        return [getattr(self, param_name)
+                for param_name in self.PARAMS_TIME + self.PARAMS
+                if hasattr(self, param_name)]
+
+
     def get_params_dict(self, attr=tuple()):
 
         attr = tuple(attr) if isinstance(attr, str) else attr
 
-        param_objs = \
-                [getattr(self, param_name)
-                 for param_name in self.PARAMS_TIME + self.PARAMS
-                 if hasattr(self, param_name)]
+        param_objs = self.get_params()
 
         if len(attr) == 1:
             return [getattr(par, attr[0])
@@ -161,5 +166,22 @@ class Component():
                 for var in self.VARIABS + self.VARIABS_TIME
                 if hasattr(self, var)
                 for vv in getattr(self, var).values()]
+
+    def get_component_hash_name(self):
+
+
+        hash_input = sorted(
+        [self.name] +
+        list(map(lambda x: x.name, self.get_params())) +
+        list(map(lambda x: x.name, self.get_variabs())) +
+        list(map(lambda x: '%s_%s'%(x.expr, x.mlt), self.get_constraints()))
+        )
+
+        logger.debug('Generating component hash.')
+
+        return md5(str(hash_input).encode('utf-8')).hexdigest()
+
+
+
 
 

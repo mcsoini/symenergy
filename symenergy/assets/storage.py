@@ -10,6 +10,7 @@ import wrapt
 import numpy as np
 import itertools
 from copy import copy
+from hashlib import md5
 
 import symenergy.core.asset as asset
 from symenergy.core.constraint import Constraint
@@ -120,6 +121,8 @@ class Storage(asset.Asset):
         self._update_class_attrs()
         self._init_prev_slot()
 
+        self.energy_cost = energy_cost
+
         # only one power for each slot, ... charging or discharging is
         # determined in the constraints depending on the specification in
         # the slots_map
@@ -145,7 +148,7 @@ class Storage(asset.Asset):
 
         self.init_cstr_storage()
 
-        self.init_cost_component(energy_cost)
+        self.init_cost_component()
 
     @property
     def slots_map(self):
@@ -285,12 +288,30 @@ class Storage(asset.Asset):
 
                 self.cstr_pwrerg[slot] = cstr
 
-    def init_cost_component(self, energy_cost):
+    def init_cost_component(self):
         '''
         Set constant and linear components of variable costs.
         '''
 
-        self.cc = energy_cost * sum(self.e.values())
+        self.cc = self.energy_cost * sum(self.e.values())
 
 
+    def get_component_hash_name(self):
+        ''' Expand component hash.
+
+        Storage has additional attributes which need to be included in the
+        component hash value. These are:
+
+        * `energy_cost`
+        * `slots_map`
+        '''
+
+        hash_name_0 = super().get_component_hash_name()
+        hash_input = [str(self.slots_map),
+                      '{:.20f}'.format(self.energy_cost),
+                      str(self.energy_cost)]
+
+        logger.debug('Generating storage hash.')
+
+        return md5(str(hash_input + [hash_name_0]).encode('utf-8')).hexdigest()
 
