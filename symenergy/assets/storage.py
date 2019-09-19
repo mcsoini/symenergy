@@ -107,7 +107,7 @@ class Storage(asset.Asset):
         }
 
     def __init__(self, name, eff, slots_map=None, slots=None,
-                 capacity=False, energy_capacity=False):
+                 capacity=False, energy_capacity=False, energy_cost=1e-3):
 
         super().__init__(name)
 #        self.name = name
@@ -145,7 +145,7 @@ class Storage(asset.Asset):
 
         self.init_cstr_storage()
 
-        self.init_cost_component()
+        self.init_cost_component(energy_cost)
 
     @property
     def slots_map(self):
@@ -285,12 +285,12 @@ class Storage(asset.Asset):
 
                 self.cstr_pwrerg[slot] = cstr
 
-    def init_cost_component(self):
+    def init_cost_component(self, energy_cost):
         '''
         Set constant and linear components of variable costs.
         '''
 
-        self.cc = 1e-3 * sum(self.e.values())
+        self.cc = energy_cost * sum(self.e.values())
 
 
 
