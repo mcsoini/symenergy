@@ -130,6 +130,11 @@ class Model:
     @df_comb.setter
     def df_comb(self, df_comb):
         self._df_comb = df_comb.reset_index(drop=True)
+        if self.nress:
+            self.nress = len(self._df_comb)
+        else:
+            self.ncomb = len(self._df_comb)
+
 
     @update_component_list
     def add_storage(self, name, *args, **kwargs):
