@@ -15,6 +15,8 @@ from symenergy import _get_logger
 
 logger = _get_logger(__name__)
 
+CHUNKS_PER_THREAD = 2
+
 try:
     from pathos.multiprocessing import ProcessingPool as Pool
 except Exception as e: logger.info(e)
@@ -51,7 +53,7 @@ def parallelize_df(df, func, nthreads, use_pathos=False, **kwargs):
     MP_EMA.reset()
 
     nthreads = min(nthreads, len(df))
-    nchunks = min(nthreads * 2, len(df))
+    nchunks = min(nthreads * CHUNKS_PER_THREAD, len(df))
 
     df_split = numpy.array_split(df, nchunks)
     if use_pathos:
