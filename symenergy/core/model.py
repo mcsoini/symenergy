@@ -240,23 +240,6 @@ class Model:
             self.cache.write(self.df_comb)
 
 
-    def get_result_dict(self, row, string_keys=False):
-        '''
-        Combines the variabs_multips and the result iterables into a dict.
-
-        Keyword argument:
-            * x -- df_comb table row, must contain columns
-                   'variabs_multibs', 'result'
-            * string_keys -- boolean; if True, return symbol names as keys
-                             rather than symbols
-        '''
-
-        dict_res = {str(var) if string_keys else var: res
-                    for var, res
-                    in zip(row.variabs_multips, row.result[0])}
-        return dict_res
-
-
     def fix_stored_energy(self):
 
         if __name__ == '__main__':
@@ -298,7 +281,7 @@ class Model:
         TODO: Doesn't work for free storage (not slots_map constraint).
         '''
 
-        dict_var = self.get_result_dict(x, True)
+        dict_var = dict(zip(map(str, x.variabs_multips), list(x.result)[0]))
 
         for store in self.storages.values():
             sum_chg = sum(dict_var['%s_pchg_%s'%(store.name, chg_slot)]
