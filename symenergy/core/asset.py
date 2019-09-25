@@ -135,7 +135,8 @@ class Asset(component.Component):
             base_name = '%s_pos_%s_%s'%(self.name, variable, str(slot.name))
 
             cstr = Constraint(base_name=base_name, slot=slot,
-                              var_name=str(var_attr[slot]))
+                              var_name=str(var_attr[slot]),
+                              is_positivity_constraint=True)
 
             var = var_attr[slot]
             cstr.expr = var

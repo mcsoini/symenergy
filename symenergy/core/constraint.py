@@ -19,7 +19,8 @@ class Constraint():
     '''
 
     def __init__(self, base_name, slot, multiplier_name='lb',
-                 is_equality_constraint=False, var_name=None):
+                 is_equality_constraint=False, var_name=None,
+                 is_positivity_constraint=False):
         '''
         Arguments:
             * base_name -- string
@@ -29,6 +30,7 @@ class Constraint():
 
         self.slot = slot
         self.is_equality_constraint = is_equality_constraint
+        self.is_positivity_constraint = is_positivity_constraint
         self.base_name = base_name
         self.multiplier_name = multiplier_name
         self.var_name = var_name

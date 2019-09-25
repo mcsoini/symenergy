@@ -320,7 +320,10 @@ class Evaluator():
         df_result = df_result.reset_index().join(df_lam.set_index(ind)[cols], on=ind)
 
         def sanitize_unexpected_zeros(df):
-            for col, func in self.model.constrs_pos_cols_vars.items():
+            dict_col_func = {cstr.col: cstr.base_name
+                             for cstr in self.model.constrs
+                             if cstr.is_positivity_constraint}
+            for col, func in dict_col_func.items():
                 df.loc[(df.func == func + '_lam_plot')
                        & (df[col] != 1) & (df['lambd'] == 0),
                        'lambd'] = np.nan
