@@ -494,16 +494,16 @@ class Model:
             func = self.wrapper_call_subs_tc
             self.df_comb['tc'] = parallelize_df(df, func, self.nthreads)
 
-    def subs_total_cost(self, result, var_mlt_slct, idx):
+    def subs_total_cost(self, res, var, idx):
         '''
         Substitutes solution into TC variables.
         This expresses the total cost as a function of the parameters.
         '''
 
-        dict_var = {var: list(result)[0][ivar]
-                    if not isinstance(result, sp.sets.EmptySet)
+        dict_var = {var: res[ivar]
+                    if not isinstance(res, sp.sets.EmptySet)
                     else np.nan for ivar, var
-                    in enumerate(var_mlt_slct)}
+                    in enumerate(var)}
 
         MP_COUNTER.increment()
 
@@ -695,7 +695,7 @@ class Model:
 
             return tuple([var for var in res.free_symbols
                                  if var in x.variabs_multips]
-                            for nres, res in enumerate(list(x.result)[0]))
+                            for nres, res in enumerate(x.result))
 
         res_vars = self.df_comb[['result', 'variabs_multips', 'idx']].copy()
         res_vars.loc[mask_valid, 'res_vars'] = \
@@ -825,12 +825,12 @@ class Model:
         if __name__ == '__main__':
             x = self.df_comb.iloc[1]
 
-        if x.mask_res_unq == 0:
-            list_res_new = list(list(x.result)[0])
+        if x.code_lindep == 0:
+            list_res_new = x.result
 
         elif x.mask_res_unq == 1:
 
-            list_res = list(x.result)[0]
+            list_res = x.result
             list_var = x.variabs_multips
 
             collect = {}
@@ -852,7 +852,7 @@ class Model:
         else:
             raise ValueError('mask_res_unq must be 0 or 1')
 
-        return [list_res_new]
+        return list_res_new
 
     def __repr__(self):
 

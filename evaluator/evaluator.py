@@ -204,7 +204,7 @@ class Evaluator():
 
             idx = mv_list_str.index(slct_eq)
 
-            func = list(x.result)[0][idx]
+            func = x.result[idx]
 
             return func
 
