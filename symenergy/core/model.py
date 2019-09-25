@@ -16,7 +16,6 @@ import time
 from hashlib import md5
 from sympy.tensor.array import derive_by_array
 
-
 from symenergy.assets.plant import Plant
 from symenergy.assets.storage import Storage
 from symenergy.assets.curtailment import Curtailment
@@ -25,6 +24,7 @@ from symenergy.core.slot import Slot, noneslot
 from symenergy.core.parameter import Parameter
 from symenergy.auxiliary.parallelization import parallelize_df
 from symenergy.auxiliary.parallelization import MP_COUNTER, MP_EMA
+from symenergy.auxiliary.parallelization import log_time_progress
 from symenergy import _get_logger
 from symenergy.patches.sympy_linsolve import linsolve
 from symenergy.auxiliary.constrcomb import filter_constraint_combinations
@@ -36,37 +36,12 @@ logger.warning('!!! Monkey-patching sympy.linsolve !!!')
 sp.linsolve = linsolve
 
 
-if __name__ == '__main__':
-    sys.exit()
-
-
-def log_time_progress(f):
-    '''
-    Decorator for progress logging.
-    Note: Due to multiprocessing, this can't be used as an actual decorator.
-    https://stackoverflow.com/questions/9336646/python-decorator-with-multiprocessing-fails
-    Using explicit wrappers instead.
-    '''
-
-    def wrapper(self, df, name, ntot, *args):
-        t = time.time()
-        res = f(df, *args)
-        t = (time.time() - t)  / len(df)
-
-        MP_EMA.update_ema(t)
-
-        vals = (name, int(MP_COUNTER.value()), ntot,
-                MP_COUNTER.value()/ntot * 100,
-                len(df), MP_EMA.value()/len(df)*1000, t*1000 / len(df))
-        logger.info(('{}: {}/{} ({:.1f}%), chunksize {}, '
-                     'tavg={:.1f}ms, tcur={:.1f}ms').format(*vals))
-
-        return res
-    return wrapper
-
+if __name__ == '__main__': sys.exit()
 
 
 class Model:
+
+
 
     MUTUALLY_EXCLUSIVE = {
         'No power production when curtailing':

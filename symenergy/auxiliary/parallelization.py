@@ -11,6 +11,7 @@ from multiprocessing import Process, Value, Lock
 import numpy
 import pandas as pd
 import itertools
+import time
 from symenergy import _get_logger
 
 logger = _get_logger(__name__)
@@ -45,10 +46,37 @@ class Counter():
         with self.lock:
             return self.val.value
 
+
 MP_COUNTER = Counter()
 MP_EMA = Counter()
 
-def parallelize_df(df, func, nthreads, use_pathos=False, **kwargs):
+
+def log_time_progress(f):
+    '''
+    Decorator for progress logging.
+    Note: Due to multiprocessing, this can't be used as an actual decorator.
+    https://stackoverflow.com/questions/9336646/python-decorator-with-multiprocessing-fails
+    Using explicit wrappers instead.
+    '''
+
+    def wrapper(self, df, name, ntot, *args):
+        t = time.time()
+        res = f(df, *args)
+        t = (time.time() - t)  / len(df)
+
+        MP_EMA.update_ema(t)
+
+        vals = (name, int(MP_COUNTER.value()), ntot,
+                MP_COUNTER.value()/ntot * 100,
+                len(df), MP_EMA.value()/len(df)*1000, t*1000 / len(df))
+        logger.info(('{}: {}/{} ({:.1f}%), chunksize {}, '
+                     'tavg={:.1f}ms, tcur={:.1f}ms').format(*vals))
+
+        return res
+    return wrapper
+
+
+def parallelize_df(df, func, nthreads, *args, use_pathos=False, **kwargs):
     MP_COUNTER.reset()
     MP_EMA.reset()
 
