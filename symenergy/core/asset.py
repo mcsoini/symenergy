@@ -113,7 +113,7 @@ class Asset(component.Component):
                     and not capacity_name + '_ret' == var_name):
                     cap -= getattr(self, capacity_name + '_ret')[noneslot]
 
-                cstr.expr = cstr.mlt * (var - cap)
+                cstr.expr = var - cap
 
                 cstr_dict[slot] = cstr
 
@@ -138,7 +138,7 @@ class Asset(component.Component):
                               var_name=str(var_attr[slot]))
 
             var = var_attr[slot]
-            cstr.expr = cstr.mlt * var
+            cstr.expr = var
 
             cstr_dict[slot] = cstr
 

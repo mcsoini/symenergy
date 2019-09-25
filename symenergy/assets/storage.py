@@ -256,7 +256,7 @@ class Storage(asset.Asset):
                             for slot, p in getattr(self, 'p%s'%cd).items())
                         * self.eff.symb**(sgn * 1/2)
                         - self.e[noneslot])
-                cstr_pwrerg.expr = expr * cstr_pwrerg.mlt
+                cstr_pwrerg.expr = expr
 
                 setattr(self, 'cstr_pwrerg_%s'%cd, {noneslot: cstr_pwrerg})
 
@@ -284,7 +284,7 @@ class Storage(asset.Asset):
                         - pdch * slot_w * self.eff.symb**(-1/2)
                         - e)
 
-                cstr.expr = expr * cstr.mlt
+                cstr.expr = expr
 
                 self.cstr_pwrerg[slot] = cstr
 

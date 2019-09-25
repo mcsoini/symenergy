@@ -213,16 +213,15 @@ class Model:
                         for store in self.storages.values()
                         if slot in store.pdch)
 
-        equ = \
-        cstr.mlt * (slot.l.symb
-                    - slot.vre.symb * self.vre_scale.symb
-                    + total_chg
-                    - total_dch
-                    - sum(plant.p[slot] for plant
-                          in self.plants.values()))
+        equ = (slot.l.symb
+               - slot.vre.symb * self.vre_scale.symb
+               + total_chg
+               - total_dch
+               - sum(plant.p[slot] for plant
+                     in self.plants.values()))
 
         if self.curtailment:
-            equ += cstr.mlt * self.curt.p[slot]
+            equ += self.curt.p[slot]
 
         return equ
 
