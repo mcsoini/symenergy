@@ -458,25 +458,23 @@ class Model:
     def call_solve_df(self, df):
         ''' Applies to dataframe. '''
 
-        return [self.solve(lag, var, idx) for lag, var, idx in df]
+        return df.apply(self.solve, axis=1).tolist()
 
 
     def solve_all(self):
 
         logger.info('Solving')
 
-        df = list(zip(self.df_comb.lagrange,
-                      self.df_comb.variabs_multips,
-                      self.df_comb.idx))
-
         if __name__ == '__main__':
-            lagrange, variabs_multips_slct, index = df[0]
+            lagrange, variabs_multips_slct, index = self.df_comb[0]
+            x = self.df_comb.iloc[0]
 
         if not self.nthreads:
-            self.df_comb['result'] = self.call_solve_df(df)
+            self.df_comb['result'] = self.call_solve_df(self.df_comb)
         else:
             func = self.wrapper_call_solve_df
-            self.df_comb['result'] = parallelize_df(df, func, self.nthreads)
+            self.df_comb['result'] = parallelize_df(self.df_comb,
+                                                    func, self.nthreads)
 
 # =============================================================================
 # =============================================================================
