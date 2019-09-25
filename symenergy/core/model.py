@@ -412,16 +412,41 @@ class Model:
 #     Various solver-related methods
 # =============================================================================
 
-    def solve(self, lagrange, variabs_multips_slct, index):
+    def solve(self, x):
 
-        mat = derive_by_array(lagrange, variabs_multips_slct)
+        # substitute variables with binding positivitiy constraints
+        subs_zero = {cstr.expr_0: sp.Integer(0) for col, cstr
+                     in self.constrs_dict.items()
+                     if cstr.is_positivity_constraint
+                     and x[cstr.col]}
+
+        mat = derive_by_array(x.lagrange, x.variabs_multips)
         mat = sp.Matrix(mat).expand()
+        mat = mat.subs(subs_zero)
+
+        variabs_multips_slct = list(set(x.variabs_multips) - set(subs_zero))
+
         A, b = sp.linear_eq_to_matrix(mat, variabs_multips_slct)
-        solution = sp.linsolve((A, b), variabs_multips_slct)
 
         MP_COUNTER.increment()
+        solution_0 = sp.linsolve((A, b), variabs_multips_slct)
 
-        return None if isinstance(solution, sp.sets.EmptySet) else solution
+        if isinstance(solution_0, sp.sets.EmptySet):
+            return None
+
+        else:
+
+            # init with zeros
+            solution_dict = dict.fromkeys(x.variabs_multips, sp.Integer(0))
+
+            # update with solutions
+            solution_dict.update(dict(zip(variabs_multips_slct,
+                                          list(solution_0)[0])))
+
+            solution = tuple(solution_dict.values())
+
+
+            return solution
 
 
     def wrapper_call_solve_df(self, df, *args):
