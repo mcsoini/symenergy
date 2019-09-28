@@ -89,7 +89,11 @@ def parallelize_df(df, func, nthreads, *args, use_pathos=False, **kwargs):
         results = pool.map(func, df_split, **kwargs)
     else:
         pool = multiprocessing.Pool(nthreads)
-        results = pool.map(func, df_split)
+        if args:
+#            print((df_split, args))
+            results = pool.starmap(func, itertools.product(df_split, args))
+        else:
+            results = pool.map(func, df_split)
     pool.close()
     pool.join()
     if use_pathos:
