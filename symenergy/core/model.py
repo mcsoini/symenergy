@@ -661,12 +661,14 @@ class Model:
            matter which component power is used. Then the solution can
            be discarded without loss of generality. All cases will still
            be captured by other constraint combinations.
+        3. Different components but same component classes. If multiple idling
+           storage plants are present, their mulitpliers show linear
+           dependencies.
 
         Returns:
             * Series mask with values: 0 -> no variables in solutions; 1 ->
                 single variable in solution: set to zero; > 1 -> mixed
                 interdependency: drop solution; NaN: empty solution set
-
         '''
 
 #        check_vars_left = lambda x: any(var in x.result.free_symbols
@@ -717,15 +719,35 @@ class Model:
                 res_vars.loc[mask_valid].apply(get_comps, axis=1)
 
         # maximum unique component number
-        def get_max_nunq(x):
+        def get_max_ncompunq(x):
             nmax = 0
             if x.res_comps:
                 nmax = max(len(set(comp_list)) for comp_list in x.res_comps)
             return nmax
+        res_vars.loc[mask_valid, 'ncompunq'] = \
+                res_vars.loc[mask_valid].apply(get_max_ncompunq, axis=1)
 
-        res_vars.loc[mask_valid, 'mask_res_unq'] = res_vars.loc[mask_valid].apply(get_max_nunq, axis=1)
+        # maximum unique component class number
+        def get_max_ncompclassunq(x):
+            nmax = 0
+            if x.res_comps:
+                nmax = len(set([x.__class__ for x in
+                                itertools.chain.from_iterable(x.res_comps)]))
+            return nmax
+        res_vars.loc[mask_valid, 'ncompclassesunq'] = \
+                res_vars.loc[mask_valid].apply(get_max_ncompclassunq, axis=1)
 
-        return res_vars.mask_res_unq
+        # generate lindep codes
+        res_vars['code_lindep'] = 0
+
+
+        res_vars.loc[res_vars.ncompunq < 2, 'code_lindep'] = 1
+        res_vars.loc[(res_vars.ncompunq >= 2)
+                     & (res_vars.ncompclassesunq >= 2 ), 'code_lindep'] = 2
+        res_vars.loc[(res_vars.ncompunq >= 2)
+                     & (res_vars.ncompclassesunq < 2 ), 'code_lindep'] = 3
+
+        return res_vars.code_lindep
 
 
     def filter_invalid_solutions(self):
@@ -784,14 +806,16 @@ class Model:
         # get info on linear combinations
         mask_lindep = self.get_mask_linear_dependencies()
 
-        nkey1, nkey2 = (mask_lindep == 1).sum(), (mask_lindep == 2).sum()
+        ncomb0 = len(self.df_comb)
+        nkey1, nkey2, nkey3 = (mask_lindep == 1).sum(), (mask_lindep == 2).sum(), (mask_lindep == 3).sum()
         logger.warning(('Number of solutions with linear dependencies: '
-                       'Key 1: {:d} ({:.1f}%), Key 2: {:d} ({:.1f}%)'
+                       'Key 1: {:d} ({:.1f}%), Key 2: {:d} ({:.1f}%), Key 3: {:d} ({:.1f}%)'
                        ).format(nkey1, nkey1/ncomb0*100,
-                                nkey2, nkey2/ncomb0*100))
+                                nkey2, nkey2/ncomb0*100,
+                                nkey3, nkey3/ncomb0*100))
 
         self.df_comb = pd.concat([self.df_comb, mask_lindep], axis=1)
-        self.df_comb = self.df_comb.loc[-(mask_lindep > 1)]
+        self.df_comb = self.df_comb.loc[-(self.df_comb.code_lindep == 2)]
 
         # adjust results for single-component linear dependencies
         self.df_comb['result'] = \
@@ -812,7 +836,10 @@ class Model:
         if x.code_lindep == 0:
             list_res_new = x.result
 
-        elif x.mask_res_unq == 1:
+        if x.code_lindep == 3:
+            list_res_new = x.result
+
+        elif x.code_lindep == 1:
 
             list_res = x.result
             list_var = x.variabs_multips
@@ -834,7 +861,7 @@ class Model:
                 for res, var in collect.items():
                     logger.info('     Solution for %s contained variabs %s.'%(res, var))
         else:
-            raise ValueError('mask_res_unq must be 0 or 1')
+            raise ValueError('code_lindep must be 0, 3, or 1')
 
         return list_res_new
 
