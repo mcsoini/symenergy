@@ -283,15 +283,8 @@ class Model:
         self.constrs_dict = {cstr.col: cstr for cstr in self.constrs.keys()}
 
         # list of constraint columns
-        self.constrs_cols = [cstr.col for cstr in self.constrs.keys()]
-        self.constrs_neq = [cstr for cstr in self.constrs
-                            if not cstr.is_equality_constraint]
-        self.constrs_cols_neq = [cstr.col for cstr
-                                 in self.constrs_neq]
-
-        self.constrs_pos_cols_vars = {cstr.col: cstr.var_name
-                                      for cstr in self.constrs
-                                      if '_pos_' in cstr.col}
+        self.constrs_cols_neq = [cstr.col for cstr in self.constrs
+                                 if not cstr.is_equality_constraint]
 
 
     def get_model_mutually_exclusive_cols(self):
