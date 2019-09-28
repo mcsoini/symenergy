@@ -12,6 +12,7 @@ import pandas as pd
 import itertools
 import time
 
+from symenergy.core.model import Model
 from symenergy import _get_logger
 
 logger = _get_logger(__name__)
@@ -34,15 +35,15 @@ class Evaluator():
     Evaluates model results for selected
     '''
 
-    def __init__(self, model, x_vals, drop_non_optimum=False,
-                 eval_accuracy=1e-9, nthreads=None):
+    def __init__(self, model:Model, x_vals:dict, drop_non_optimum=False,
+                 tolerance=1e-9, nthreads=None):
         '''
         Keyword arguments:
             * model -- symenergy model
            ( * select_x -- symenergy Parameter; to be varied
                            according to x_vals )
             * x_vals -- iterable with value for the evaluation of select_x
-            * eval_accuracy -- absolute slack for constraint evaluation
+            * tolerance -- absolute tolerance for constraint evaluation
         '''
 
         self.model = model
@@ -53,9 +54,9 @@ class Evaluator():
 
         self.x_vals = x_vals
 
-        self.eval_accuracy = eval_accuracy
+        self.tolerance = tolerance
 
-        self.dfev = model.df_comb.copy()
+        self.dfev = self.model.df_comb.copy()
 
         self.model.init_total_param_values()
         self.is_positive = self.model.get_all_is_positive()
@@ -112,6 +113,7 @@ class Evaluator():
 
         return list_dep_var
 
+
     def get_evaluated_lambdas(self, skip_multipliers=True):
         '''
         For each dependent variable and total cost get a lambda function
@@ -132,8 +134,7 @@ class Evaluator():
 
             logger.info('Extracting solution for %s...'%slct_eq_0)
 
-            slct_eq = (slct_eq_0.name
-                       if not isinstance(slct_eq_0, str)
+            slct_eq = (slct_eq_0.name if not isinstance(slct_eq_0, str)
                        else slct_eq_0)
 
             if slct_eq != 'tc':
@@ -285,24 +286,23 @@ class Evaluator():
         return mask_valid
 
 
-    def call_evaluate_by_x(self, df_x, df_lam, verbose):
-
-        eval_x = lambda x: self.evaluate_by_x(x, df_lam, verbose)
-
-        if __name__ == '__main__':
-            x = df_x.iloc[0]
-
-
-        result = pd.concat([eval_x(x[1])
-                            for x in self.df_x_vals.iterrows()])
-
-        return result
+#    def call_evaluate_by_x(self, df_x, df_lam, verbose):
+#
+#        eval_x = lambda x: self.evaluate_by_x(x, df_lam, verbose)
+#
+#        if __name__ == '__main__':
+#            x = df_x.iloc[0]
+#
+#
+#        result = pd.concat([eval_x(x[1])
+#                            for x in self.df_x_vals.iterrows()])
+#
+#        return result
 
 
     def call_evaluate_by_x_new(self, df_x, df_lam, verbose):
 
         t = time.time()
-
 
         new_index = df_x.set_index(df_x.columns.tolist()).index
 
@@ -453,7 +453,7 @@ class Evaluator():
 
         msk_pos = df.is_positive == 1
         mask_positive = pd.Series(True, index=df.index)
-        mask_positive.loc[msk_pos] = df.loc[msk_pos].lambd + self.eval_accuracy >= 0
+        mask_positive.loc[msk_pos] = df.loc[msk_pos].lambd + self.tolerance >= 0
 
         return mask_positive
 
@@ -502,7 +502,7 @@ class Evaluator():
                 constraint_met = pd.Series(True, index=df.index)
                 constraint_met.loc[mask_slct_func] = \
                                     (df.loc[mask_slct_func].lambd
-                                     * (1 - self.eval_accuracy)
+                                     * (1 - self.tolerance)
                                      <= val_cap.loc[mask_slct_func])
 
                 # delete temporary columns:
@@ -634,9 +634,9 @@ class Evaluator():
         self.df_exp_opt = self.df_exp.loc[mask_opt].copy()
 
 
-    def map_func_to_slot(self):
+    def _map_func_to_slot(self):
 
-        print('map_func_to_slot')
+        logger.debug('map_func_to_slot')
         func_list = self.df_exp.func.unique()
 
         slot_name_list = list(self.model.slots.keys())
