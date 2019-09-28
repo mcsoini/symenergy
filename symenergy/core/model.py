@@ -230,16 +230,16 @@ class Model:
 
 
 #
-    def _fix_stored_energy_full(self, x):
+#    def _fix_stored_energy_full(self, x):
+##
+##        x = self.df_comb.loc[]
 #
-#        x = self.df_comb.loc[]
-
-        dict_var = self.get_result_dict(x, True)
+#        dict_var = self.get_result_dict(x, True)
+##
+##        store = self.comps['phs']
+##
+##        store.pchg
 #
-#        store = self.comps['phs']
-#
-#        store.pchg
-
 
 
     def _fix_stored_energy(self, x):
@@ -690,9 +690,6 @@ class Model:
 
         # for each individual solution, get residual variables/multipliers
         def get_residual_vars(x):
-            if x.idx%100 == 0:
-                logger.info(x.idx)
-
             return tuple([var for var in res.free_symbols
                                  if var in x.variabs_multips]
                             for nres, res in enumerate(x.result))
@@ -706,9 +703,6 @@ class Model:
 
         # add solution variable itself to all non-empty lists
         def add_solution_var(x):
-            if x.idx%100 == 0:
-                logger.info(x.idx)
-
             return tuple(x.res_vars[nres_vars]
                                 + [x.variabs_multips[nres_vars]]
                             if res_vars else []
@@ -722,9 +716,6 @@ class Model:
         comp_dict_varmtp.update(self.variabs)
 
         def get_comps(x):
-            if x.idx%100 == 0:
-                logger.info(x.idx)
-
             return tuple((list(set([comp_dict_varmtp[var]
                                               for var in res_vars])))
                                     for res_vars in x.res_vars

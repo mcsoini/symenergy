@@ -342,40 +342,40 @@ class Evaluator():
         return df_result
 
 
-    def evaluate_by_x(self, x, df_lam, verbose, new=True):
-
-        df = df_lam.copy()
-
-        t = time.time()
-
-        if verbose:
-            logger.info('Evaluating %s'%(str(x.to_dict())
-                                         if hasattr(x, 'to_dict') else str(x)))
-        logger.debug('x_name: %s'%self.x_name)
-        for col in self.x_name:
-            df[col] = x[col]
-
-        df_result = df.copy()
-        df_result['lambd'] = self._evaluate(df_result)
-
-        def sanitize_unexpected_zeros(df):
-            for col, func in self.model.constrs_pos_cols_vars.items():
-                df.loc[(df.func == func + '_lam_plot')
-                       & (df[col] != 1) & (df['lambd'] == 0),
-                       'lambd'] = np.nan
-
-        sanitize_unexpected_zeros(df_result)
-
-        mask_valid = self._get_mask_valid_solutions(df_result)
-        df_result = df_result.join(mask_valid, on=mask_valid.index.names)
-        df_result['is_optimum'] = self.init_cost_optimum(df_result)
-
-        if self.drop_non_optimum:
-            df_result = df_result.loc[df_result.is_optimum]
-
-        if verbose:
-            logger.info(time.time() - t)
-        return df_result
+#    def evaluate_by_x(self, x, df_lam, verbose, new=True):
+#
+#        df = df_lam.copy()
+#
+#        t = time.time()
+#
+#        if verbose:
+#            logger.info('Evaluating %s'%(str(x.to_dict())
+#                                         if hasattr(x, 'to_dict') else str(x)))
+#        logger.debug('x_name: %s'%self.x_name)
+#        for col in self.x_name:
+#            df[col] = x[col]
+#
+#        df_result = df.copy()
+#        df_result['lambd'] = self._evaluate(df_result)
+#
+#        def sanitize_unexpected_zeros(df):
+#            for col, func in self.model.constrs_pos_cols_vars.items():
+#                df.loc[(df.func == func + '_lam_plot')
+#                       & (df[col] != 1) & (df['lambd'] == 0),
+#                       'lambd'] = np.nan
+#
+#        sanitize_unexpected_zeros(df_result)
+#
+#        mask_valid = self._get_mask_valid_solutions(df_result)
+#        df_result = df_result.join(mask_valid, on=mask_valid.index.names)
+#        df_result['is_optimum'] = self.init_cost_optimum(df_result)
+#
+#        if self.drop_non_optimum:
+#            df_result = df_result.loc[df_result.is_optimum]
+#
+#        if verbose:
+#            logger.info(time.time() - t)
+#        return df_result
 
 
 #    def after_init_table(f):
