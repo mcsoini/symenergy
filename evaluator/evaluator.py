@@ -426,6 +426,7 @@ class Evaluator():
         self.const_comb_opt = self.df_exp.loc[self.df_exp.is_optimum, 'idx'
                                              ].unique().tolist()
 
+        self._map_func_to_slot()
 
     def _init_constraints_active(self, df):
         '''
