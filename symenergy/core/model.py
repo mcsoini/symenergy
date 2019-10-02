@@ -210,63 +210,7 @@ class Model:
             self.solve_all()
             self.filter_invalid_solutions()
             self.generate_total_costs()
-#            self.fix_stored_energy()
             self.cache.write(self.df_comb)
-
-
-    def fix_stored_energy(self):
-
-        if __name__ == '__main__':
-            x = self.df_comb.iloc[0]
-            row = x
-
-        if self.storages:
-            logger.info('Recalculating stored energy.')
-            self.df_comb['result'] = self.df_comb.apply(
-                                        self._fix_stored_energy, axis=1)
-        else:
-            logger.warning('Skipping stored energy recalculation. '
-                           'Model does not contain storage assets.')
-
-
-#
-#    def _fix_stored_energy_full(self, x):
-##
-##        x = self.df_comb.loc[]
-#
-#        dict_var = self.get_result_dict(x, True)
-##
-##        store = self.comps['phs']
-##
-##        store.pchg
-#
-
-
-    def _fix_stored_energy(self, x):
-        '''
-        Recalculates stored energy from power results.
-
-        Input parameters:
-            * x -- df_comb table row, must contain columns
-                   'variabs_multibs', 'result'
-            * name -- storage object name
-
-        TODO: Should be done by storage class.
-        TODO: Doesn't work for free storage (not slots_map constraint).
-        '''
-
-        dict_var = dict(zip(map(str, x.variabs_multips), list(x.result)[0]))
-
-        for store in self.storages.values():
-            sum_chg = sum(dict_var['%s_pchg_%s'%(store.name, chg_slot)]
-                          * (self.slots[chg_slot].weight
-                             if self.slots[chg_slot].weight else 1)
-                          for chg_slot in
-                          tuple(slots for slots in store.slots_map['chg']))
-
-            dict_var['%s_e_None'%store.name] = sum_chg * store.eff.symb**0.5
-
-        return [[dict_var[str(var)] for var in x.variabs_multips]]
 
 
     def collect_component_constraints(self):
