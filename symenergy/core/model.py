@@ -43,7 +43,7 @@ class Model:
 
 
 
-    MUTUALLY_EXCLUSIVE = {
+    _MUTUALLY_EXCLUSIVE = {
         'No power production when curtailing':
                 (('pos_p', 'this', False), ('curt_pos_p', 'this', False)),
         'No discharging when curtailing':
@@ -302,7 +302,7 @@ class Model:
         '''
 
         list_col_names = []
-        for mename, me in self.MUTUALLY_EXCLUSIVE.items():
+        for mename, me in self._MUTUALLY_EXCLUSIVE.items():
 
             # identify relevant constraints of all components
             cstrs_all = [comp.get_constraints(False, True, True)
@@ -366,7 +366,7 @@ class Model:
 
         logger.info('Length of merged df_comb: %d'%len(dfcomb))
 
-        # filter according to model MUTUALLY_EXCLUSIVE
+        # filter according to model _MUTUALLY_EXCLUSIVE
         logger.info('*'*30 + 'model filtering' + '*'*30)
         model_mut_excl_cols = self.get_model_mutually_exclusive_cols()
         dfcomb = filter_constraint_combinations(dfcomb, model_mut_excl_cols)
