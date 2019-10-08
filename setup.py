@@ -5,10 +5,11 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="SymEnergy",
-    version="0.1",
+    version="0.2",
     author="SymEnergy contributors listed in AUTHORS",
     author_email="soini@posteo.de",
-    description="Symbolic energy system optimization",
+    description=("Lagrange multiplier based energy market toy "
+                 "modeling framework"),
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/mcsoini/symenergy",

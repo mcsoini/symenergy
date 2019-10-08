@@ -12,10 +12,12 @@ import pandas as pd
 import itertools
 import time
 
-import symenergy.evaluator.plotting as plotting
-import grimsel.auxiliary.aux_sql_func as aql
+from symenergy.core.model import Model
+from symenergy import _get_logger
 
-from symenergy.auxiliary.parallelization import parallelize_df
+logger = _get_logger(__name__)
+
+
 
 class LambdContainer():
 
@@ -28,45 +30,38 @@ class LambdContainer():
             setattr(self, func_name, func)
 
 
-class Evaluator(plotting.EvPlotting):
+class Evaluator():
     '''
     Evaluates model results for selected
     '''
 
-    def __init__(self, model, x_vals, drop_non_optimum=False,
-                 eval_accuracy=1e-9, nthreads=None, sql_params=None):
+    def __init__(self, model:Model, x_vals:dict, drop_non_optimum=False,
+                 tolerance=1e-9, nthreads=None):
         '''
         Keyword arguments:
             * model -- symenergy model
            ( * select_x -- symenergy Parameter; to be varied
                            according to x_vals )
             * x_vals -- iterable with value for the evaluation of select_x
-            * eval_accuracy -- absolute slack for constraint evaluation
+            * tolerance -- absolute tolerance for constraint evaluation
         '''
 
         self.model = model
 
         self.nthreads = nthreads
-        self.sql_params = sql_params
 
         self.drop_non_optimum = drop_non_optimum
 
         self.x_vals = x_vals
 
-        self.eval_accuracy = eval_accuracy
+        self.tolerance = tolerance
 
-        self.dfev = model.df_comb.copy()
+        self.dfev = self.model.df_comb.copy()
 
         self.model.init_total_param_values()
         self.is_positive = self.model.get_all_is_positive()
 
         self.df_x_vals = self.get_x_vals_combs()
-
-
-        if sql_params:
-            self.db = sql_params['sql_db']
-            self.tb = sql_params['sql_table']
-            self.sc = sql_params['sql_schema']
 
     @property
     def x_vals(self):
@@ -118,6 +113,7 @@ class Evaluator(plotting.EvPlotting):
 
         return list_dep_var
 
+
     def get_evaluated_lambdas(self, skip_multipliers=True):
         '''
         For each dependent variable and total cost get a lambda function
@@ -136,10 +132,9 @@ class Evaluator(plotting.EvPlotting):
                      else list_dep_var[0])
         for slct_eq_0 in list_dep_var:
 
-            print('Extracting solution for %s'%slct_eq_0, end='...')
+            logger.info('Extracting solution for %s...'%slct_eq_0)
 
-            slct_eq = (slct_eq_0.name
-                       if not isinstance(slct_eq_0, str)
+            slct_eq = (slct_eq_0.name if not isinstance(slct_eq_0, str)
                        else slct_eq_0)
 
             if slct_eq != 'tc':
@@ -148,7 +143,7 @@ class Evaluator(plotting.EvPlotting):
                 get_func = lambda x: self._get_func_from_idx(x, slct_eq)
                 self.dfev[slct_eq] = self.dfev.apply(get_func, axis=1)
 
-            print('substituting', end='...')
+            logger.info('substituting...')
             self.dfev['%s_expr_plot'%slct_eq] = \
                         self.dfev[slct_eq].apply(self._subs_param_values)
 
@@ -156,18 +151,17 @@ class Evaluator(plotting.EvPlotting):
                                                     modules=['numpy'],
                                                     dummify=False)
 
-            print('lambdify', end='...')
+            logger.info('lambdify...')
 
             self.dfev[slct_eq + '_lam_plot'] = (
                             self.dfev['%s_expr_plot'%slct_eq].apply(lambdify))
-            print('done.')
+            logger.info('done.')
 
-        idx = list(map(str, self.model.constrs_cols_neq)) + ['const_comb']
+        idx = self.model.constrs_cols_neq + ['idx']
         cols = [c for c in self.dfev.columns
                 if isinstance(c, str)
                 and '_lam_plot' in c]
         df_lam_plot = self.dfev.set_index(idx).copy()[cols]
-
 
         col_names = {'level_%d'%(len(self.model.constrs_cols_neq) + 1): 'func',
                      0: 'lambd_func'}
@@ -176,7 +170,7 @@ class Evaluator(plotting.EvPlotting):
         df_lam_plot = (df_lam_plot.reset_index(drop=True)
                                   .reset_index())
         df_lam_plot = df_lam_plot.set_index(self.model.constrs_cols_neq
-                                            + ['const_comb', 'func'])
+                                            + ['func', 'idx'])
 
         self.df_lam_plot = df_lam_plot
 
@@ -211,7 +205,7 @@ class Evaluator(plotting.EvPlotting):
 
             idx = mv_list_str.index(slct_eq)
 
-            func = list(x.result)[0][idx]
+            func = x.result[idx]
 
             return func
 
@@ -265,72 +259,71 @@ class Evaluator(plotting.EvPlotting):
 
         return df.apply(process, axis=1)
 
-    def init_table(self, warn_existing_tables):
 
-        sc = self.sql_params['sql_schema']
-        db = self.sql_params['sql_db']
-        tb = self.sql_params['sql_table']
+    def _get_mask_valid_solutions(self, df):
 
-        aql.exec_sql('CREATE SCHEMA IF NOT EXISTS %s'%(sc), db=db)
+        if __name__ == '__main__':
+            df = df_result.copy()
+        else:
+            df = df.copy() # this is important, otherwise we change the x_vals
 
-        self.sql_cols = [('func', 'VARCHAR'),
-                         ('const_comb', 'VARCHAR'),
-                         ('is_positive', 'SMALLINT'),
-                         ('lambd', 'DOUBLE PRECISION'),
-                         ('mask_valid', 'BOOLEAN'),
-                         ('is_optimum', 'BOOLEAN'),
-                         ] + [('"%s"'%x, 'DOUBLE PRECISION')
-                              for x in self.x_name]
+        mask_valid = pd.Series(True, index=df.index)
 
-        aql.init_table(tb, self.sql_cols, sc, db=db,
-                       warn_if_exists=warn_existing_tables)
+        mask_positive = self._get_mask_valid_positive(df)
+        mask_valid = mask_valid & mask_positive
 
-    def evaluate_by_x(self, x, df_lam):
+        mask_capacity = self._get_mask_valid_capacity(df.copy())
+        mask_valid &= mask_capacity
 
-        df = df_lam.copy()
+        df['mask_valid'] = mask_valid
+
+        # consolidate mask by constraint combination and x values
+        index = self.x_name + ['idx']
+        mask_valid = df.pivot_table(index=index,
+                                    values='mask_valid',
+                                    aggfunc=min)
+
+        return mask_valid
+
+
+#    def call_evaluate_by_x(self, df_x, df_lam, verbose):
+#
+#        eval_x = lambda x: self.evaluate_by_x(x, df_lam, verbose)
+#
+#        if __name__ == '__main__':
+#            x = df_x.iloc[0]
+#
+#
+#        result = pd.concat([eval_x(x[1])
+#                            for x in self.df_x_vals.iterrows()])
+#
+#        return result
+
+
+    def call_evaluate_by_x_new(self, df_x, df_lam, verbose):
 
         t = time.time()
 
-        print('x', x)
-        for col in self.x_name:
-            df[col] = x[col]
+        new_index = df_x.set_index(df_x.columns.tolist()).index
 
-# ALTERNATIVE ATTEMPT: EVALUATE TC FIRST, THEN LOOP FROM LOWEST TC TO HIGHEST,
-# STOP WHEN FEASIBLE; DOESN'T SEEM tO BE FASTER IN ITS CURRENT FORM
-#            # evaluate total cost
-#            df_tc = df.loc[df.func == 'tc_lam_plot'].copy()
-#            df_tc['lambd'] = self._evaluate(df.loc[df.func == 'tc_lam_plot'])
-#            # drop nan
-#            df_tc = df_tc.loc[-df_tc.lambd.isnull()]
-#            # sort lowest to highest
-#            df_tc = df_tc.sort_values('lambd', ascending=True)
-#
-#            for ind, row in df_tc.iterrows():
-#                print(ind)
-#                df_cc = df.loc[(df.const_comb == row.const_comb)
-#                             & (df.func != 'tc_lam_plot')].copy()
-#
-#                df_cc['lambd'] = self._evaluate(df_cc)
-#
-#                mask_valid = self._get_mask_valid_solutions(df_cc)
-#
-#                if mask_valid.mask_valid.iloc[0]:
-#                    # we found the optimum
-#                    df_tc_slct = df_tc.loc[df_tc.const_comb == row.const_comb]
-#                    df_result = pd.concat([df_cc, df_tc_slct],
-#                                          axis=0, sort=False)
-#                    df_result['mask_valid'] = True
-#                    df_result['is_optimum'] = True
-#                    break
-#                else:
-#                    pass
+        def _eval(func):
+            data = func.iloc[0](*df_x.values.T)
+            if not isinstance(data, np.ndarray):
+                data = np.ones(df_x.iloc[:, 0].values.shape) * data
+            return pd.DataFrame(data, index=new_index)
 
-#        else:
-        df_result = df.copy()
-        df_result['lambd'] = self._evaluate(df_result)
+        df_result = df_lam.groupby(['func', 'idx']).lambd_func.apply(_eval)
+        df_result = df_result.rename(columns={0: 'lambd'})
+
+        cols = [c for c in df_lam.columns if c.startswith('act_')] + ['is_positive']
+        ind = ['func', 'idx']
+        df_result = df_result.reset_index().join(df_lam.set_index(ind)[cols], on=ind)
 
         def sanitize_unexpected_zeros(df):
-            for col, func in self.model.constrs_pos_cols_vars.items():
+            dict_col_func = {cstr.col: cstr.base_name
+                             for cstr in self.model.constrs
+                             if cstr.is_positivity_constraint}
+            for col, func in dict_col_func.items():
                 df.loc[(df.func == func + '_lam_plot')
                        & (df[col] != 1) & (df['lambd'] == 0),
                        'lambd'] = np.nan
@@ -344,86 +337,70 @@ class Evaluator(plotting.EvPlotting):
         if self.drop_non_optimum:
             df_result = df_result.loc[df_result.is_optimum]
 
-        if self.sql_params:
-            sc = self.sql_params['sql_schema']
-            db = self.sql_params['sql_db']
-            tb = self.sql_params['sql_table']
-            cols = [col[0].replace('"', '') for col in self.sql_cols]
-
-            aql.write_sql(df_result[cols], db, sc=sc,
-                          tb=tb, if_exists='append')
-            print(time.time() - t)
-            return None
-        else:
-            print(time.time() - t)
-            return df_result
+        if verbose:
+            logger.info(time.time() - t)
+        return df_result
 
 
-    def _get_mask_valid_solutions(self, df):
+#    def evaluate_by_x(self, x, df_lam, verbose, new=True):
+#
+#        df = df_lam.copy()
+#
+#        t = time.time()
+#
+#        if verbose:
+#            logger.info('Evaluating %s'%(str(x.to_dict())
+#                                         if hasattr(x, 'to_dict') else str(x)))
+#        logger.debug('x_name: %s'%self.x_name)
+#        for col in self.x_name:
+#            df[col] = x[col]
+#
+#        df_result = df.copy()
+#        df_result['lambd'] = self._evaluate(df_result)
+#
+#        def sanitize_unexpected_zeros(df):
+#            for col, func in self.model.constrs_pos_cols_vars.items():
+#                df.loc[(df.func == func + '_lam_plot')
+#                       & (df[col] != 1) & (df['lambd'] == 0),
+#                       'lambd'] = np.nan
+#
+#        sanitize_unexpected_zeros(df_result)
+#
+#        mask_valid = self._get_mask_valid_solutions(df_result)
+#        df_result = df_result.join(mask_valid, on=mask_valid.index.names)
+#        df_result['is_optimum'] = self.init_cost_optimum(df_result)
+#
+#        if self.drop_non_optimum:
+#            df_result = df_result.loc[df_result.is_optimum]
+#
+#        if verbose:
+#            logger.info(time.time() - t)
+#        return df_result
 
 
-        if __name__ == '__main__':
-            df = df_result.copy()
-        else:
-            df = df.copy() # this is important, otherwise we change the x_vals
+#    def after_init_table(f):
+#        def wrapper(self, *args, **kwargs):
+#
+#            if self.sql_params:
+#
+#                if 'warn_existing_tables' in self.sql_params:
+#                    warn_existing_tables = self.sql_params['warn_existing_tables']
+#                else:
+#                    warn_existing_tables = True
+#
+#                self.init_table(warn_existing_tables)
+#
+#            f(self, *args, **kwargs)
+#
+#        return wrapper
 
-
-        mask_valid = pd.Series(True, index=df.index)
-
-        mask_positive = self._get_mask_valid_positive(df)
-        mask_valid = mask_valid & mask_positive
-
-        mask_capacity = self._get_mask_valid_capacity(df.copy())
-        mask_valid &= mask_capacity
-
-        df['mask_valid'] = mask_valid
-
-        # consolidate mask by constraint combination and x values
-        index = self.x_name + ['const_comb']
-        mask_valid = df.pivot_table(index=index,
-                                    values='mask_valid',
-                                    aggfunc=min)
-
-        return mask_valid
-
-
-
-    def call_evaluate_by_x(self, df_x, df_lam):
-
-        eval_x = lambda x: self.evaluate_by_x(x, df_lam)
-
-        if __name__ == '__main__':
-            x = df_x.iloc[0]
-
-        result = self.df_x_vals.apply(eval_x, axis=1)
-
-
-        return result
-
-
-
-    def after_init_table(f):
-        def wrapper(self, *args, **kwargs):
-
-            if self.sql_params and 'warn_existing_tables' in self.sql_params:
-                warn_existing_tables = self.sql_params['warn_existing_tables']
-            else:
-                warn_existing_tables = True
-
-            self.init_table(warn_existing_tables)
-
-            f(self, *args, **kwargs)
-
-        return wrapper
-
-    @after_init_table
-    def expand_to_x_vals(self):
+#    @after_init_table
+    def expand_to_x_vals(self, verbose=True):
         '''
         Applies evaluate_by_x to all df_x_vals rows.
             * by_x_vals -- if True: expand x_vals for all const_combs/func
                            if False: expand const_combs/func for all x_vals
         '''
-
 
         # keeping pos cols to sanitize zero equality constraints
         constrs_cols_pos = [cstr for cstr in self.model.constrs_cols_neq
@@ -433,52 +410,29 @@ class Evaluator(plotting.EvPlotting):
         constrs_cols_cap = [cstr for cstr in self.model.constrs_cols_neq
                             if '_cap_' in cstr]
 
-        keep_cols = (['func', 'const_comb', 'lambd_func']
+        keep_cols = (['func', 'lambd_func', 'idx']
                      + constrs_cols_pos + constrs_cols_cap)
         df_lam_plot = self.df_lam_plot.reset_index()[keep_cols]
-
-        df_lam_plot['lambd_func_hash'] = \
-                df_lam_plot.lambd_func.apply(lambda x: 'func_%d'%abs(hash(x)))
-        if len(df_lam_plot.lambd_func.unique()) != len(df_lam_plot):
-            raise RuntimeError('lambd_func_hash has non-unique values.')
-
-
-        funcs = (df_lam_plot[['lambd_func_hash', 'lambd_func']]
-                            .apply(tuple, axis=1).tolist())
-        self.lambd_container = LambdContainer(funcs)
 
 
         df_lam_plot = self._init_constraints_active(df_lam_plot)
 
-
         df_x = self.df_x_vals
         df_lam = df_lam_plot
-        if not self.nthreads:
-            df_exp_0 = self.call_evaluate_by_x(df_x, df_lam)
-        else:
-            func = self.call_evaluate_by_x
-            nthreads = self.nthreads
-            df_exp_0 = parallelize_df(df_x, func, nthreads, df_lam=df_lam)
+        df_exp_0 = self.call_evaluate_by_x_new(df_x, df_lam, verbose)
+        df_exp_0 = df_exp_0.reset_index(drop=True)
 
-        if not self.sql_params:
-            df_exp_0 = pd.concat(df_exp_0.tolist())
+        self.df_exp = df_exp_0
+        self.const_comb_opt = self.df_exp.loc[self.df_exp.is_optimum, 'idx'
+                                             ].unique().tolist()
 
-            df_exp_0 = df_exp_0.reset_index(drop=True)
-
-            self.df_exp = df_exp_0
-
-            self.const_comb_opt = (self.df_exp.loc[self.df_exp.is_optimum,
-                                                   'const_comb'].unique().tolist())
-
-
+        self._map_func_to_slot()
 
     def _init_constraints_active(self, df):
         '''
         Create binary columns depending on whether the plant constraints
         are active or not.
         '''
-
-        # the following lists are attributes just so they can be getattr'd
 
         get_var = lambda x: x.split('_lam_')[0]
         set_constr = lambda x, lst: (1 if x in map(str, getattr(self, lst))
@@ -500,7 +454,7 @@ class Evaluator(plotting.EvPlotting):
 
         msk_pos = df.is_positive == 1
         mask_positive = pd.Series(True, index=df.index)
-        mask_positive.loc[msk_pos] = df.loc[msk_pos].lambd + self.eval_accuracy >= 0
+        mask_positive.loc[msk_pos] = df.loc[msk_pos].lambd + self.tolerance >= 0
 
         return mask_positive
 
@@ -538,7 +492,7 @@ class Evaluator(plotting.EvPlotting):
                     if func_C_addret:
                         mask_addret = (df.func.str.contains(func_C_addret))
                         df_C = df.loc[mask_addret].copy()
-                        df_C = df_C.set_index(['const_comb'] + self.x_name)['lambd'].rename('_C_%s'%addret)
+                        df_C = df_C.set_index(['idx'] + self.x_name)['lambd'].rename('_C_%s'%addret)
                         df = df.join(df_C, on=df_C.index.names)
 
                         # doesn't apply to itself, hence -mask_addret
@@ -549,7 +503,7 @@ class Evaluator(plotting.EvPlotting):
                 constraint_met = pd.Series(True, index=df.index)
                 constraint_met.loc[mask_slct_func] = \
                                     (df.loc[mask_slct_func].lambd
-                                     * (1 - self.eval_accuracy)
+                                     * (1 - self.tolerance)
                                      <= val_cap.loc[mask_slct_func])
 
                 # delete temporary columns:
@@ -573,205 +527,98 @@ class Evaluator(plotting.EvPlotting):
         df_bal = df.loc[df.is_optimum].copy()
 
         # base dataframe: all operational variables
-        drop = ['tc', 'pi_', 'lb_']
+        drop = ['tc_', 'pi_', 'lb_']
         df_bal = df_bal.loc[-df_bal.func.str.contains('|'.join(drop))]
 
-        df_bal = df_bal[['func', 'const_comb', 'func_no_slot',
+        df_bal = df_bal[['func', 'idx', 'func_no_slot',
                          'slot', 'lambd'] + self.x_name]
+
+        # map to pwr/erg
+        list_erg_var = [var_e.name for store in self.model.storages.values()
+                        for var_e in store.e.values()]
+        list_erg_func = [f for f in df_bal.func.unique()
+                         if any(f.startswith(var_e)
+                                for var_e in list_erg_var)]
+        df_bal['pwrerg'] = (df_bal.assign(pwrerg='erg').pwrerg
+                                  .where(df_bal.func.isin(list_erg_func),
+                                         'pwr'))
 
         # add parameters
         par_add = ['l', 'vre']
         pars = [getattr(slot, var) for var in par_add
                for slot in self.model.slots.values() if hasattr(slot, var)]
+        pars_x = [p for p in pars if p.name in self.x_name]
+        pars = [p for p in pars if not p.name in self.x_name]
 
-        df_bal_add = pd.DataFrame(df_bal[self.x_name + ['const_comb']].drop_duplicates())
+        df_bal_add = pd.DataFrame(df_bal[self.x_name + ['idx']]
+                                    .drop_duplicates())
         for par in pars:
             df_bal_add[par.name] = par.value
 
-        df_bal_add = df_bal_add.set_index(self.x_name).stack().rename('lambd').reset_index()
-        df_bal_add = df_bal_add.rename(columns={'level_%d'%len(self.x_name): 'func'})
+        for par in pars_x:
+            df_bal_add['y_' + par.name] = df_bal_add[par.name]
+
+        df_bal_add = df_bal_add.set_index(self.x_name + ['idx']).stack().rename('lambd').reset_index()
+        df_bal_add = df_bal_add.rename(columns={'level_%d'%(1 + len(self.x_name)): 'func'})
+        df_bal_add.func = df_bal_add.func.apply(lambda x: x.replace('y_', ''))
         df_bal_add['func_no_slot'] = df_bal_add.func.apply(lambda x: '_'.join(x.split('_')[:-1]))
         df_bal_add['slot'] = df_bal_add.func.apply(lambda x: x.split('_')[-1])
-        map_const_comb = df_bal[self.x_name + ['const_comb']].drop_duplicates()
-        df_bal_add = df_bal_add.join(map_const_comb.set_index(self.x_name)['const_comb'], on=self.x_name)
-
+        df_bal_add['pwrerg'] = 'pwr'
 
         df_bal = pd.concat([df_bal, df_bal_add], axis=0, sort=True)
 
         # if ev.select_x == m.scale_vre: join to df_bal and adjust all vre
-        if self.model.vre_scale in self.x_vals.keys():
+        if self.model.vre_scale in self.x_vals:
             mask_vre = df_bal.func.str.contains('vre')
             df_bal.loc[mask_vre, 'lambd'] *= df_bal.loc[mask_vre, 'vre_scale']
 
+        # negative by func_no_slot
         varpar_neg = ['l', 'curt_p']
-
         df_bal.loc[df_bal.func_no_slot.isin(varpar_neg), 'lambd'] *= -1
 
-        varpar_neg = [store.name + '_p_' + slot_name + '_lam_plot'
+        # negative by func
+        varpar_neg = [store.name + '_p' + chgdch + '_' + slot_name + '_lam_plot'
                       for store in self.model.storages.values()
-                      for slot_name, chgdch in store.slots_map.items() if chgdch == 'chg']
+                      for chgdch, slots_names in store.slots_map.items()
+                      for slot_name in slots_names if chgdch == 'chg']
 
         df_bal.loc[df_bal.func.isin(varpar_neg), 'lambd'] *= -1
 
         self.df_bal = df_bal
 
-    def build_supply_table_sql(self, df=None):
-        '''
-        Generates a table representing the supply constraint for easy plotting.
-        '''
 
-        self.map_func_to_slot_sql()
-
-
-
-        self.sql_cols_supply = [('func', 'VARCHAR'),
-                         ('const_comb', 'VARCHAR'),
-                         ('func_no_slot', 'VARCHAR'),
-                         ('slot', 'VARCHAR'),
-                         ('lambd', 'DOUBLE PRECISION'),
-                         ] + [('"%s"'%x, 'DOUBLE PRECISION')
-                              for x in self.x_name]
-
-        self.cols_tb_supply = aql.init_table('%s_supply'%self.tb,
-                                             self.sql_cols_supply, self.sc,
-                                             db=self.db)
-
-        db = self.sql_params['sql_db']
-
-        exec_strg = '''
-        INSERT INTO {sql_schema}.{sql_table}_supply ({cols})
-        SELECT {cols}
-        FROM {sql_schema}.{sql_table}
-        WHERE is_optimum = True
-            AND NOT (func LIKE 'tc%' or func LIKE 'pi_%' OR func LIKE 'lb_%');
-        '''.format(**self.sql_params, cols=self.cols_tb_supply)
-        aql.exec_sql(exec_strg, db=db)
-
-        # add parameters
-        par_add = ['l', 'vre']
-        pars = [getattr(slot, var) for var in par_add
-               for slot in self.model.slots.values() if hasattr(slot, var)]
-
-        for par in pars:
-
-            par_name = par.name
-            slot_name = par.slot.name
-            par_name_no_slot = par_name.replace('_' + slot_name, '')
-            par_val = par.value
-
-            exec_strg = '''
-            WITH tb_raw AS (
-              SELECT DISTINCT const_comb, {cols_x}
-              FROM {sql_schema}.{sql_table}_supply
-            )
-            INSERT INTO {sql_schema}.{sql_table}_supply ({cols})
-            SELECT
-                '{par_name}'::VARCHAR AS func,
-                const_comb,
-                '{par_name_no_slot}'::VARCHAR AS func_no_slot,
-                '{slot_name}'::VARCHAR AS slot,
-                {par_val}::DOUBLE PRECISION AS lambd, {cols_x}
-            FROM tb_raw
-            '''.format(**self.sql_params,
-                       cols=self.cols_tb_supply,
-                       cols_x = ', '.join('"%s"'%x for x in self.x_name),
-                       par_name=par_name,
-                       par_val=par_val,
-                       par_name_no_slot=par_name_no_slot,
-                       slot_name=slot_name)
-            aql.exec_sql(exec_strg, db=db)
-
-        # if ev.select_x == m.scale_vre: join to df_bal and adjust all vre
-        if self.model.vre_scale in self.x_vals:
-            exec_strg = '''
-            UPDATE {sql_schema}.{sql_table}_supply
-            SET lambd = lambd * vre_scale
-            WHERE func LIKE '%vre%';
-            '''.format(**self.sql_params)
-            aql.exec_sql(exec_strg, db=db)
-
-
-
-
-
-        funcs_neg = []
-        # add load all slots
-        funcs_neg += [slot.l.name for slot in self.model.slots.values()]
-        # add curtailment
-        funcs_neg += [p.name for slot, p in self.model.curt.p.items()
-                      ] if hasattr(self.model, 'curt') else []
-        # add charging
-        funcs_neg += [p.name for store in self.model.storages.values()
-                      for slot, p in store.p.items()
-                      if store.slots_map[slot.name] == 'chg']
-
-        funcs_neg = ' OR func LIKE '.join("'{}%'".format(ff)
-                                          for ff in funcs_neg)
-
-        exec_strg = '''
-        UPDATE {sql_schema}.{sql_table}_supply
-        SET lambd = lambd * -1
-        WHERE func LIKE {funcs_neg};
-        '''.format(**self.sql_params, funcs_neg=funcs_neg)
-        aql.exec_sql(exec_strg, db=db)
-
-
-        self.df_bal = aql.read_sql(self.sql_params['sql_db'],
-                                   self.sql_params['sql_schema'],
-                                   self.sql_params['sql_table'])
-
-    def enforce_constraints(self):
-        '''
-        Discard solutions which violate any of the
-            * positive
-            * capacity
-        constraints.
-        TODO: Ideally this would be modular and part of the components.
-        '''
-
-        self.df_exp = self._init_constraints_active(self.df_exp)
-
-        mask_valid = self._get_mask_valid_solutions(self.df_exp)
-
-        self.df_exp = self.df_exp.join(mask_valid, on=mask_valid.index.names)
-
-        self.df_exp.loc[self.df_exp.mask_valid == 0, 'lambd'] = np.nan
-
-    def evaluate_all(self):
-
-        df_lam_plot = self.df_lam_plot.reset_index()[['func',
-                                                      'const_comb',
-                                                      'lambd_func']]
-
-        df = pd.merge(self.df_x_vals.assign(key=1),
-                      df_lam_plot.assign(key=1), on='key')
-
-        df['lambd'] = self._evaluate(df)
-
-
-    def init_cost_optimum(self, df):
+    def init_cost_optimum(self, df_result):
         ''' Adds cost optimum column to the expanded dataframe. '''
 
-        tc = df.loc[(df.func == 'tc_lam_plot') & df.mask_valid].copy()
+        cols = ['lambd', 'idx'] + self.x_name
+        tc = df_result.loc[(df_result.func == 'tc_lam_plot')
+                           & df_result.mask_valid, cols].copy()
 
         if not tc.empty:
 
             tc_min = (tc.groupby(self.x_name, as_index=0)
                         .apply(lambda x: x.nsmallest(1, 'lambd')))
 
-            tc_min['is_optimum'] = True
-            tc_min = tc_min.set_index(['const_comb'] + self.x_name)
+            def get_cost_optimum_single(df):
+                df = df.sort_values('lambd')
+                df['is_optimum'] = False
+                df.iloc[0, -1] = True
+                return df[['is_optimum']]
 
-            df = df[[c for c in df.columns if not c == 'is_optimum']]
-            df = df.join(tc_min['is_optimum'], on=tc_min.index.names)
+            mask_is_opt = (tc.set_index('idx')
+                             .groupby(self.x_name)
+                             .apply(get_cost_optimum_single))
 
-            df['is_optimum'] = df.is_optimum.fillna(False)
+            df_result = df_result.join(mask_is_opt, on=mask_is_opt.index.names)
+
+            # mask_valid == False have is_optimum == NaN at this point
+            df_result.is_optimum.fillna(False, inplace=True)
 
         else:
 
-            df['is_optimum'] = False
+            df_result['is_optimum'] = False
 
-        return df.is_optimum
+        return df_result.is_optimum
 
     def drop_non_optimal_combinations(self):
         '''
@@ -787,9 +634,10 @@ class Evaluator(plotting.EvPlotting):
         mask_opt = self.df_exp.const_comb.isin(constrs_opt)
         self.df_exp_opt = self.df_exp.loc[mask_opt].copy()
 
-    def map_func_to_slot(self):
 
-        print('map_func_to_slot')
+    def _map_func_to_slot(self):
+
+        logger.debug('map_func_to_slot')
         func_list = self.df_exp.func.unique()
 
         slot_name_list = list(self.model.slots.keys())
@@ -803,62 +651,11 @@ class Evaluator(plotting.EvPlotting):
         func_map = {func: func_new[:-1] if func_new.endswith('_') else func_new
                     for func, func_new in func_map.items()}
 
-
         slot_map = {func: slot if not slot == '' else 'global'
                     for func, slot in slot_map.items()}
 
         self.df_exp['slot'] = self.df_exp['func'].replace(slot_map)
         self.df_exp['func_no_slot'] = self.df_exp['func'].replace(func_map)
-
-
-
-    def map_func_to_slot_sql(self):
-
-        print('map_func_to_slot')
-
-        tb = self.sql_params['sql_table']
-        sc = self.sql_params['sql_schema']
-        db = self.sql_params['sql_db']
-
-        func_list = aql.read_sql(db, sc, tb, keep=['func'], distinct=True)
-        func_list = func_list['func'].tolist()
-
-        slot_name_list = list(self.model.slots.keys())
-
-        slot_map = {func: '+'.join([ss for ss in slot_name_list
-                                    if ss in func])
-                    for func in func_list}
-
-        func_map = {func: func.replace('_None', '').replace(slot + '_lam_plot', '')
-                    for func, slot in slot_map.items()}
-        func_map = {func: func_new[:-1] if func_new.endswith('_') else func_new
-                    for func, func_new in func_map.items()}
-
-
-        slot_map = {func: slot if not slot == '' else 'global'
-                    for func, slot in slot_map.items()}
-
-
-        all_map = ', '.join([str((func, slot_map[func], func_map[func])) for func in slot_map])
-
-        exec_strg = '''
-        ALTER TABLE {sql_schema}.{sql_table}
-        ADD COLUMN IF NOT EXISTS slot VARCHAR,
-        ADD COLUMN IF NOT EXISTS func_no_slot VARCHAR;
-        '''.format(**self.sql_params)
-        aql.exec_sql(exec_strg, db=db)
-
-        exec_strg = '''
-        UPDATE {sql_schema}.{sql_table} AS tb
-        SET func_no_slot = map.func_no_slot,
-            slot = map.slot
-        FROM (
-            WITH temp (func, slot, func_no_slot) AS (VALUES {all_map})
-            SELECT * FROM temp
-        ) AS map
-        WHERE tb.func = map.func
-        '''.format(**self.sql_params, all_map=all_map)
-        aql.exec_sql(exec_strg, db=db)
 
 
     def get_readable_cc_dict(self):

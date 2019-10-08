@@ -3,6 +3,7 @@ cache/*
 
 config_local.*
 
+*.pickle
 OBSOLETE/
 *.pyc
 *.log

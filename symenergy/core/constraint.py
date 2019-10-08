@@ -19,7 +19,8 @@ class Constraint():
     '''
 
     def __init__(self, base_name, slot, multiplier_name='lb',
-                 is_equality_constraint=False, var_name=None):
+                 is_equality_constraint=False, var_name=None,
+                 is_positivity_constraint=False):
         '''
         Arguments:
             * base_name -- string
@@ -29,6 +30,7 @@ class Constraint():
 
         self.slot = slot
         self.is_equality_constraint = is_equality_constraint
+        self.is_positivity_constraint = is_positivity_constraint
         self.base_name = base_name
         self.multiplier_name = multiplier_name
         self.var_name = var_name
@@ -40,14 +42,19 @@ class Constraint():
 
     @property
     def expr(self):
-        if not self.__expr:
-            raise ValueError('Constraint %s: expr undefined'%self.base_name)
-        return self.__expr
+        if not self._expr:
+            raise RuntimeError('Constraint %s: expr undefined'%self.base_name)
+        return self._expr
 
     @expr.setter
     def expr(self, expr):
-        self.__expr = expr
+        if hasattr(expr, 'free_symbols') and self.mlt in expr.free_symbols:
+            raise ValueError(('Trying to define constraint %s with expression '
+                              'containing multiplier')%self.base_name)
 
+        self.expr_0 = self._expr = expr
+        if expr:
+            self._expr *= self.mlt
 
 
     def init_shadow_price(self):

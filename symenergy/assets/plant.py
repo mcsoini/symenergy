@@ -13,9 +13,8 @@ from symenergy.core.parameter import Parameter
 
 class Plant(asset.Asset):
     '''
-    Does know about slots.
-    '''
-    '''
+    Implements power plants with linear cost supply curve.
+
     All plants have:
         * symbol power production p
         * symbol costs vc_0 and vc_1
@@ -34,12 +33,20 @@ class Plant(asset.Asset):
     VARIABS_POSITIVE = ['p', 'C_ret', 'C_add']
 
     # mutually exclusive constraint combinations
-    MUTUALLY_EXCLUSIVE = [('pos_C_ret', 'C_ret_cap_C'),
-                          ('pos_p', 'p_cap_C')]
+    MUTUALLY_EXCLUSIVE = {
+# =============================================================================
+# TODO: This needs to be fixed: C_ret defined for Noneslot
+#         'Power plant retirement not simult. max end zero':
+#             (('pos_C_ret', 'this', True), ('C_ret_cap_C', 'this', True)),
+# =============================================================================
+        'Power plant output not simult. max end zero':
+            (('pos_p', 'this', True), ('p_cap_C', 'this', True))
+
+        # C_ret max --> no output
+        }
 
     def __init__(self, name, vc0, vc1=None,
                  fcom=None, slots=None, capacity=False, cap_ret=False):
-
         '''
         Params:
             * name --
@@ -52,11 +59,11 @@ class Plant(asset.Asset):
 
         TODO: Make vc1 optional.
         '''
-        super().__init__()
+
+        super().__init__(name)
+#        self.name = name
 
         self.slots = slots if slots else {'0': Slot('0', 0, 0)}
-
-        self.name = name
 
         self.init_symbol_operation('p')
 
@@ -83,8 +90,8 @@ class Plant(asset.Asset):
 
         self.init_cost_component()
 
-        self.init_is_capacity_constrained('C', 'p')
-        self.init_is_positive()
+#        self.init_is_capacity_constrained('C', 'p')
+#        self.init_is_positive()
 
     def init_cost_component(self):
         '''
