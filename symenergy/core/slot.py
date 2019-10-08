@@ -25,8 +25,7 @@ class Slot(component.Component):
     PARAMS_TIME = ['vre', 'l']
     VARIABS = []
     VARIABS_TIME = []
-    MULTIPS = []
-    
+
     VARIABS_POSITIVE = []
 
     MAP_CAPACITY = {}
