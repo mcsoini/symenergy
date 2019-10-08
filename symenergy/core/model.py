@@ -231,7 +231,7 @@ class Model:
                                  if not cstr.is_equality_constraint]
 
 
-    def get_model_mutually_exclusive_cols(self):
+    def _get_model_mutually_exclusive_cols(self):
         '''
         Expand model `_MUTUALLY_EXCLUSIVE` to plants and time slots.
 
@@ -309,7 +309,7 @@ class Model:
 
         list_dfcomb = []
         for comp in self.comps.values():
-            list_dfcomb.append(comp.get_constraint_combinations())
+            list_dfcomb.append(comp._get_constraint_combinations())
 
         list_dfcomb = [df for df in list_dfcomb if not df.empty]
 
@@ -323,7 +323,7 @@ class Model:
 
         # filter according to model _MUTUALLY_EXCLUSIVE
         logger.info('*'*30 + 'model filtering' + '*'*30)
-        model_mut_excl_cols = self.get_model_mutually_exclusive_cols()
+        model_mut_excl_cols = self._get_model_mutually_exclusive_cols()
         dfcomb = filter_constraint_combinations(dfcomb, model_mut_excl_cols)
 
         self.df_comb = dfcomb.drop('dummy', axis=1)

@@ -55,7 +55,7 @@ class Component():
             return param_objs
 
 
-    def get_constraint_combinations(self):
+    def _get_constraint_combinations(self):
         '''
         Return all relevant constraint combinations for this component.
 
@@ -72,8 +72,8 @@ class Component():
 
         '''
 
-        constrs_cols_neq = [cstr.col for cstr in self.get_constraints() if not
-                       cstr.is_equality_constraint]
+        constrs_cols_neq = [cstr.col for cstr in self.get_constraints()
+                            if not cstr.is_equality_constraint]
 
         mut_excl_cols = self.get_mutually_exclusive_cstrs()
 
