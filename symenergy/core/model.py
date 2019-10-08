@@ -233,10 +233,11 @@ class Model:
 
     def get_model_mutually_exclusive_cols(self):
         '''
-        Expand model MUTUALLY_EXCLUSIVE to plants and time slots.
+        Expand model `_MUTUALLY_EXCLUSIVE` to plants and time slots.
 
         The initial list of constraint combinations is filtered only according
-        to constraint combinations within each component separately. Here,
+        to constraint combinations within each component separately
+        (component `_MUTUALLY_EXCLUSIVE` dictionaries). Here,
         additional constraint combinations from different components are
         removed.
 
@@ -291,9 +292,19 @@ class Model:
 
     def init_constraint_combinations(self):
         '''
-        Gathers all non-equal component constraints,
-        calculates cross-product of all
-        (binding, non-binding) combinations and instantiates dataframe.
+        Generates dataframe `model.df_comb` with constraint combinations.
+
+        1. Obtains relevant constraint combinations from components (see
+           :func:`symenergy.core.component.Component._get_constraint_combinations`)
+        2. Generates table corresponding to the full cross-product of all
+           component constraint combinations.
+        3. Filters constraint combinations according to the
+           :attr:`model._MUTUALLY_EXCLUSIVE` class attribute.
+
+        This function initilizes the `symenergy.df_comb` attribute
+
+        See also: Simple example 1
+
         '''
 
         list_dfcomb = []

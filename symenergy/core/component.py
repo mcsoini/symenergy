@@ -17,8 +17,17 @@ logger = _get_logger(__name__)
 
 class Component():
     '''
-    Make sure that all children implement PARAMS, VARIABS AND MULTIPS
+    Base class for components.
+
+    This serves as parent class for
+
+    - time slots (:class:`symenergy.core.slot.Slot`)
+    - assets (:class:`symenergy.core.asset.Asset`)
+
+    It is not instantiated directly.
+
     '''
+
     def __init__(self, name):
 
         self.name = name
@@ -48,9 +57,19 @@ class Component():
 
     def get_constraint_combinations(self):
         '''
-        Gathers all non-equal component constraints,
-        calculates cross-product of all
-        (binding, non-binding) combinations and instantiates dataframe.
+        Return all relevant constraint combinations for this component.
+
+        1. Generates full cross-product of all binding or non-binding
+           inequality constraints.
+        2. Filters the resulting table based on its `_MUTUALLY_EXCLUSIVE`
+           dictionary.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Relevant combinations of binding/non-binding inequality
+            constraints for this component.
+
         '''
 
         constrs_cols_neq = [cstr.col for cstr in self.get_constraints() if not
@@ -110,7 +129,9 @@ class Component():
         constrs = {} if names else []
 
         attrs = [(key, attr) for key, attr in vars(self).items() if
-                 key.startswith('cstr_')]  # naming convention of constraint attrs
+                 key.startswith('cstr_')]  # naming convention of constraint attrs;
+                                           # values are dicts, so we can't check
+                                           # isinstance(attr, Constraint)
 
         for key, attr in attrs:
             key = (self.name, key) if comp_names else key

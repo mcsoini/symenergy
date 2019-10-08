@@ -21,7 +21,12 @@ Symbolic modelling of energy systems, based on SymPy.
 
    example_constant
    doc_core_model
+   doc_core_component
    doc_auxiliary_io
+
+.. image:: _static/flowchart_symenergy.png
+    :align: center
+    :alt: flowchart
 
 Indices and tables
 ==================

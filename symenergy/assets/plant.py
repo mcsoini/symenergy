@@ -13,9 +13,8 @@ from symenergy.core.parameter import Parameter
 
 class Plant(asset.Asset):
     '''
-    Does know about slots.
-    '''
-    '''
+    Implements power plants with linear cost supply curve.
+
     All plants have:
         * symbol power production p
         * symbol costs vc_0 and vc_1
@@ -36,7 +35,7 @@ class Plant(asset.Asset):
     # mutually exclusive constraint combinations
     MUTUALLY_EXCLUSIVE = {
 # =============================================================================
-# This needs to be fixed: C_ret defined for Noneslot
+# TODO: This needs to be fixed: C_ret defined for Noneslot
 #         'Power plant retirement not simult. max end zero':
 #             (('pos_C_ret', 'this', True), ('C_ret_cap_C', 'this', True)),
 # =============================================================================
