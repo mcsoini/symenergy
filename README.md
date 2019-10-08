@@ -1,4 +1,4 @@
-# SymEnergy --- frozen complementary branch for paper [..]  
+# SymEnergy --- frozen complementary branch for paper [10.1016/j.eneco.2019.104495](10.1016/j.eneco.2019.104495)
 Symbolic modelling of energy systems, based on SymPy.
 
 An implementation of the Lagrange multiplier method applied to simple energy systems.
