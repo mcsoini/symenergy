@@ -27,9 +27,10 @@ logger = _get_logger(__name__)
 
 class Storage(asset.Asset):
     '''
-    For simplicity, storage is modelled with fixed time slots for
-    charging and discharging. Like this the time slots don't require an
-    order.
+    Class describing storage assets which charge and discharge energy.
+
+    The time slot order follows from the order in which they are added to the
+    model instance (:func:`symenergy.core.model.Model.add_slot`).
 
     Parameters
     ----------
@@ -182,17 +183,6 @@ class Storage(asset.Asset):
         Default case: All
         '''
 
-        # expand to all combinations of 'chg', 'dch', 'e':
-#        dict_prev_slot = {(var1, var2, sthis): sprev
-#                          for sprev, sthis in dict_prev_slot.items()
-#                          for var1, var2
-#                          in itertools.product(*[['chg', 'dch', 'e']] * 2)}
-#
-#        # modify if 'e' is only defined for the None slot
-#        if len(self.e) == 1 and list(self.e.keys())[0] is noneslot:
-#
-#        self.variabs['e']
-#
         if not self._slot_blocks:
 
             shifted_slots = np.roll(np.array(list(self.slots.values())), 1)
