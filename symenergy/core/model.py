@@ -92,6 +92,16 @@ class Model:
 
         self.cache = io.Cache(self.get_model_hash_name())
 
+        # check validity of time slot block definition
+        if (self.slot_blocks and (len(self.slots) > 4 or
+            (len(self.comps) > len(self.slots)) and len(self.slots) < 4)):
+
+            raise RuntimeError('Number of time slots must be equal to 4 '
+                               'if time slot blocks are used.')
+
+        if len(self.comps) > 0:  # only when other components are added
+            assert len(self.slot_blocks) in [0, 2], 'Number of slot blocks must be 0 or 2.'
+
 
     def init_curtailment(self):
 
@@ -142,6 +152,15 @@ class Model:
 
     @_update_component_list
     def add_slot(self, name, *args, **kwargs):
+
+        print(kwargs)
+        if self.slot_blocks and not 'block' in kwargs:
+            raise RuntimeError('If any of the slots is assigned to a block, '
+                               'all slots must be.')
+
+        if self.slot_blocks:
+            reps = self.slot_blocks[kwargs['block']].repetitions
+            kwargs['repetitions'] = reps
 
         new_slot = Slot(name, **kwargs)
 
