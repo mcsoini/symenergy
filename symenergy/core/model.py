@@ -11,6 +11,7 @@ from pathlib import Path
 import itertools
 import pandas as pd
 import sympy as sp
+import wrapt
 import numpy as np
 import time
 from hashlib import md5
@@ -71,26 +72,25 @@ class Model:
         self.nress = None  # number of valid results
 
 
-    def update_component_list(f):
-        def wrapper(self, *args, **kwargs):
-            f(self, *args, **kwargs)
+    @wrapt.decorator
+    def _update_component_list(f, self, args, kwargs):
+        f(*args, **kwargs)
 
-            self.comps = self.plants.copy()
-            self.comps.update(self.slots)
-            self.comps.update(self.storages)
-            self.init_curtailment()
+        self.comps = self.plants.copy()
+        self.comps.update(self.slots)
+        self.comps.update(self.storages)
+        self.init_curtailment()
 
-            self.collect_component_constraints()
-            self.init_supply_constraints()
-            self.init_total_param_values()
-            self.get_variabs_params()
-            self.init_total_cost()
+        self.collect_component_constraints()
+        self.init_supply_constraints()
+        self.init_total_param_values()
+        self.get_variabs_params()
+        self.init_total_cost()
 
-            self.init_supply_constraints()
+        self.init_supply_constraints()
 
-            self.cache = io.Cache(self.get_model_hash_name())
+        self.cache = io.Cache(self.get_model_hash_name())
 
-        return wrapper
 
     def init_curtailment(self):
 
@@ -111,18 +111,19 @@ class Model:
             self.ncomb = len(self._df_comb)
 
 
-    @update_component_list
+    @_update_component_list
     def add_storage(self, name, *args, **kwargs):
         ''''''
 
         self.storages.update({name: Storage(name, **kwargs)})
 
-    @update_component_list
+    @_update_component_list
     def add_plant(self, name, *args, **kwargs):
 
         self.plants.update({name: Plant(name, **kwargs)})
 
-    @update_component_list
+
+    @_update_component_list
     def add_slot(self, name, *args, **kwargs):
 
 
