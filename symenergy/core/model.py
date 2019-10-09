@@ -98,6 +98,13 @@ class Model:
             self.curt = Curtailment('curt', self.slots)
             self.comps['curt'] = self.curt
 
+
+    @wrapt.decorator
+    def _add_slots_to_kwargs(f, self, args, kwargs):
+
+        kwargs.update(dict(slots=self.slots))
+        return f(*args, **kwargs)
+
     @property
     def df_comb(self):
         return self._df_comb
@@ -112,12 +119,15 @@ class Model:
 
 
     @_update_component_list
+    @_add_slots_to_kwargs
     def add_storage(self, name, *args, **kwargs):
         ''''''
 
         self.storages.update({name: Storage(name, **kwargs)})
 
+
     @_update_component_list
+    @_add_slots_to_kwargs
     def add_plant(self, name, *args, **kwargs):
 
         self.plants.update({name: Plant(name, **kwargs)})
