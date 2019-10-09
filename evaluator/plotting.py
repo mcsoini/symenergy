@@ -26,7 +26,7 @@ class SymenergyPlotter():
     val_column = None  # defined by children
     cols_neg = []
 
-    def __init__(self, ev, ind_axx, ind_pltx, ind_plty):
+    def __init__(self, ev, ind_axx, ind_pltx, ind_plty, slct_series=None):
 
         print('Init SymenergyPlotter')
 
@@ -34,6 +34,8 @@ class SymenergyPlotter():
         self.ind_pltx = ind_pltx
         self.ind_plty = ind_plty
         self.ind_axx = ind_axx
+
+        self.slct_series = slct_series
 
         self._init_ind_lists()
         self._make_table()
@@ -70,6 +72,8 @@ class SymenergyPlotter():
         dfgp = df.pivot_table(index=self.ind_slct + self.ind_all,
                               columns=self.cat_column,  values=self.val_column)
         dfgp.columns.names = [None]
+
+        dfgp = dfgp[self.slct_series]
 
         cols_to_str = {key: val for key, val in
                        {self.ind_pltx: lambda x: x[self.ind_pltx].apply(str),
