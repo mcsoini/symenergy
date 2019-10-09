@@ -93,6 +93,41 @@ class Asset(component.Component):
         return cap_var
 
 
+    def _init_single_cstr_capacity(self, var_name, capacity_name, sgn):
+
+        slot_objs = (self.slots.values() if self.get_flag_timedep(var_name)
+             else [noneslot])
+
+        cstr_name = 'cstr_%s_cap_%s'%(var_name + ('_neg' if sgn == -1 else ''),
+                                      capacity_name)
+        setattr(self, cstr_name, {})  # initialize instance dict attribute
+        cstr_dict = getattr(self, cstr_name)
+
+        var_attr = getattr(self, var_name)
+
+        for slot in set(slot_objs) & set(var_attr):
+            base_name = '%s_%s_cap%s_%s_%s'%(self.name, var_name,
+                                           {-1: 'neg', +1: ''}[sgn],
+                                           capacity_name,
+                                           str(slot.name))
+
+            cstr = Constraint(base_name=base_name, slot=slot,
+                              var_name=str(var_attr[slot]))
+
+            # define expression
+            var = getattr(self, var_name)[slot]
+            cap = getattr(self, capacity_name).symb
+
+            # subtract retired capacity if applicable
+            if (hasattr(self, capacity_name + '_ret')
+                # ... not for retired capacity constraint
+                and not capacity_name + '_ret' == var_name):
+                cap -= getattr(self, capacity_name + '_ret')[noneslot]
+
+            cstr.expr = sgn * var - cap
+
+            cstr_dict[slot] = cstr
+
 
     def _init_cstr_capacity(self, capacity_name):
         '''
@@ -110,35 +145,10 @@ class Asset(component.Component):
 
         for var_name in list_var_names:  # loop over constrained variables
 
-            slot_objs = (self.slots.values() if self.get_flag_timedep(var_name)
-                         else [noneslot])
+            for sgn in self.CAPACITY_CONSTRAINT_SIGN[var_name]:
 
-            cstr_name = 'cstr_%s_cap_%s'%(var_name, capacity_name)
-            setattr(self, cstr_name, {})  # initialize instance dict attribute
-            cstr_dict = getattr(self, cstr_name)
+                self._init_single_cstr_capacity(var_name, capacity_name, sgn)
 
-            var_attr = getattr(self, var_name)
-
-            for slot in set(slot_objs) & set(var_attr):
-                base_name = '%s_%s_cap_%s_%s'%(self.name, var_name,
-                                               capacity_name, str(slot.name))
-
-                cstr = Constraint(base_name=base_name, slot=slot,
-                                  var_name=str(var_attr[slot]))
-
-                # define expression
-                var = getattr(self, var_name)[slot]
-                cap = getattr(self, capacity_name).symb
-
-                # subtract retired capacity if applicable
-                if (hasattr(self, capacity_name + '_ret')
-                    # ... not for retired capacity constraint
-                    and not capacity_name + '_ret' == var_name):
-                    cap -= getattr(self, capacity_name + '_ret')[noneslot]
-
-                cstr.expr = var - cap
-
-                cstr_dict[slot] = cstr
 
     def init_cstr_positive(self, variable):
         '''
