@@ -355,7 +355,7 @@ class BalancePlot(SymenergyPlotter):
                    & -df.slot.isin(['global'])
                    & -df.pwrerg.isin(['erg'])]
 
-        df['lambd'] = df.lambd.astype(float)
+        df.loc[:, 'lambd'] = df.lambd.astype(float)
         df = df.sort_values(self.ind_axx)
 
         return df
