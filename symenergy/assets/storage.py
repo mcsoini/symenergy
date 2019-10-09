@@ -51,7 +51,7 @@ class Storage(asset.Asset):
 
     PARAMS = ['eff', 'C', 'E']
     PARAMS_TIME = []
-    VARIABS = []
+    VARIABS = ['et']
     VARIABS_TIME = ['pchg', 'pdch', 'e']
 
     VARIABS_POSITIVE = ['p', 'e', 'C_ret', 'C_add', 'pchg', 'pdch']
@@ -108,11 +108,13 @@ class Storage(asset.Asset):
         }
 
     def __init__(self, name, eff, slots_map=None, slots=None,
-                 capacity=False, energy_capacity=False, energy_cost=1e-3):
+                 capacity=False, energy_capacity=False, energy_cost=1e-3,
+                 _slot_blocks=None):
 
         super().__init__(name)
 #        self.name = name
         self.slots = slots
+        self._slot_blocks = _slot_blocks
 
         self.slots_map = (slots_map if slots_map
                           else {'chg': list(self.slots.keys()),
@@ -137,6 +139,10 @@ class Storage(asset.Asset):
         self.init_cstr_positive('e')
 
         self.eff = Parameter('%s_%s'%('eff', self.name), noneslot, eff)
+
+        if self._slot_blocks:
+            self.init_symbol_operation('et')
+            self._init_cstr_slot_blocks_storage()
 
         if capacity:
             self.C = Parameter('C_%s'%self.name, noneslot, capacity)
@@ -176,9 +182,6 @@ class Storage(asset.Asset):
         Default case: All
         '''
 
-        shifted_slots = np.roll(np.array(list(self.slots.values())), 1)
-        dict_prev_slot = dict(zip(self.slots.values(), shifted_slots))
-
         # expand to all combinations of 'chg', 'dch', 'e':
 #        dict_prev_slot = {(var1, var2, sthis): sprev
 #                          for sprev, sthis in dict_prev_slot.items()
@@ -190,6 +193,18 @@ class Storage(asset.Asset):
 #
 #        self.variabs['e']
 #
+        if not self._slot_blocks:
+
+            shifted_slots = np.roll(np.array(list(self.slots.values())), 1)
+            dict_prev_slot = dict(zip(self.slots.values(), shifted_slots))
+
+        else:
+            # 2x2 time slots
+            list_slots = list(self.slots.values())
+            dict_prev_slot = {list_slots[0]: list_slots[1],
+                              list_slots[1]: list_slots[0],
+                              list_slots[2]: list_slots[3],
+                              list_slots[3]: list_slots[2],}
 
         self._dict_prev_slot = dict_prev_slot
 

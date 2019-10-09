@@ -9,6 +9,7 @@ Part of symenergy. Copyright 2018 authors listed in AUTHORS.
 
 import sympy as sp
 from hashlib import md5
+import itertools
 
 import symenergy.core.component as component
 from symenergy.core.constraint import Constraint
@@ -28,12 +29,22 @@ class UnexpectedSymbolError(Exception):
 
         super().__init__(message)
 
+def _expand_class_attrs(cls):
+    cls._add_default_cap_constr_sgn()
+    return cls
+
+@_expand_class_attrs
 class Asset(component.Component):
     '''Mixin class containing shared methods of plants and storage'''
 
     # capacity class map
     MAP_CAPACITY = {'C': ['p', 'pchg', 'pdch', 'C_ret'],  # all power and retired capacity
-                    'E': ['e']}  # storage energy capacity
+                    'E': ['e', 'et']}  # storage energy capacity and block transfer
+
+    # positive and or variable are capacity constraint; only for `et`, since it
+    # can be both pos and neg
+    CAPACITY_CONSTRAINT_SIGN = {'et': [+1, -1]}  # default is [+1]
+
 
     def __init__(self, name):
 
@@ -41,6 +52,16 @@ class Asset(component.Component):
 #        self.name = name
 
         self.params = []
+
+
+    @classmethod
+    def _add_default_cap_constr_sgn(cls):
+
+        list_vars = itertools.chain.from_iterable(cls.MAP_CAPACITY.values())
+        dict_cstr_sgn = dict(itertools.product(list_vars, [[+1]]))
+        dict_cstr_sgn.update(cls.CAPACITY_CONSTRAINT_SIGN)
+        cls.CAPACITY_CONSTRAINT_SIGN = dict_cstr_sgn
+
 
     def get_constrained_variabs(self):
         '''
