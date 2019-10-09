@@ -233,7 +233,8 @@ class SymenergyPlotter():
     def _get_color_list(self):
 
         # init color list --> parent if cols_posneg empty
-        colors = brewer['Spectral'][len(self.cols_pos) + len(self.cols_neg) + 1]
+        ncolors = len(self.cols_pos) + len(self.cols_neg) + 1
+        colors = brewer['Spectral'][max(3, ncolors)][:ncolors]
 
         # convert to rgba --> parent
         colors = [tuple(int(col.strip('#')[i:2+i], 16) for i in range(0,6,2)) + (0.9,)
