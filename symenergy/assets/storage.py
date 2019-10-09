@@ -167,10 +167,6 @@ class Storage(asset.Asset):
                     .issubset(set(self.slots))), \
             'Invalid slots_map values. Must be subsets of slots.'
 
-#        assert (set(slots_map['chg']) == set(self.slots)
-#                or set(slots_map['dch']) == set(self.slots)), \
-#            'One of chg or dch must be defined for all slots.'
-
         self._slots_map = slots_map
 
 
@@ -262,8 +258,6 @@ class Storage(asset.Asset):
 
         else:
             # e_t = e_t-1 + sqrt(eta) * pchg_t - 1 / sqrt(eta) * pdch_t
-
-            # select time slot
 
             self.cstr_pwrerg = {}
 

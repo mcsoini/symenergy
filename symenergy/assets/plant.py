@@ -81,17 +81,12 @@ class Plant(asset.Asset):
             self.init_symbol_operation('C_ret')
             self.init_cstr_positive('C_ret')
 
-
         if capacity:
-
             self.C = Parameter('C_%s'%self.name, noneslot, capacity)
             self.init_cstr_capacity('C')
 
-
         self.init_cost_component()
 
-#        self.init_is_capacity_constrained('C', 'p')
-#        self.init_is_positive()
 
     def init_cost_component(self):
         '''
