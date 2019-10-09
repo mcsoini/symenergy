@@ -37,6 +37,8 @@ class Slot(component.Component):
 
     def __init__(self, name, load, vre, weight=1, block=None, repetitions=1):
 
+        assert isinstance(name, str), 'Slot name must be string.'
+
         super().__init__(name)
 #        self.name = name
 
@@ -52,6 +54,7 @@ class Slot(component.Component):
 
         return 'Slot %s'%str(self.name)# + (', weight %s'%self.weight)
 
+
     def get_component_hash_name(self):
 
         hash_name_0 = super().get_component_hash_name()
@@ -61,6 +64,7 @@ class Slot(component.Component):
         logger.debug('Generating time slot hash.')
 
         return md5(str(hash_input + [hash_name_0]).encode('utf-8')).hexdigest()
+
 
 class NoneSlot():
     

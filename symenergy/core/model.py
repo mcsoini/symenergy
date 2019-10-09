@@ -125,7 +125,6 @@ class Model:
     @update_component_list
     def add_slot(self, name, *args, **kwargs):
 
-        assert isinstance(name, str), 'Slot name must be string.'
 
         self.slots.update({name: Slot(name, **kwargs)})
 
