@@ -140,11 +140,11 @@ class Storage(asset.Asset):
 
         if capacity:
             self.C = Parameter('C_%s'%self.name, noneslot, capacity)
-            self.init_cstr_capacity('C')
+            self._init_cstr_capacity('C')
 
         if energy_capacity:
             self.E = Parameter('E_%s'%self.name, noneslot, energy_capacity)
-            self.init_cstr_capacity('E')
+            self._init_cstr_capacity('E')
 
         self.init_cstr_storage()
 

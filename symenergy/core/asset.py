@@ -71,7 +71,9 @@ class Asset(component.Component):
 
         return cap_var
 
-    def init_cstr_capacity(self, capacity_name):
+
+
+    def _init_cstr_capacity(self, capacity_name):
         '''
         Instantiates a dictionary {slot symbol: Constraint}.
 
