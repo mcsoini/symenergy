@@ -249,6 +249,27 @@ class Storage(asset.Asset):
 
         return list_col_names
 
+    def _init_cstr_slot_blocks_storage(self):
+        '''
+        Defines the variable `et` as the first block's charging surplus.
+        '''
+
+        name = '%s_%s_%s'%(self.name, 'def_et', noneslot.name)
+        cstr = Constraint(name, slot=noneslot, is_equality_constraint=True)
+
+        list_slots = list(self.slots.values())[:2]
+        eff = self.eff.symb
+        reps = self._slot_blocks[list_slots[0].block].repetitions
+
+        chg = sum(self.pchg[slot] for slot in list_slots if slot in self.pchg)
+        dch = sum(self.pdch[slot] for slot in list_slots if slot in self.pdch)
+
+        et = self.et[noneslot]
+
+        cstr.expr = et - (chg * eff**(1/2) - dch / eff**(1/2)) * reps
+
+        self.cstr_def_et = {noneslot: cstr}
+
 
     def init_cstr_storage(self):
         '''
