@@ -21,7 +21,7 @@ from symenergy.assets.plant import Plant
 from symenergy.assets.storage import Storage
 from symenergy.assets.curtailment import Curtailment
 from symenergy.core.constraint import Constraint
-from symenergy.core.slot import Slot, noneslot
+from symenergy.core.slot import Slot, SlotBlock, noneslot
 from symenergy.core.parameter import Parameter
 from symenergy.auxiliary.parallelization import parallelize_df
 from symenergy.auxiliary.parallelization import MP_COUNTER, MP_EMA
@@ -55,6 +55,7 @@ class Model:
 
         self.plants = {}
         self.slots = {}
+        self.slot_blocks = {}
         self.storages = {}
 
         self.comps = []
@@ -118,10 +119,16 @@ class Model:
             self.ncomb = len(self._df_comb)
 
 
+    def add_slot_block(self, name, repetitions):
+
+        self.slot_blocks.update({name: SlotBlock(name, repetitions)})
+
     @_update_component_list
     @_add_slots_to_kwargs
     def add_storage(self, name, *args, **kwargs):
         ''''''
+
+        kwargs['_slot_blocks'] = self.slot_blocks
 
         self.storages.update({name: Storage(name, **kwargs)})
 
@@ -136,8 +143,14 @@ class Model:
     @_update_component_list
     def add_slot(self, name, *args, **kwargs):
 
+        new_slot = Slot(name, **kwargs)
 
-        self.slots.update({name: Slot(name, **kwargs)})
+        sb = new_slot.block
+        assert not sb or sb in self.slot_blocks, 'Unknown slot block "%s"'%sb
+
+
+        self.slots.update({name: new_slot})
+
 
     def init_total_param_values(self):
         '''
