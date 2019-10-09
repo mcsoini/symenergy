@@ -8,6 +8,7 @@ Part of symenergy. Copyright 2018 authors listed in AUTHORS.
 
 from hashlib import md5
 
+from collections import namedtuple
 
 from symenergy.core import component
 from symenergy.core.parameter import Parameter
@@ -15,6 +16,8 @@ from symenergy.core.parameter import Parameter
 from symenergy import _get_logger
 
 logger = _get_logger(__name__)
+
+SlotBlock = namedtuple('SlotBlock', ['name', 'repetitions'])
 
 class Slot(component.Component):
     '''
@@ -32,7 +35,7 @@ class Slot(component.Component):
 
     MUTUALLY_EXCLUSIVE = {}
 
-    def __init__(self, name, load, vre, weight=1):
+    def __init__(self, name, load, vre, weight=1, block=None, repetitions=1):
 
         super().__init__(name)
 #        self.name = name
@@ -41,6 +44,9 @@ class Slot(component.Component):
         self.vre = Parameter('vre_%s'%self.name, self, vre)
 
         self.weight = weight
+        self.block = block
+        self.repetitions = repetitions
+
 
     def __repr__(self):
 
@@ -49,7 +55,8 @@ class Slot(component.Component):
     def get_component_hash_name(self):
 
         hash_name_0 = super().get_component_hash_name()
-        hash_input = ['{:.20f}'.format(self.weight)]
+        hash_input = ['{:.20f}-{}-{:d}'.format(self.weight, self.block,
+                                                self.repetitions)]
 
         logger.debug('Generating time slot hash.')
 
