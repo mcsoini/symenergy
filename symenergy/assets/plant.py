@@ -93,19 +93,16 @@ class Plant(asset.Asset):
         Set constant and linear components of variable costs.
         '''
 
-        if hasattr(self, 'vc1'):
-            self.vc = {slot:
-                       (self.vc0.symb + self.vc1.symb * self.p[slot])
-                       * (slot.weight if slot.weight else 1)
-                       for slot in self.slots.values()}
-        else:
-            self.vc = {slot:
-                       self.vc0.symb
-                       * (slot.weight if slot.weight else 1)
-                       for slot in self.slots.values()}
+        def get_vc(slot):
+            return ((self.vc0.symb + self.vc1.symb * self.p[slot])
+                    if hasattr(self, 'vc1')
+                    else self.vc0.symb)
+
+        self.vc = {slot: get_vc(slot) * slot.repetitions * slot.weight
+                   for slot in self.slots.values()}
 
         self.cc = sum(sp.integrate(vc, self.p[slot])
-                         for slot, vc in self.vc.items())
+                      for slot, vc in self.vc.items())
 
         if 'fcom' in self.__dict__:
 
