@@ -293,8 +293,15 @@ class Storage(asset.Asset):
                         - pdch * slot_w * self.eff.symb**(-1/2)
                         - e)
 
-                cstr.expr = expr
+                # first slot of first block --> subtract `et`
+                # note: this needs to be consistent with the `cstr_def_et`
+                # constraint
+                if self._slot_blocks and list(self.slots.values())[0] is slot:
+                    expr -= self.et[noneslot] / slot.repetitions
+                elif self._slot_blocks and list(self.slots.values())[2] is slot:
+                    expr += self.et[noneslot] / slot.repetitions
 
+                cstr.expr = expr
                 self.cstr_pwrerg[slot] = cstr
 
     def init_cost_component(self):
