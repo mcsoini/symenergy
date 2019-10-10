@@ -194,15 +194,28 @@ class SymenergyPlotter():
         self.xy_combs = list(itertools.product(self._get_xy_list(self.ind_pltx),
                                                self._get_xy_list(self.ind_plty)
                                                ))
+    @property
+    def initial_selection(self):
+        '''
+        Initial data selection (MultiSelect widgets) defaults to first data row
+        '''
 
+        return getattr(self, '_initial_selection',
+                       tuple(self.data.reset_index()[self.ind_slct].iloc[0]))
+
+    @initial_selection.setter
+    def initial_selection(self, val):
+
+        self._initial_selection = val
+        self._make_cds()
 
     def _make_cds(self):
 
         # initial selection
-        slct_def = list(self.dfgp.iloc[[0]].index)[0][:len(self.ind_slct)]
 
         # definition of datasources --> all pos/neg logic in balance class --> child
         self.cds_pos = (ColumnDataSource(self.dfgp[self.cols_pos].loc[slct_def].reset_index())
+        slct_def = self.initial_selection
                         if self.cols_pos else None)
         self.cds_neg = (ColumnDataSource(self.dfgp[self.cols_neg].loc[slct_def].reset_index())
                         if self.cols_neg else None)
@@ -260,10 +273,11 @@ class SymenergyPlotter():
     def _get_multiselects(self):
 
         selects = []
-        for ind in self.ind_slct:
+        for nind, ind in enumerate(self.ind_slct):
 
             list_slct = list(map(str, self.slct_list_dict[ind]))
-            slct = MultiSelect(size=1, value=[list_slct[0]],
+            slct = MultiSelect(size=1,
+                               value=[str(self.initial_selection[nind])],
                                options=list_slct, title=ind)
             self.callback.args['slct_%s'%ind] = slct
             slct.js_on_change('value', self.callback)
