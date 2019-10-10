@@ -308,7 +308,7 @@ class Evaluator():
 
         def _eval(func):
             data = func.iloc[0](*df_x.values.T)
-            if not isinstance(data, np.ndarray):
+            if not isinstance(data, np.ndarray):  # constant value --> expand
                 data = np.ones(df_x.iloc[:, 0].values.shape) * data
             return pd.DataFrame(data, index=new_index)
 
@@ -317,7 +317,8 @@ class Evaluator():
 
         cols = [c for c in df_lam.columns if c.startswith('act_')] + ['is_positive']
         ind = ['func', 'idx']
-        df_result = df_result.reset_index().join(df_lam.set_index(ind)[cols], on=ind)
+        df_result = df_result.reset_index().join(df_lam.set_index(ind)[cols],
+                                                 on=ind)
 
         def sanitize_unexpected_zeros(df):
             dict_col_func = {cstr.col: cstr.base_name
@@ -325,8 +326,8 @@ class Evaluator():
                              if cstr.is_positivity_constraint}
             for col, func in dict_col_func.items():
                 df.loc[(df.func == func + '_lam_plot')
-                       & (df[col] != 1) & (df['lambd'] == 0),
-                       'lambd'] = np.nan
+                       & (df[col] != 1)
+                       & (df['lambd'] == 0), 'lambd'] = np.nan
 
         sanitize_unexpected_zeros(df_result)
 
