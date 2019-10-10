@@ -251,8 +251,10 @@ class Storage(asset.Asset):
         eff = self.eff.symb
         reps = self._slot_blocks[list_slots[0].block].repetitions
 
-        chg = sum(self.pchg[slot] for slot in list_slots if slot in self.pchg)
-        dch = sum(self.pdch[slot] for slot in list_slots if slot in self.pdch)
+        chg = sum(self.pchg[slot] * slot.weight.symb
+                  for slot in list_slots if slot in self.pchg)
+        dch = sum(self.pdch[slot] * slot.weight.symb
+                  for slot in list_slots if slot in self.pdch)
 
         et = self.et[noneslot]
 
@@ -274,7 +276,7 @@ class Storage(asset.Asset):
                 cstr_pwrerg = Constraint(name, slot=noneslot,
                                          is_equality_constraint=True)
 
-                expr = (sum(p * (slot.weight if slot.weight else 1)
+                expr = (sum(p * slot.weight.symb
                             for slot, p in getattr(self, 'p%s'%cd).items())
                         * self.eff.symb**(sgn * 1/2)
                         - self.e[noneslot])
@@ -298,7 +300,7 @@ class Storage(asset.Asset):
                 e = self.e[slot]
                 e_prev = self.e[self._dict_prev_slot[slot]]
 
-                slot_w = (slot.weight if slot.weight else 1)
+                slot_w = slot.weight.symb
                 expr = (e_prev
                         + pchg * slot_w * self.eff.symb**(1/2)
                         - pdch * slot_w * self.eff.symb**(-1/2)

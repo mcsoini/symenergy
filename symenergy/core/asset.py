@@ -247,7 +247,7 @@ class Asset(component.Component):
 
         hash_name_0 = super().get_component_hash_name()
         # adding slots
-        hash_input = list(map(lambda x: '%s_%s'%(x.name, x.weight),
+        hash_input = list(map(lambda x: '%s'%(x.name),
                               self.slots.values()))
 
         logger.debug('Generating asset hash.')

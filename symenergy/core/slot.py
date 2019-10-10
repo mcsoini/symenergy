@@ -44,8 +44,8 @@ class Slot(component.Component):
 
         self.l = Parameter('l_%s'%self.name, self, load)
         self.vre = Parameter('vre_%s'%self.name, self, vre)
+        self.weight = Parameter('weight_%s'%self.name, self, weight)
 
-        self.weight = weight
         self.block = block
         self.repetitions = repetitions
 
@@ -58,8 +58,7 @@ class Slot(component.Component):
     def get_component_hash_name(self):
 
         hash_name_0 = super().get_component_hash_name()
-        hash_input = ['{:.20f}-{}-{:d}'.format(self.weight, self.block,
-                                                self.repetitions)]
+        hash_input = ['{}-{:d}'.format(self.block, self.repetitions)]
 
         logger.debug('Generating time slot hash.')
 
