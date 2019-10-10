@@ -275,7 +275,15 @@ class SymenergyPlotter():
 
         # init color list --> parent if cols_posneg empty
         ncolors = len(self.cols_pos) + len(self.cols_neg) + 1
-        colors = brewer['Spectral'][max(3, ncolors)][:ncolors]
+
+        colorset = 'Set3'
+        maxcolors = max(brewer[colorset].keys())
+        mincolors = min(brewer[colorset].keys())
+        if ncolors <= maxcolors:
+            colors = brewer[colorset][max(mincolors, ncolors)][:ncolors]
+        else:
+            colorcycler = itertools.cycle(brewer[colorset][maxcolors])
+            colors = list(zip(*zip(range(ncolors), colorcycler)))[1]
 
         # convert to rgba --> parent
         colors = [tuple(int(col.strip('#')[i:2+i], 16) for i in range(0,6,2)) + (0.9,)
