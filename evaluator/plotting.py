@@ -12,6 +12,7 @@ from bokeh.layouts import column, row, gridplot, WidgetBox
 from bokeh.models import Legend, CDSView, GroupFilter
 from bokeh.models.widgets import MultiSelect
 from bokeh.plotting import figure
+from bokeh.models.glyphs import MultiLine
 from bokeh.core.properties import value
 from bokeh.palettes import brewer
 from bokeh.io import show
@@ -125,7 +126,6 @@ class SymenergyPlotter():
     val_column = None  # defined by children
     cols_neg = []
 
-        print('Init SymenergyPlotter')
     def __init__(self, ev, ind_axx, ind_pltx, ind_plty, slct_series=None,
                  cat_column=None):
 
@@ -142,7 +142,6 @@ class SymenergyPlotter():
         self._init_ind_lists()
         self._make_table()
 
-        self.colors = self._get_color_list()
 
     def _init_ind_lists(self):
         # init indices
@@ -154,25 +153,31 @@ class SymenergyPlotter():
                                       + [self.ind_axx]
                                       + self.cat_column)]
 
+    @property
+    def data(self):
+        '''External modification of the data triggers. '''
+        return self._data
+
+    @data.setter
+    def data(self, data):
+        self._data = data
+
+        self._make_cols_lists()
+        self.colors = self._get_color_list()
         self._make_index_lists()
         self._make_cds()
         self._make_views()
         self._init_callback()
 
-    def _select_data(self):
-        '''
-        Implemented in children. Select DataFrame from Evaluator attributes.
-        '''
 
     def _make_table(self):
 
         df = self._select_data()
 
-        dfgp = df.pivot_table(index=self.ind_slct + self.ind_all,
-                              columns=self.cat_column,  values=self.val_column)
-        dfgp.columns.names = [None]
+        gpindex = self.ind_plt + self.ind_slct + [self.ind_axx]
+        data = df.pivot_table(index=gpindex, columns=self.cat_column,
+                              values=self.val_column)
 
-        dfgp = dfgp[self.slct_series]
         if len(self.cat_column) > 1:
             data.columns = [str(tuple(c)).replace('\'', '')
                             for c in data.columns]
@@ -183,9 +188,15 @@ class SymenergyPlotter():
                        {self.ind_pltx: lambda x: x[self.ind_pltx].apply(str),
                         self.ind_plty: lambda x: x[self.ind_plty].apply(str)}.items()
                        if key is not None}
-        dfgp = dfgp.reset_index().assign(**cols_to_str).set_index(dfgp.index.names)
+        data = data.reset_index().assign(**cols_to_str).set_index(data.index.names)
 
-        self.dfgp = dfgp
+        self.all_series = data.columns.tolist()
+
+        if self.slct_series:
+            data = data[self.slct_series]
+            data = data.loc[~data.isna().all(axis=1)]
+
+        self.data = data
 
 
     def _make_cols_lists(self):
@@ -207,8 +218,8 @@ class SymenergyPlotter():
 
     def _make_index_lists(self):
 
-        self.slct_list_dict = {ind: self.dfgp.index.get_level_values(ind).unique().tolist()
-                               for ind in self.dfgp.index.names}
+        self.slct_list_dict = {ind: self.data.index.get_level_values(ind).unique().tolist()
+                               for ind in self.data.index.names}
 
         self.xy_combs = list(itertools.product(self._get_xy_list(self.ind_pltx),
                                                self._get_xy_list(self.ind_plty)
@@ -232,38 +243,45 @@ class SymenergyPlotter():
 
         # initial selection
 
-        self.cds_pos = (ColumnDataSource(self.dfgp[self.cols_pos].loc[slct_def].reset_index())
         slct_def = self.initial_selection
+
+        self.cds_pos = (ColumnDataSource(self.data[self.cols_pos].xs(slct_def, level=self.ind_slct).reset_index())
                         if self.cols_pos else None)
-        self.cds_neg = (ColumnDataSource(self.dfgp[self.cols_neg].loc[slct_def].reset_index())
+        self.cds_neg = (ColumnDataSource(self.data[self.cols_neg].xs(slct_def, level=self.ind_slct).reset_index())
                         if self.cols_neg else None)
-        self.cds_all_pos = (ColumnDataSource(self.dfgp[self.cols_pos].reset_index())
+        self.cds_all_pos = (ColumnDataSource(self.data[self.cols_pos].reset_index())
                             if self.cols_pos else None)
-        self.cds_all_neg = (ColumnDataSource(self.dfgp[self.cols_neg].reset_index())
+        self.cds_all_neg = (ColumnDataSource(self.data[self.cols_neg].reset_index())
                             if self.cols_neg else None)
+
 
     def _make_views(self):
 
+        get_flt = lambda ind, val: ([GroupFilter(column_name=ind, group=val)]
+                                    if ind else [])
+
         def get_view(source, valx, valy):
-
-            get_flt = lambda ii, vv: ([GroupFilter(column_name=ii, group=vv)]
-                                      if ii else [])
-
-            filters = get_flt(self.ind_pltx, valx) + get_flt(self.ind_plty, valy)
+            filters = (get_flt(self.ind_pltx, valx)
+                       + get_flt(self.ind_plty, valy))
             return CDSView(source=source, filters=filters)
 
+        list_pn = ['pos', 'neg']
         list_cds = [(cds, pn) for cds, pn in
-                    zip([self.cds_pos, self.cds_neg], ['pos', 'neg']) if cds]
+                    zip([self.cds_pos, self.cds_neg], list_pn) if cds]
 
-        self.views = {(valx, valy): {posneg: get_view(source, valx, valy)
-                                for source, posneg in list_cds}
-                 for valx, valy in self.xy_combs}
+        self.views = dict.fromkeys(self.xy_combs)
+
+        for valx, valy in self.views.keys():
+            self.views[(valx, valy)] = dict.fromkeys(list_pn)
+
+            for source, pn in list_cds:
+                self.views[(valx, valy)][pn] = get_view(source, valx, valy)
 
 
+    def _select_data(self):
 
-
-
-
+        raise NotImplementedError(('%s must implement '
+                                   '`_select_data`'%self.__class__))
 
 
     def get_js_args(self):
@@ -475,14 +493,37 @@ class GeneralPlot(SymenergyPlotter):
 
 if __name__ == '__main__':
 
-    balplot = BalancePlot(ev, ind_axx='vre_scale',
-                          ind_pltx='eff_phs',
-                          ind_plty='slot')
+    balplot = GeneralPlot(ev, ind_axx='vre_scale',
+                          ind_pltx='func_no_slot',
+                          ind_plty=None,
+                          cat_column=['E_phs', 'slot'],
+#                          slct_series=['(phs_e, s1)', '(phs_e, s0)'],
+                          )
+
+#    balplot.initial_selection = (0.1, 0.5)
+
+    self = balplot
+
+    balplot.data = balplot.data.loc[balplot.data.index.get_level_values('func_no_slot').isin(['pi_load', 'phs_e'])]
+
+    self.cols_neg
 
 
     show(balplot._get_layout())
 
-
+#
+#df = pd.DataFrame({'x': range(4), 'y1': np.random.randn(4), 'y2': np.random.randn(4), 'cat': ['a','a','b','b']})
+#
+#source = ColumnDataSource(data=df)
+#plot=figure()
+#
+#view = CDSView(source=source, filters=[GroupFilter(column_name='cat', group='b')])
+#for col in ['y1', 'y2']:
+#    print(source.data[col])
+#    plot.line('x', col,  source=source, line_width=5)
+#    plot.circle('x', col,  source=source)
+#
+#show(plot)
 
 
 # %%
