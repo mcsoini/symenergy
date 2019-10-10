@@ -53,6 +53,18 @@ class Asset(component.Component):
         self.params = []
 
 
+    @property
+    def cc(self):
+
+        return self._cc
+
+
+    @cc.setter
+    def cc(self, cc):
+
+        self._cc = sp.simplify(cc)
+
+
     @classmethod
     def _add_default_cap_constr_sgn(cls):
 
