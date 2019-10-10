@@ -132,7 +132,7 @@ class Evaluator():
                      else list_dep_var[0])
         for slct_eq_0 in list_dep_var:
 
-            logger.info('Extracting solution for %s...'%slct_eq_0)
+            logger.info('Generating lambda functions for %s.'%slct_eq_0)
 
             slct_eq = (slct_eq_0.name if not isinstance(slct_eq_0, str)
                        else slct_eq_0)
@@ -143,7 +143,7 @@ class Evaluator():
                 get_func = lambda x: self._get_func_from_idx(x, slct_eq)
                 self.dfev[slct_eq] = self.dfev.apply(get_func, axis=1)
 
-            logger.info('substituting...')
+            logger.debug('substituting...')
             self.dfev['%s_expr_plot'%slct_eq] = \
                         self.dfev[slct_eq].apply(self._subs_param_values)
 
@@ -151,11 +151,11 @@ class Evaluator():
                                                     modules=['numpy'],
                                                     dummify=False)
 
-            logger.info('lambdify...')
+            logger.debug('lambdify...')
 
             self.dfev[slct_eq + '_lam_plot'] = (
                             self.dfev['%s_expr_plot'%slct_eq].apply(lambdify))
-            logger.info('done.')
+            logger.debug('done.')
 
         idx = self.model.constrs_cols_neq + ['idx']
         cols = [c for c in self.dfev.columns
