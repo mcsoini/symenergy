@@ -418,12 +418,29 @@ class BalancePlot(SymenergyPlotter):
                         legend=list(map(value, cols)),
                         source=data, view=view)
 
+class GeneralPlot(SymenergyPlotter):
+
+    val_column = 'lambd'
+    cols_neg = ['l', 'pchg', 'curt_p']
+
+    def _select_data(self):
+
+        df = self.ev.df_exp.loc[self.ev.df_exp.is_optimum]
+
+        df.loc[:, 'lambd'] = df.lambd.astype(float)
+        df = df.sort_values(self.ind_axx)
+
+        return df
 
 
+    def _make_single_plot(self, fig, data, view, cols, color):
 
+        for column_slct, color_slct in zip(cols, color):
 
-
-
+            fig.circle(x=self.ind_axx, y=column_slct, color=color_slct,
+                       source=data, view=view, line_color='DimGrey')
+            fig.line(x=self.ind_axx, y=column_slct, color=color_slct,
+                     source=data, view=view)
 
 
 if __name__ == '__main__':
