@@ -125,14 +125,17 @@ class SymenergyPlotter():
     val_column = None  # defined by children
     cols_neg = []
 
-    def __init__(self, ev, ind_axx, ind_pltx, ind_plty, slct_series=None):
-
         print('Init SymenergyPlotter')
+    def __init__(self, ev, ind_axx, ind_pltx, ind_plty, slct_series=None,
+                 cat_column=None):
 
         self.ev = ev
         self.ind_pltx = ind_pltx
         self.ind_plty = ind_plty
         self.ind_axx = ind_axx
+
+        if cat_column:
+            self.cat_column = cat_column
 
         self.slct_series = slct_series
 
@@ -141,16 +144,20 @@ class SymenergyPlotter():
 
         self.colors = self._get_color_list()
 
+    def _init_ind_lists(self):
+        # init indices
+        self.ind_plt = list(filter(lambda x: x is not None,
+                                   [self.ind_pltx,
+                                    self.ind_plty]))
+        self.ind_slct = [x for x in self.ev.x_name
+                         if not x in (self.ind_plt
+                                      + [self.ind_axx]
+                                      + self.cat_column)]
+
         self._make_index_lists()
         self._make_cds()
         self._make_views()
         self._init_callback()
-
-    def _init_ind_lists(self):
-        # init indices
-        self.ind_all = list(filter(lambda x: x is not None,
-                               [self.ind_axx, self.ind_pltx, self.ind_plty]))
-        self.ind_slct = [x for x in self.ev.x_name if not x in self.ind_all]
 
     def _select_data(self):
         '''
@@ -166,6 +173,11 @@ class SymenergyPlotter():
         dfgp.columns.names = [None]
 
         dfgp = dfgp[self.slct_series]
+        if len(self.cat_column) > 1:
+            data.columns = [str(tuple(c)).replace('\'', '')
+                            for c in data.columns]
+        else:
+            data.columns = [str(c) for c in data.columns]
 
         cols_to_str = {key: val for key, val in
                        {self.ind_pltx: lambda x: x[self.ind_pltx].apply(str),
@@ -175,9 +187,17 @@ class SymenergyPlotter():
 
         self.dfgp = dfgp
 
-        self.cols_neg = [c for c in dfgp.columns
-                         if any(c.endswith(pat) for pat in self.cols_neg)]
-        self.cols_pos = [c for c in dfgp.columns if c not in self.cols_neg]
+
+    def _make_cols_lists(self):
+
+        if len(self.cat_column) > 1:
+            self.cols_neg = [c for c in self.data.columns
+                             if any(sub_c.endswith(pat)
+                                    for pat in self.cols_neg for sub_c in c)]
+        else:
+            self.cols_neg = [c for c in self.data.columns
+                             if any(c.endswith(pat) for pat in self.cols_neg)]
+        self.cols_pos = [c for c in self.data.columns if c not in self.cols_neg]
 
 
     def _get_xy_list(self, ind):
@@ -404,7 +424,7 @@ class SymenergyPlotter():
 
 class BalancePlot(SymenergyPlotter):
 
-    cat_column = 'func_no_slot'
+    cat_column = ['func_no_slot']
     val_column = 'lambd'
     cols_neg = ['l', 'pchg', 'curt_p']
 
