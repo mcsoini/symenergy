@@ -24,8 +24,7 @@ class Slot(component.Component):
     Doesn't know about plants.
     '''
 
-    PARAMS = []
-    PARAMS_TIME = ['vre', 'l']
+    PARAMS = ['vre', 'l', 'w']
     VARIABS = []
     VARIABS_TIME = []
 
@@ -44,7 +43,7 @@ class Slot(component.Component):
 
         self.l = Parameter('l_%s'%self.name, self, load)
         self.vre = Parameter('vre_%s'%self.name, self, vre)
-        self.weight = Parameter('weight_%s'%self.name, self, weight)
+        self.w = Parameter('w_%s'%self.name, self, weight)
 
         self.block = block
         self.repetitions = repetitions

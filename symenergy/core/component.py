@@ -36,7 +36,7 @@ class Component():
 
     def _check_attributes(self):
 
-        list_attr = ('PARAMS', 'PARAMS_TIME', 'VARIABS', 'VARIABS_TIME')
+        list_attr = ('PARAMS', 'VARIABS', 'VARIABS_TIME')
         assert all(hasattr(self, attr) for attr in list_attr), (
             'Children of `Component` must implement all of '
             '%s'%', '.join(list_attr))
@@ -45,7 +45,7 @@ class Component():
     def get_params(self):
 
         return [getattr(self, param_name)
-                for param_name in self.PARAMS_TIME + self.PARAMS
+                for param_name in self.PARAMS
                 if hasattr(self, param_name)]
 
 
