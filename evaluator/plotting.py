@@ -144,10 +144,9 @@ class SymenergyPlotter():
 
 
     def _init_ind_lists(self):
-        # init indices
+
         self.ind_plt = list(filter(lambda x: x is not None,
-                                   [self.ind_pltx,
-                                    self.ind_plty]))
+                                   [self.ind_pltx, self.ind_plty]))
         self.ind_slct = [x for x in self.ev.x_name
                          if not x in (self.ind_plt
                                       + [self.ind_axx]

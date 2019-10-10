@@ -181,7 +181,7 @@ class Model:
                              for comp in self.comps.values()
                              for symb, val
                              in comp.get_params_dict(('symb',
-                                                     'value')).items()}
+                                                      'value')).items()}
 
         self.param_values.update({self.vre_scale.symb: self.vre_scale.value})
 
