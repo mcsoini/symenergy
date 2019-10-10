@@ -317,11 +317,12 @@ class SymenergyPlotter():
                 posneg_vars = zip(['pos', 'neg'],
                                   [self.cols_pos, self.cols_neg],
                                   [self.cds_pos, self.cds_neg])
-                for posneg, cols_list, data_curr in posneg_vars:
+                for posneg, cols, data in posneg_vars:
 
-                    self._make_single_plot(figure=p, color=self.colors[posneg],
-                                           posneg=posneg, valx=valx, valy=valy,
-                                           data=data_curr, cols=cols_list)
+                    view = self.views[(valx, valy)][posneg]
+
+                    self._make_single_plot(fig=p, color=self.colors[posneg],
+                                           data=data, view=view, cols=cols)
 
                 p.legend.visible = False
                 list_p.append(p)
@@ -411,6 +412,11 @@ class BalancePlot(SymenergyPlotter):
         return df
 
 
+    def _make_single_plot(self, fig, data, view, cols, color):
+
+        fig.varea_stack(x=self.ind_axx, stackers=cols, color=color,
+                        legend=list(map(value, cols)),
+                        source=data, view=view)
 
 
 
@@ -418,11 +424,6 @@ class BalancePlot(SymenergyPlotter):
 
 
 
-    def _make_single_plot(self, figure, data, cols, valx, valy, color, posneg):
-
-        figure.varea_stack(x=self.ind_axx, stackers=cols, color=color,
-                           legend=list(map(value, cols)),
-                           source=data, view=self.views[(valx, valy)][posneg])
 
 
 if __name__ == '__main__':
