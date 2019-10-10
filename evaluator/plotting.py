@@ -17,6 +17,105 @@ from bokeh.palettes import brewer
 from bokeh.io import show
 
 
+class JSCallbackCoder():
+
+    def __init__(self, ind_slct, cols_pos, cols_neg):
+
+        self.ind_slct = ind_slct
+        self.cols_pos = cols_pos
+        self.cols_neg = cols_neg
+
+        self._make_js_general_str()
+        self._make_js_init_str()
+        self._make_js_push_str()
+        self._make_js_loop_str()
+        self._make_js_emit_str()
+
+
+    def _make_js_general_str(self):
+
+        self.var_slct_str = '; '.join('var {inds} = slct_{inds}.value'.format(inds=inds)
+                                      for inds in self.ind_slct) + ';'
+        self.param_str = ', ' + ', '.join(self.ind_slct)
+        self.match_str = ' && '.join('source.data[\'{inds}\'][i] == {inds}'.format(inds=inds)
+                                     for inds in self.ind_slct)
+
+
+    def _make_js_push_str(self):
+
+        get_push_str = lambda pn: ''.join(('cds_{pn}.data[\'{col}\']'
+                                           '.push(cds_all_{pn}.'
+                                           'data[\'{col}\'][i]); '
+                                           ).format(pn=pn, col=col)
+                                for col in getattr(self, 'cols_%s'%pn))
+
+        self.push_str_pos = get_push_str('pos')
+        self.push_str_neg = get_push_str('neg')
+
+
+    def _make_js_init_str(self):
+
+        self.init_str = ''.join('cds_%s.data[\'%s\'] = []; '%(pn, col)
+                                for pn in ['pos', 'neg']
+                                for col in getattr(self, 'cols_%s'%pn))
+
+
+    def _make_js_loop_str(self):
+
+        get_loop_str = lambda pn: '''
+            for (var i = 0; i <= cds_all_{pn}.get_length(); i++){{
+                if (checkMatch(i, cds_all_{pn}{param_str})){{
+                {push_str}
+              }}
+            }}'''.format(pn=pn, param_str=self.param_str,
+                         push_str=getattr(self, 'push_str_%s'%pn)
+                         ) if getattr(self, 'cols_%s'%pn) else ''
+
+        self.loop_str_pos = get_loop_str('pos')
+        self.loop_str_neg = get_loop_str('neg')
+
+
+    def _make_js_emit_str(self):
+
+        get_emit_str = lambda pn: ''' cds_%s.change.emit();
+                            '''%pn if getattr(self, 'cols_%s'%pn) else ''
+
+        self.emit_str = get_emit_str('pos') + get_emit_str('neg')
+
+
+    def get_js_string(self):
+
+        # init JS callback object --> parent
+        js_code = """
+            {var_slct_str}
+
+            {init_str}
+            function checkMatch(i, source{param_str}) {{
+               return {match_str};
+            }}
+            {loop_str_pos}
+            {loop_str_neg}
+
+            {emit_str}
+            """.format(var_slct_str=self.var_slct_str,
+                       param_str=self.param_str,
+                       match_str=self.match_str,
+                       init_str=self.init_str,
+                       loop_str_neg=self.loop_str_neg,
+                       loop_str_pos=self.loop_str_pos,
+                       emit_str=self.emit_str)
+
+        return js_code
+
+
+    def __call__(self):
+
+        return self.get_js_string()
+
+    def __repr__(self):
+
+        return self.get_js_string()
+
 class SymenergyPlotter():
     '''
     Base class
@@ -45,12 +144,6 @@ class SymenergyPlotter():
         self._make_index_lists()
         self._make_cds()
         self._make_views()
-        self._make_js_general_str()
-        self._make_js_init_str()
-        self._make_js_push_str()
-        self._make_js_loop_str()
-        self._make_js_emit_str()
-        self._make_js_general_str()
         self._init_callback()
 
     def _init_ind_lists(self):
@@ -136,47 +229,10 @@ class SymenergyPlotter():
                  for valx, valy in self.xy_combs}
 
 
-    def _make_js_general_str(self):
-
-        self.var_slct_str = '; '.join('var {inds} = slct_{inds}.value'.format(inds=inds)
-                                      for inds in self.ind_slct) + ';'
-        self.param_str = ', ' + ', '.join(self.ind_slct)
-        self.match_str = ' && '.join('source.data[\'{inds}\'][i] == {inds}'.format(inds=inds) for inds in self.ind_slct)
 
 
-    def _make_js_push_str(self):
-        '''
-        Implemented in children.
-        '''
 
 
-    def _make_js_init_str(self):
-        '''
-        Implemented in children.
-        '''
-
-
-    def _make_js_loop_str(self):
-
-        # as long as only existing cds_all_ are set --> parent
-        get_loop_str = lambda source_str, push_str: '''
-            for (var i = 0; i <= {source_str}.get_length(); i++){{
-              if (checkMatch(i, {source_str}{param_str})){{
-                {push_str}
-              }}
-            }}'''.format(push_str=push_str, param_str=self.param_str,
-                         source_str=source_str) if hasattr(self, source_str) else ''
-
-        self.loop_str_pos = get_loop_str('cds_all_pos', self.push_str_pos)
-        self.loop_str_neg = get_loop_str('cds_all_neg', self.push_str_neg)
-
-
-    def _make_js_emit_str(self):
-
-        get_emit_str = lambda cds: ''' {cds}.change.emit();
-                            '''.format(cds=cds) if hasattr(self, cds) else ''
-
-        self.emit_str = get_emit_str('cds_pos') + get_emit_str('cds_neg')
 
 
     def get_js_args(self):
@@ -191,30 +247,15 @@ class SymenergyPlotter():
         return dict(itertools.chain.from_iterable(map(dict.items, js_args)))
 
 
-    def get_js_string(self):
 
-        # init JS callback object --> parent
-        js_code = """
-            {var_slct_str}
-            {init_str}
-            function checkMatch(i, source{param_str}) {{
-               return {match_str};
-            }}
-            {loop_str_pos}
-            {loop_str_neg}
-            {emit_str}
-            """.format(var_slct_str=self.var_slct_str, param_str=self.param_str,
-                       match_str=self.match_str, init_str=self.init_str,
-                       loop_str_neg=self.loop_str_neg,
-                       loop_str_pos=self.loop_str_pos,
-                       emit_str=self.emit_str)
-
-        return js_code
 
     def _init_callback(self):
+        js_string = JSCallbackCoder(self.ind_slct,
+                                    self.cols_pos,
+                                    self.cols_neg)()
 
         self.callback = CustomJS(args=self.get_js_args(),
-                                 code=self.get_js_string())
+                                 code=js_string)
 
     def _get_multiselects(self):
 
@@ -361,42 +402,12 @@ class BalancePlot(SymenergyPlotter):
 
         return df
 
-    def _make_js_push_str(self):
-        # affects series names --> children
-        def get_push_str(posneg, plant, var):
-            return ('cds_{pn}.data[\'{plant}{var}\']'
-                    '.push(cds_all_{pn}.data[\'{plant}{var}\'][i]); '
-                   ).format(pn=posneg, plant=plant, var=var)
-
-        self.push_str_pos = ''.join([
-            ''.join([get_push_str('pos', store_name, '_pdch') for store_name in self.ev.model.storages]),
-            ''.join([get_push_str('pos', plant_name, '_p') for plant_name in self.ev.model.plants]),
-            get_push_str('pos', 'vre', '')
-        ])
-
-        self.push_str_neg = ''.join([
-            get_push_str('neg', 'l', ''),
-            get_push_str('neg', 'curt', '_p') if 'curt' in self.ev.model.comps else '',
-            ''.join([get_push_str('neg', store_name, '_pchg') for store_name in self.ev.model.storages]),
-        ])
 
 
-    def _make_js_init_str(self):
 
-        # initialize series lists --> children
-        def get_init_str(list_p, list_var, list_pn):
-            return ''.join('cds_%s.data[\'%s%s\'] = []; '%(pn, p, var)
-                for p, var, pn
-                in [(p, *vpn)for p, vpn in itertools.product(list_p, zip(list_var, list_pn))]
-            )
 
-        self.init_str = '; '.join([
-            get_init_str(['l'], [''], ['neg']),
-            get_init_str(['vre'], [''], ['pos']),
-            get_init_str(self.ev.model.storages, ['_pdch', '_pchg'], ['pos', 'neg']),
-            get_init_str(self.ev.model.plants, ['_p'], ['pos']),
-            get_init_str(['curt'], ['_p'], ['neg']) if 'curt' in self.ev.model.comps else '',
-        ])
+
+
 
 
     def _make_single_plot(self, figure, data, cols, valx, valy, color, posneg):
