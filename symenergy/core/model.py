@@ -41,7 +41,16 @@ if __name__ == '__main__': sys.exit()
 
 
 class Model:
+    '''
 
+
+    Parameters
+    ----------
+    slot_weights -- int
+      If all time slots have the same weight, instantiate a model-wide
+      parameter singleton instead of individual parameters for each time slot.
+
+    '''
 
 
     _MUTUALLY_EXCLUSIVE = {
@@ -51,7 +60,8 @@ class Model:
                 (('pos_pdch', 'this', False), ('curt_pos_p', 'this', False))
          }
 
-    def __init__(self, nthreads=None, curtailment=False):
+    def __init__(self, nthreads=None, curtailment=False,
+                 slot_weight=1):
 
         self.plants = {}
         self.slots = {}
@@ -61,6 +71,8 @@ class Model:
         self.comps = []
 
         self.nthreads = nthreads
+
+        self._slot_weights = Parameter('w', noneslot, slot_weight)
 
         # global vre scaling parameter, set to 1; used for evaluation
         self.vre_scale = Parameter('vre_scale', noneslot, 1)
@@ -161,6 +173,9 @@ class Model:
         if self.slot_blocks:
             reps = self.slot_blocks[kwargs['block']].repetitions
             kwargs['repetitions'] = reps
+
+        if not 'weight' in kwargs:  # use default weight parameter
+            kwargs['weight'] = self._slot_weights
 
         new_slot = Slot(name, **kwargs)
 

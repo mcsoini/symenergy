@@ -43,7 +43,11 @@ class Slot(component.Component):
 
         self.l = Parameter('l_%s'%self.name, self, load)
         self.vre = Parameter('vre_%s'%self.name, self, vre)
-        self.w = Parameter('w_%s'%self.name, self, weight)
+
+        if isinstance(weight, int):
+            self.w = Parameter('w_%s'%self.name, self, weight)
+        elif isinstance(weight, Parameter):
+            self.w = weight
 
         self.block = block
         self.repetitions = repetitions
