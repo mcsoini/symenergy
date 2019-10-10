@@ -159,7 +159,6 @@ class SymenergyPlotter():
 
     def _make_table(self):
 
-        print('make')
         df = self._select_data()
 
         dfgp = df.pivot_table(index=self.ind_slct + self.ind_all,
@@ -213,7 +212,6 @@ class SymenergyPlotter():
 
         # initial selection
 
-        # definition of datasources --> all pos/neg logic in balance class --> child
         self.cds_pos = (ColumnDataSource(self.dfgp[self.cols_pos].loc[slct_def].reset_index())
         slct_def = self.initial_selection
                         if self.cols_pos else None)
@@ -250,15 +248,16 @@ class SymenergyPlotter():
 
     def get_js_args(self):
 
-        # pass all ColumnDataSources to CustomJS --> parent
         get_datasource = lambda name: ({name: getattr(self, name)}
                                        if hasattr(self, name) else {})
 
         js_args = [get_datasource(name) for name
                    in ['cds_pos', 'cds_neg', 'cds_all_pos', 'cds_all_neg']]
 
-        return dict(itertools.chain.from_iterable(map(dict.items, js_args)))
+        # list of dicts to single dict
+        js_args = dict(itertools.chain.from_iterable(map(dict.items, js_args)))
 
+        return js_args
 
 
 
@@ -317,8 +316,6 @@ class SymenergyPlotter():
         for valy in self._get_xy_list(self.ind_plty):
             for valx in self._get_xy_list(self.ind_pltx):
 
-#        for valx, valy in self.xy_combs:
-
                 make_str = lambda x, y: '%s = %s'%(x, y)
                 title_str = ', '.join(make_str(ind_plt, val)
                                       for ind_plt, val
@@ -363,7 +360,6 @@ class SymenergyPlotter():
 
     def __call__(self):
 
-        print('Calling _get_layout')
         return self._get_layout()
 
     def _get_legend(self):
