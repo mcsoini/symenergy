@@ -19,9 +19,9 @@ logger = _get_logger(__name__)
 
 SlotBlock = namedtuple('SlotBlock', ['name', 'repetitions'])
 
+
 class Slot(component.Component):
     '''
-    Doesn't know about plants.
     '''
 
     PARAMS = ['vre', 'l', 'w']
@@ -39,7 +39,6 @@ class Slot(component.Component):
         assert isinstance(name, str), 'Slot name must be string.'
 
         super().__init__(name)
-#        self.name = name
 
         self.l = Parameter('l_%s'%self.name, self, load)
         self.vre = Parameter('vre_%s'%self.name, self, vre)
@@ -69,7 +68,7 @@ class Slot(component.Component):
 
 
 class NoneSlot():
-    
+
     def __init__(self):
         self.name = str(None)
 

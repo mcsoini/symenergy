@@ -165,7 +165,6 @@ class Model:
     @_update_component_list
     def add_slot(self, name, *args, **kwargs):
 
-        print(kwargs)
         if self.slot_blocks and not 'block' in kwargs:
             raise RuntimeError('If any of the slots is assigned to a block, '
                                'all slots must be.')
