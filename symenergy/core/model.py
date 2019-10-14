@@ -49,6 +49,9 @@ class Model:
     slot_weights -- int
       If all time slots have the same weight, instantiate a model-wide
       parameter singleton instead of individual parameters for each time slot.
+    constraint_filt : str
+        :func:`pandas.DataFrame.query` string to filter the constraint
+        activation columns of the `df_comb` dataframe
 
     '''
 
@@ -61,7 +64,7 @@ class Model:
          }
 
     def __init__(self, nthreads=None, curtailment=False,
-                 slot_weight=1):
+                 slot_weight=1, constraint_filt=None):
 
         self.plants = {}
         self.slots = {}
@@ -71,6 +74,7 @@ class Model:
         self.comps = []
 
         self.nthreads = nthreads
+        self.constraint_filt = constraint_filt
 
         self._slot_weights = Parameter('w', noneslot, slot_weight)
 
@@ -261,7 +265,7 @@ class Model:
         if self.cache.file_exists:
             self.df_comb = self.cache.load()
         else:
-            self.init_constraint_combinations()
+            self.init_constraint_combinations(self.constraint_filt)
             self.define_problems()
             self.solve_all()
             self.filter_invalid_solutions()
@@ -346,7 +350,7 @@ class Model:
         return list_col_names
 
 
-    def init_constraint_combinations(self):
+    def init_constraint_combinations(self, constraint_filt=None):
         '''
         Generates dataframe `model.df_comb` with constraint combinations.
 
@@ -383,8 +387,11 @@ class Model:
         dfcomb = filter_constraint_combinations(dfcomb, model_mut_excl_cols)
 
         self.df_comb = dfcomb.drop('dummy', axis=1)
-        self.ncomb = len(self.df_comb)
 
+        if constraint_filt:
+            self.df_comb = self.df_comb.query(constraint_filt)
+
+        self.ncomb = len(self.df_comb)
 
 
     def get_variabs_params(self):
