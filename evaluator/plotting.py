@@ -298,9 +298,12 @@ class SymenergyPlotter():
 
 
     def _init_callback(self):
+
+        cols_pos = self.cols_pos + self.ind_plt + [self.ind_axx, 'index']
+        cols_neg = self.cols_neg + self.ind_plt + [self.ind_axx, 'index']
         js_string = JSCallbackCoder(self.ind_slct,
-                                    self.cols_pos,
-                                    self.cols_neg)()
+                                    cols_pos,
+                                    cols_neg)()
 
         self.callback = CustomJS(args=self.get_js_args(),
                                  code=js_string)
