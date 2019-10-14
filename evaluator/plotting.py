@@ -500,6 +500,15 @@ class GeneralAreaPlot(GeneralPlot):
                         legend=list(map(value, cols)),
                         source=data, view=view)
 
+class GeneralBarPlot(GeneralPlot):
+
+
+    def _make_single_plot(self, fig, data, view, cols, color):
+
+        fig.vbar_stack(cols, x=self.ind_axx, width=0.9,
+                       color=color, source=data,
+                       legend=list(map(value, cols)))
+
 
 
 if __name__ == '__main__':
