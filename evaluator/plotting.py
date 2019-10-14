@@ -86,7 +86,6 @@ class JSCallbackCoder():
 
     def get_js_string(self):
 
-        # init JS callback object --> parent
         js_code = """
             {var_slct_str}
 
