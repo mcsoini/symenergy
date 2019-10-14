@@ -36,19 +36,18 @@ class Evaluator():
     '''
 
     def __init__(self, model:Model, x_vals:dict, drop_non_optimum=False,
-                 tolerance=1e-9, nthreads=None):
+                 tolerance=1e-9):
         '''
-        Keyword arguments:
-            * model -- symenergy model
-           ( * select_x -- symenergy Parameter; to be varied
-                           according to x_vals )
-            * x_vals -- iterable with value for the evaluation of select_x
-            * tolerance -- absolute tolerance for constraint evaluation
+        Parameters
+        ----------
+            model : :class:`symenergy.core.model.Model`
+            x_vals : dict or list
+                either dictionary `{parameter_name: list_of_value}`
+            tolerance : float
+                absolute tolerance for constraint evaluation
         '''
 
         self.model = model
-
-        self.nthreads = nthreads
 
         self.drop_non_optimum = drop_non_optimum
 
