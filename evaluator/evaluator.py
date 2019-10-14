@@ -141,10 +141,10 @@ class Evaluator():
                 # function idx depends on constraint, since not all constraints
                 # contain the same functions
                 get_func = lambda x: self._get_func_from_idx(x, slct_eq)
-                self.dfev[slct_eq] = self.dfev.apply(get_func, axis=1)
+                self.dfev.loc[:, slct_eq] = self.dfev.apply(get_func, axis=1)
 
             logger.debug('substituting...')
-            self.dfev['%s_expr_plot'%slct_eq] = \
+            self.dfev.loc[:, '%s_expr_plot'%slct_eq] = \
                         self.dfev[slct_eq].apply(self._subs_param_values)
 
             lambdify = lambda res_plot: sp.lambdify(self.x_symb, res_plot,
@@ -153,7 +153,7 @@ class Evaluator():
 
             logger.debug('lambdify...')
 
-            self.dfev[slct_eq + '_lam_plot'] = (
+            self.dfev.loc[:, slct_eq + '_lam_plot'] = (
                             self.dfev['%s_expr_plot'%slct_eq].apply(lambdify))
             logger.debug('done.')
 
@@ -275,7 +275,7 @@ class Evaluator():
         mask_capacity = self._get_mask_valid_capacity(df.copy())
         mask_valid &= mask_capacity
 
-        df['mask_valid'] = mask_valid
+        df.loc[:, 'mask_valid'] = mask_valid
 
         # consolidate mask by constraint combination and x values
         index = self.x_name + ['idx']
@@ -333,8 +333,8 @@ class Evaluator():
 
         mask_valid = self._get_mask_valid_solutions(df_result)
         df_result = df_result.join(mask_valid, on=mask_valid.index.names)
-        df_result['lambd'] = df_result.lambd.astype(float)
-        df_result['is_optimum'] = self.init_cost_optimum(df_result)
+        df_result.loc[:, 'lambd'] = df_result.lambd.astype(float)
+        df_result.loc[:, 'is_optimum'] = self.init_cost_optimum(df_result)
 
         if self.drop_non_optimum:
             df_result = df_result.loc[df_result.is_optimum]
@@ -541,8 +541,8 @@ class Evaluator():
         list_erg_func = [f for f in df_bal.func.unique()
                          if any(f.startswith(var_e)
                                 for var_e in list_erg_var)]
-        df_bal['pwrerg'] = (df_bal.assign(pwrerg='erg').pwrerg
-                                  .where(df_bal.func.isin(list_erg_func),
+        df_bal.loc[:, 'pwrerg'] = (df_bal.assign(pwrerg='erg').pwrerg
+                                      .where(df_bal.func.isin(list_erg_func),
                                          'pwr'))
 
         # add parameters
@@ -555,17 +555,17 @@ class Evaluator():
         df_bal_add = pd.DataFrame(df_bal[self.x_name + ['idx']]
                                     .drop_duplicates())
         for par in pars:
-            df_bal_add[par.name] = par.value
+            df_bal_add.loc[:, par.name] = par.value
 
         for par in pars_x:
-            df_bal_add['y_' + par.name] = df_bal_add[par.name]
+            df_bal_add.loc[:, 'y_' + par.name] = df_bal_add[par.name]
 
         df_bal_add = df_bal_add.set_index(self.x_name + ['idx']).stack().rename('lambd').reset_index()
         df_bal_add = df_bal_add.rename(columns={'level_%d'%(1 + len(self.x_name)): 'func'})
         df_bal_add.func = df_bal_add.func.apply(lambda x: x.replace('y_', ''))
-        df_bal_add['func_no_slot'] = df_bal_add.func.apply(lambda x: '_'.join(x.split('_')[:-1]))
-        df_bal_add['slot'] = df_bal_add.func.apply(lambda x: x.split('_')[-1])
-        df_bal_add['pwrerg'] = 'pwr'
+        df_bal_add.loc[:, 'func_no_slot'] = df_bal_add.func.apply(lambda x: '_'.join(x.split('_')[:-1]))
+        df_bal_add.loc[:, 'slot'] = df_bal_add.func.apply(lambda x: x.split('_')[-1])
+        df_bal_add.loc[:, 'pwrerg'] = 'pwr'
 
         df_bal = pd.concat([df_bal, df_bal_add], axis=0, sort=True)
 
@@ -603,7 +603,7 @@ class Evaluator():
 
             def get_cost_optimum_single(df):
                 df = df.sort_values('lambd')
-                df['is_optimum'] = False
+                df.loc[:, 'is_optimum'] = False
                 df.iloc[0, -1] = True
                 return df[['is_optimum']]
 
@@ -618,7 +618,7 @@ class Evaluator():
 
         else:
 
-            df_result['is_optimum'] = False
+            df_result.loc[:, 'is_optimum'] = False
 
         return df_result.is_optimum
 
@@ -656,8 +656,8 @@ class Evaluator():
         slot_map = {func: slot if not slot == '' else 'global'
                     for func, slot in slot_map.items()}
 
-        self.df_exp['slot'] = self.df_exp['func'].replace(slot_map)
-        self.df_exp['func_no_slot'] = self.df_exp['func'].replace(func_map)
+        self.df_exp.loc[:, 'slot'] = self.df_exp['func'].replace(slot_map)
+        self.df_exp.loc[:, 'func_no_slot'] = self.df_exp['func'].replace(func_map)
 
 
     def get_readable_cc_dict(self):
