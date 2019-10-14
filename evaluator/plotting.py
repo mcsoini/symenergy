@@ -385,7 +385,7 @@ class SymenergyPlotter():
 
         list_p = self._get_plot_list()
         selects = self._get_multiselects()
-        ncols = len(self.slct_list_dict[self.ind_pltx])
+        ncols = len(self.slct_list_dict[self.ind_pltx]) if self.ind_pltx else 1
         p_leg = self._get_legend()
 
         controls = WidgetBox(*selects)
