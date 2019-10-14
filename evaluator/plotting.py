@@ -491,6 +491,15 @@ class GeneralPlot(SymenergyPlotter):
             fig.line(x=self.ind_axx, y=column_slct, color=color_slct,
                      source=data, view=view)
 
+class GeneralAreaPlot(GeneralPlot):
+
+
+    def _make_single_plot(self, fig, data, view, cols, color):
+
+        fig.varea_stack(x=self.ind_axx, stackers=cols, color=color,
+                        legend=list(map(value, cols)),
+                        source=data, view=view)
+
 
 
 if __name__ == '__main__':
