@@ -333,6 +333,7 @@ class Evaluator():
 
         mask_valid = self._get_mask_valid_solutions(df_result)
         df_result = df_result.join(mask_valid, on=mask_valid.index.names)
+        df_result['lambd'] = df_result.lambd.astype(float)
         df_result['is_optimum'] = self.init_cost_optimum(df_result)
 
         if self.drop_non_optimum:
