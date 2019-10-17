@@ -841,6 +841,16 @@ class Model:
         self.nress = len(self.df_comb)
 
 
+    def print_results(self, df, idx):
+
+        x = df.query('idx == %d'%idx).iloc[0]
+
+        for var, res in dict(zip(x.variabs_multips, x.result)).items():
+
+            print('*'*20, var, '*'*20)
+            print((res))
+
+
     def fix_linear_dependencies(self, x):
         '''
         All solutions showing linear dependencies are set to zero. See doc
