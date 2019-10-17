@@ -884,7 +884,7 @@ class Model:
                     collect[list_var[nres]] = ', '.join(map(str, free_symbs))
 
             if collect:
-                logger.info('%d'%x.idx)
+                logger.info('idx=%d'%x.idx)
                 for res, var in collect.items():
                     logger.info('     Solution for %s contained variabs %s.'%(res, var))
         else:
