@@ -51,6 +51,7 @@ class Evaluator():
 
         self.drop_non_optimum = drop_non_optimum
 
+        self._x_vals = None
         self.x_vals = x_vals
 
         self.tolerance = tolerance
@@ -68,6 +69,12 @@ class Evaluator():
 
     @x_vals.setter
     def x_vals(self, x_vals):
+        x_keys_old = [val for val in self._x_vals] if self._x_vals else None
+        x_keys = list(x_vals)
+        if x_keys_old:
+            assert x_keys == x_keys_old, \
+                'Keys of x_vals attribute must not change.'
+
         self._x_vals = x_vals#self.sanitize_x_vals(x_vals)
         self.x_symb = [x.symb for x in self._x_vals.keys()]
         self.x_name = [x.name for x in self.x_symb]
