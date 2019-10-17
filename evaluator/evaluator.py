@@ -61,7 +61,7 @@ class Evaluator():
         self.model.init_total_param_values()
         self.is_positive = self.model.get_all_is_positive()
 
-        self.df_x_vals = self.get_x_vals_combs()
+        self._get_evaluated_lambdas()
 
     @property
     def x_vals(self):
@@ -79,7 +79,7 @@ class Evaluator():
         self.x_symb = [x.symb for x in self._x_vals.keys()]
         self.x_name = [x.name for x in self.x_symb]
 
-        self.df_x_vals = self.get_x_vals_combs()
+        self.df_x_vals = self._get_x_vals_combs()
 
     @property
     def df_x_vals(self):
@@ -88,24 +88,6 @@ class Evaluator():
     @df_x_vals.setter
     def df_x_vals(self, df_x_vals):
         self._df_x_vals = df_x_vals.reset_index(drop=True)
-
-
-    def get_x_val_steps(self):
-        '''
-        Assumes constant step size.
-        '''
-
-        return {par.name: (val[1] - val[0]) if len(val) > 1 else None
-                for par, val in self.x_vals.items()}
-
-    def sanitize_x_vals(self, x_vals):
-        '''
-        TODO: Figure out why this is necessary for the numerical evaluation
-        of the results!
-        '''
-
-        return {comp: [int(val * 100) / 100 for val in vals]
-                for comp, vals in x_vals.items()}
 
 
     def _get_list_dep_var(self, skip_multipliers=False):
@@ -120,7 +102,7 @@ class Evaluator():
         return list_dep_var
 
 
-    def get_evaluated_lambdas(self, skip_multipliers=True):
+    def _get_evaluated_lambdas(self, skip_multipliers=True):
         '''
         For each dependent variable and total cost get a lambda function
         evaluated by constant parameters. This subsequently evaluated
@@ -182,7 +164,7 @@ class Evaluator():
 
 
 
-    def get_x_vals_combs(self):
+    def _get_x_vals_combs(self):
         '''
         Generates dataframe with all combinations of x_vals.
 
@@ -292,20 +274,6 @@ class Evaluator():
         return mask_valid
 
 
-#    def call_evaluate_by_x(self, df_x, df_lam, verbose):
-#
-#        eval_x = lambda x: self.evaluate_by_x(x, df_lam, verbose)
-#
-#        if __name__ == '__main__':
-#            x = df_x.iloc[0]
-#
-#
-#        result = pd.concat([eval_x(x[1])
-#                            for x in self.df_x_vals.iterrows()])
-#
-#        return result
-
-
     def call_evaluate_by_x_new(self, df_x, df_lam, verbose):
 
         t = time.time()
@@ -350,59 +318,6 @@ class Evaluator():
         return df_result
 
 
-#    def evaluate_by_x(self, x, df_lam, verbose, new=True):
-#
-#        df = df_lam.copy()
-#
-#        t = time.time()
-#
-#        if verbose:
-#            logger.info('Evaluating %s'%(str(x.to_dict())
-#                                         if hasattr(x, 'to_dict') else str(x)))
-#        logger.debug('x_name: %s'%self.x_name)
-#        for col in self.x_name:
-#            df[col] = x[col]
-#
-#        df_result = df.copy()
-#        df_result['lambd'] = self._evaluate(df_result)
-#
-#        def sanitize_unexpected_zeros(df):
-#            for col, func in self.model.constrs_pos_cols_vars.items():
-#                df.loc[(df.func == func + '_lam_plot')
-#                       & (df[col] != 1) & (df['lambd'] == 0),
-#                       'lambd'] = np.nan
-#
-#        sanitize_unexpected_zeros(df_result)
-#
-#        mask_valid = self._get_mask_valid_solutions(df_result)
-#        df_result = df_result.join(mask_valid, on=mask_valid.index.names)
-#        df_result['is_optimum'] = self.init_cost_optimum(df_result)
-#
-#        if self.drop_non_optimum:
-#            df_result = df_result.loc[df_result.is_optimum]
-#
-#        if verbose:
-#            logger.info(time.time() - t)
-#        return df_result
-
-
-#    def after_init_table(f):
-#        def wrapper(self, *args, **kwargs):
-#
-#            if self.sql_params:
-#
-#                if 'warn_existing_tables' in self.sql_params:
-#                    warn_existing_tables = self.sql_params['warn_existing_tables']
-#                else:
-#                    warn_existing_tables = True
-#
-#                self.init_table(warn_existing_tables)
-#
-#            f(self, *args, **kwargs)
-#
-#        return wrapper
-
-#    @after_init_table
     def expand_to_x_vals(self, verbose=True):
         '''
         Applies evaluate_by_x to all df_x_vals rows.
