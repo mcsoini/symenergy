@@ -7,6 +7,7 @@ Created on Wed Oct  2 13:30:13 2019
 """
 
 import itertools
+import pandas as pd
 from bokeh.models.sources import ColumnDataSource, CustomJS
 from bokeh.layouts import column, row, gridplot, WidgetBox
 from bokeh.models import Legend, CDSView, GroupFilter
@@ -17,6 +18,12 @@ from bokeh.core.properties import value
 from bokeh.palettes import brewer
 from bokeh.io import show
 
+from symenergy import _get_logger
+
+logger = _get_logger(__name__)
+
+logger.info('Disabling pandas chained_assignment warnings')
+pd.set_option('mode.chained_assignment', None)
 
 class JSCallbackCoder():
 
