@@ -157,6 +157,14 @@ class Component():
                 else:
                     constrs.append(attr)
 
+        # sort by name, otherwise the order is not consistent between runs
+        # TODO: implemented constraint iterator collection which is
+        # instantiated by components; replaces this whole method
+        if len(constrs) > 1:
+            if not comp_names:
+                constrs = list(zip(*sorted((cstr.base_name, cstr)
+                               for cstr in constrs)))[1]
+
         return constrs
 
 
