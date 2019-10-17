@@ -223,7 +223,7 @@ class Storage(asset.Asset):
 
         list_col_names = []
 
-        mename, me = list(self.MUTUALLY_EXCLUSIVE.items())[0]
+#        mename, me = list(self.MUTUALLY_EXCLUSIVE.items())[0]
         for mename, me in self.MUTUALLY_EXCLUSIVE.items():
 
             list_cstrs = me

@@ -42,8 +42,6 @@ if __name__ == '__main__': sys.exit()
 
 class Model:
     '''
-
-
     Parameters
     ----------
     slot_weights -- int
@@ -116,7 +114,8 @@ class Model:
                                'if time slot blocks are used.')
 
         if len(self.comps) > 0:  # only when other components are added
-            assert len(self.slot_blocks) in [0, 2], 'Number of slot blocks must be 0 or 2.'
+            assert len(self.slot_blocks) in [0, 2], \
+                        'Number of slot blocks must be 0 or 2.'
 
 
     def init_curtailment(self):
@@ -565,7 +564,7 @@ class Model:
 
     def get_variabs_multips_slct(self, lagrange):
         '''
-        Returns all relevant variables and multipliers fcall_subs_tcor this model.
+        Returns all relevant variables and multipliers for this model.
 
         Starting from the complete set of variables and multipliers, they are
         filtered depending on whether they occur in a specific lagrange

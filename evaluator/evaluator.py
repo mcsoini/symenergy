@@ -200,7 +200,7 @@ class Evaluator():
     def _subs_param_values(self, x):
         '''
         Substitutes all parameter values except for
-        the one selected as single independent variable.
+        the one selected as independent variables.
         '''
 
         if isinstance(x, float) and np.isnan(x):
