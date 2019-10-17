@@ -456,7 +456,6 @@ class Model:
 
             solution = tuple(solution_dict.values())
 
-
             return solution
 
 
@@ -477,8 +476,8 @@ class Model:
         logger.info('Solving')
 
         if __name__ == '__main__':
-            lagrange, variabs_multips_slct, index = self.df_comb[0]
             x = self.df_comb.iloc[0]
+#            lagrange, variabs_multips_slct, index =
 
         if not self.nthreads:
             self.df_comb['result'] = self.call_solve_df(self.df_comb)
@@ -849,12 +848,12 @@ class Model:
         '''
 
         if __name__ == '__main__':
-            x = self.df_comb.iloc[1]
+            x = self.df_comb.iloc[0]
 
         if x.code_lindep == 0:
             list_res_new = x.result
 
-        if x.code_lindep == 3:
+        elif x.code_lindep == 3:
             list_res_new = x.result
 
         elif x.code_lindep == 1:

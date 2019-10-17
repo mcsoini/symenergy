@@ -345,7 +345,8 @@ class SymenergyPlotter():
             colors = list(zip(*zip(range(ncolors), colorcycler)))[1]
 
         # convert to rgba --> parent
-        colors = [tuple(int(col.strip('#')[i:2+i], 16) for i in range(0,6,2)) + (0.9,)
+        colors = [tuple(int(col.strip('#')[i:2+i], 16)
+                            for i in range(0,6,2)) + (0.9,)
                   for col in colors]
 
         colors_posneg = {
@@ -420,8 +421,10 @@ class SymenergyPlotter():
                               color=self.colors[pn],
                               legend=list(map(value, cols)), source=cds)
 
-        areas_pos = get_leg_areas(self.cols_pos, 'pos', self.cds_pos) if hasattr(self, 'cds_pos') else []
-        areas_neg = get_leg_areas(self.cols_neg, 'neg', self.cds_neg) if hasattr(self, 'cds_neg') else []
+        areas_pos = (get_leg_areas(self.cols_pos, 'pos', self.cds_pos)
+                                   if hasattr(self, 'cds_pos') else [])
+        areas_neg = (get_leg_areas(self.cols_neg, 'neg', self.cds_neg)
+                                   if hasattr(self, 'cds_neg') else [])
         areas = areas_pos + areas_neg
 
         for rend in p_leg.renderers:
@@ -514,7 +517,8 @@ class GeneralBarPlot(GeneralPlot):
 
         fig.vbar_stack(cols, x=self.ind_axx, width=0.9,
                        color=color, source=data,
-                       legend=list(map(value, cols)))
+                       legend=list(map(value, cols)),
+                       view=view)
 
 
 
