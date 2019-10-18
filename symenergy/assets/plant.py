@@ -77,13 +77,13 @@ class Plant(asset.Asset):
             self.fcom = Parameter('fcom_%s'%self.name, noneslot, fcom)
 
         if cap_ret:
-            # needs to be initialized before init_cstr_capacity('C')!
+            # needs to be initialized before _init_cstr_capacity('C')!
             self.init_symbol_operation('C_ret')
             self.init_cstr_positive('C_ret')
 
         if capacity:
             self.C = Parameter('C_%s'%self.name, noneslot, capacity)
-            self.init_cstr_capacity('C')
+            self._init_cstr_capacity('C')
 
         self.init_cost_component()
 
