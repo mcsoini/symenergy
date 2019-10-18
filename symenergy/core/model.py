@@ -625,6 +625,71 @@ class Model:
 # =============================================================================
 
 
+
+    def fix_linear_dependencies(self, x):
+        '''
+        All solutions showing linear dependencies are set to zero. See doc
+        of symenergy.core.model.Model.get_mask_linear_dependencies
+        '''
+
+        MP_COUNTER.increment()
+
+        if __name__ == '__main__':
+            x = self.df_comb.iloc[0]
+
+        if x.code_lindep == 0:
+            list_res_new = x.result
+
+        elif x.code_lindep == 3:
+            list_res_new = x.result
+
+        elif x.code_lindep == 1:
+
+            list_res = x.result
+            list_var = x.variabs_multips
+
+            collect = {}
+
+            list_res_new = [res for res in list_res]
+
+            for nres, res in enumerate(list_res):
+
+                free_symbs = [var for var in list_var if var in res.free_symbols]
+
+                if free_symbs:
+                    list_res_new[nres] = sp.numbers.Zero()
+                    collect[list_var[nres]] = ', '.join(map(str, free_symbs))
+
+            if collect:
+                logger.info('idx=%d'%x.idx)
+                for res, var in collect.items():
+                    logger.info('     Solution for %s contained variabs %s.'%(res, var))
+        else:
+            raise ValueError('code_lindep must be 0, 3, or 1')
+
+        return list_res_new
+
+
+    def call_fix_linear_dependencies(self, df):
+
+        return df.apply(self.fix_linear_dependencies, axis=1)
+
+
+    def wrapper_call_fix_linear_dependencies(self, df, *args):
+
+        name = 'Fix linear dependencies'
+        ntot = self.nress
+        func = self.call_fix_linear_dependencies
+        return log_time_progress(func)(self, df, name, ntot)
+
+
+
+
+
+# =============================================================================
+# =============================================================================
+
+
     def define_problems(self):
         '''
         For each combination of constraints, get the lagrangian
@@ -857,11 +922,16 @@ class Model:
         self.df_comb = pd.concat([self.df_comb, mask_lindep], axis=1)
         self.df_comb = self.df_comb.loc[-(self.df_comb.code_lindep == 2)]
 
-        # adjust results for single-component linear dependencies
-        self.df_comb['result'] = \
-                self.df_comb.apply(self.fix_linear_dependencies, axis=1)
-
         self.nress = len(self.df_comb)
+
+        # adjust results for single-component linear dependencies
+        if not self.nthreads:
+            self.df_comb['result'] = \
+                    self.call_fix_linear_dependencies(self.df_comb)
+        else:
+            func = self.wrapper_call_fix_linear_dependencies
+            nthreads = self.nthreads
+            self.df_comb['result'] = parallelize_df(self.df_comb, func, nthreads)
 
 
     def print_results(self, df, idx):
@@ -874,46 +944,6 @@ class Model:
             print((res))
 
 
-    def fix_linear_dependencies(self, x):
-        '''
-        All solutions showing linear dependencies are set to zero. See doc
-        of symenergy.core.model.Model.get_mask_linear_dependencies
-        '''
-
-        if __name__ == '__main__':
-            x = self.df_comb.iloc[0]
-
-        if x.code_lindep == 0:
-            list_res_new = x.result
-
-        elif x.code_lindep == 3:
-            list_res_new = x.result
-
-        elif x.code_lindep == 1:
-
-            list_res = x.result
-            list_var = x.variabs_multips
-
-            collect = {}
-
-            list_res_new = [res for res in list_res]
-
-            for nres, res in enumerate(list_res):
-
-                free_symbs = [var for var in list_var if var in res.free_symbols]
-
-                if free_symbs:
-                    list_res_new[nres] = sp.numbers.Zero()
-                    collect[list_var[nres]] = ', '.join(map(str, free_symbs))
-
-            if collect:
-                logger.info('idx=%d'%x.idx)
-                for res, var in collect.items():
-                    logger.info('     Solution for %s contained variabs %s.'%(res, var))
-        else:
-            raise ValueError('code_lindep must be 0, 3, or 1')
-
-        return list_res_new
 
     def __repr__(self):
 
