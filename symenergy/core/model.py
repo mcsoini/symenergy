@@ -110,7 +110,6 @@ class Model:
 
     @wrapt.decorator
     def _check_component_replacement(f, self, args, kwargs):
-        print(kwargs['name'], self.comps, self.slot_blocks)
         assert kwargs['name'] not in {**self.comps, **self.slot_blocks}, (
                 'A component or slot_block `%s` has already been '
                          'defined.')%kwargs['name']
@@ -580,7 +579,8 @@ class Model:
 
         name = 'Construct lagrange'
         ntot = self.ncomb
-        return log_time_progress(self.call_construct_lagrange)(self, df, name, ntot)
+        return log_time_progress(self.call_construct_lagrange
+                                 )(self, df, name, ntot)
 
 
 # =============================================================================
@@ -858,39 +858,6 @@ class Model:
     def filter_invalid_solutions(self):
         '''
         '''
-
-
-#        #
-#        smaller_combs_inf = []
-#        for n in range(1, len(self.constrs_cols_neq)):
-#
-#            combs = [c for c in map(set, itertools.combinations(self.constrs_cols_neq, n))
-#                     if not any(infc.issubset(c) for infc in smaller_combs_inf)]
-#
-#            for comb in combs:
-#                val_combs = self.df_comb[comb].apply(tuple, axis=1).unique().tolist()
-#
-#                for val_comb in val_combs:
-#                    mask = ~mask_empty.copy()
-#                    for val, col in list(zip(val_comb, comb)):
-#                        mask *= self.df_comb[col] == val
-#
-#                    count_feas = len(self.df_comb.loc[mask, list(comb)].drop_duplicates())
-#                    if count_feas == 0:
-#                        print(comb, val_comb, count_feas)
-#                        smaller_combs_inf.append(comb)
-#
-#
-#
-#
-#
-#        self.df_comb.loc[mask_empty, self.constrs_cols_neq].iloc[:, [0, 1, 2]].drop_duplicates()
-#
-#
-#        print('The following constraint combinations have empty solutions:\n',
-#              self.df_comb.loc[mask_empty, self.constrs_cols_neq])
-#
-#        list_infeas = self.df_comb.loc[mask_empty, 'const_comb']
 
 
         mask_empty = self.get_mask_empty_solution()
