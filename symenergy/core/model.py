@@ -201,18 +201,15 @@ class Model:
             raise RuntimeError('If any of the slots is assigned to a block, '
                                'all slots must be.')
 
-        if self.slot_blocks:
-            reps = self.slot_blocks[kwargs['block']].repetitions
-            kwargs['repetitions'] = reps
+        if 'block' in kwargs:
+            bk = kwargs['block']
+            assert bk in self.slot_blocks, 'Unknown block %s'%bk
+            kwargs['block'] = self.slot_blocks[bk]
 
         if not 'weight' in kwargs:  # use default weight parameter
             kwargs['weight'] = self._slot_weights
 
         new_slot = Slot(name, **kwargs)
-
-        sb = new_slot.block
-        assert not sb or sb in self.slot_blocks, 'Unknown slot block "%s"'%sb
-
 
         self.slots.update({name: new_slot})
 

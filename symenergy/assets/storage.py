@@ -249,7 +249,7 @@ class Storage(asset.Asset):
 
         list_slots = list(self.slots.values())[:2]
         eff = self.eff.symb
-        reps = self._slot_blocks[list_slots[0].block].repetitions
+        reps = self._slot_blocks[list_slots[0].block.name].rp.symb
 
         chg = sum(self.pchg[slot] * slot.w.symb
                   for slot in list_slots if slot in self.pchg)

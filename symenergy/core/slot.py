@@ -8,8 +8,6 @@ Part of symenergy. Copyright 2018 authors listed in AUTHORS.
 
 from hashlib import md5
 
-from collections import namedtuple
-
 from symenergy.core import component
 from symenergy.core.parameter import Parameter
 
@@ -17,7 +15,28 @@ from symenergy import _get_logger
 
 logger = _get_logger(__name__)
 
-SlotBlock = namedtuple('SlotBlock', ['name', 'repetitions'])
+
+class SlotBlock():
+
+    PARAMS = ['rp']
+    VARIABS = []
+    VARIABS_TIME = []
+    VARIABS_POSITIVE = []
+    MAP_CAPACITY = {}
+    MUTUALLY_EXCLUSIVE = {}
+
+    def __init__(self, name, repetitions):
+
+        self.name = name
+        self.rp = Parameter('rp_%s'%self.name, self, repetitions)
+
+    def _get_hash_name(self):
+
+        hash_input = [self.name]
+        logger.debug('Generating time slot block hash.')
+
+        return md5(str(hash_input).encode('utf-8')).hexdigest()
+
 
 
 class Slot(component.Component):
@@ -57,14 +76,14 @@ class Slot(component.Component):
         return 'Slot %s'%str(self.name)# + (', weight %s'%self.weight)
 
 
-    def get_component_hash_name(self):
+    def _get_component_hash_name(self):
 
         hash_name_0 = super()._get_component_hash_name()
-        hash_input = ['{}-{:d}'.format(self.block, self.repetitions)]
+        hash_input = self.block._get_hash_name() if self.block else ''
 
         logger.debug('Generating time slot hash.')
 
-        return md5(str(hash_input + [hash_name_0]).encode('utf-8')).hexdigest()
+        return md5(str(hash_input + hash_name_0).encode('utf-8')).hexdigest()
 
 
 class NoneSlot():
