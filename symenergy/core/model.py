@@ -106,6 +106,8 @@ class Model:
 
         self.cache = io.Cache(self.get_model_hash_name())
 
+        self._assert_slot_block_validity()
+
 
     @wrapt.decorator
     def _check_component_replacement(f, self, args, kwargs):
@@ -116,8 +118,16 @@ class Model:
 
         return f(*args, **kwargs)
 
+
+    def _assert_slot_block_validity(self):
+        '''
+        If slot blocks are used, only the case with 2 blocks containing 2 slots
+        each is implemented.
+        '''
+
         # check validity of time slot block definition
-        if (self.slot_blocks and (len(self.slots) > 4 or
+        if (self.slot_blocks and (
+            len(self.slots) > 4 or
             (len(self.comps) > len(self.slots)) and len(self.slots) < 4)):
 
             raise RuntimeError('Number of time slots must be equal to 4 '
@@ -127,6 +137,11 @@ class Model:
             assert len(self.slot_blocks) in [0, 2], \
                         'Number of slot blocks must be 0 or 2.'
 
+        if len(self.comps) > len(self.slots):
+            assert all([len([slot_ref for slot_ref in self.slots.values()
+                             if slot_ref.block == slot.block]) == 2
+                       for slot in self.slots.values()]), \
+                'Each slot block must be associated with exactly 2 slots.'
 
     def init_curtailment(self):
 
