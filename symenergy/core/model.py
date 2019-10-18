@@ -68,8 +68,7 @@ class Model:
         self.slots = {}
         self.slot_blocks = {}
         self.storages = {}
-
-        self.comps = []
+        self.comps = {}
 
         self.nthreads = nthreads
         self.constraint_filt = constraint_filt
@@ -94,7 +93,7 @@ class Model:
         self.comps = self.plants.copy()
         self.comps.update(self.slots)
         self.comps.update(self.storages)
-        self.init_curtailment()
+        self._init_curtailment()
 
         self.collect_component_constraints()
         self.init_supply_constraints()
@@ -143,7 +142,7 @@ class Model:
                        for slot in self.slots.values()]), \
                 'Each slot block must be associated with exactly 2 slots.'
 
-    def init_curtailment(self):
+    def _init_curtailment(self):
 
         if self.curtailment:
             self.curt = Curtailment('curt', self.slots)
@@ -181,7 +180,6 @@ class Model:
         ''''''
 
         kwargs['_slot_blocks'] = self.slot_blocks
-
         self.storages.update({name: Storage(name, **kwargs)})
 
 

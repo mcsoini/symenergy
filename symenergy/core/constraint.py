@@ -11,9 +11,9 @@ import sympy as sp
 class Constraint():
 
     '''
-    Constructs constraints.
+    Single constraint class.
     Makes sure that:
-        * shadow price has correct prefix lambda_*
+        * shadow price has correct prefix lb_*
         * sympy constraint expression has correct name cstr_*
         * constraint matches any of the asset.MULTIPS
     '''
@@ -67,7 +67,8 @@ class Constraint():
     def _init_expression(self):
         '''
         Component-specific definition of the sympy expression.
-        Implemented there.
+        Defined by components. Note that the multiplier is automatically
+        included in the expression in the `expr.setter`.
         '''
         self.expr = None
 

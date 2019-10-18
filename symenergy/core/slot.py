@@ -64,6 +64,7 @@ class Slot(component.Component):
 
         if isinstance(weight, int):
             self.w = Parameter('w_%s'%self.name, self, weight)
+
         elif isinstance(weight, Parameter):
             self.w = weight
 
@@ -87,6 +88,9 @@ class Slot(component.Component):
 
 
 class NoneSlot():
+    '''
+    Singleton class.
+    '''
 
     def __init__(self):
         self.name = str(None)
