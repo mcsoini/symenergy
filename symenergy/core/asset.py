@@ -255,9 +255,9 @@ class Asset(component.Component):
         return '%s %s'%(self.__class__, str(self.name))
 
 
-    def get_component_hash_name(self):
+    def _get_component_hash_name(self):
 
-        hash_name_0 = super().get_component_hash_name()
+        hash_name_0 = super()._get_component_hash_name()
         # adding slots
         hash_input = list(map(lambda x: '%s'%(x.name),
                               self.slots.values()))

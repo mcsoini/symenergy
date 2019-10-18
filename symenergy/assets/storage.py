@@ -155,7 +155,7 @@ class Storage(asset.Asset):
 
         self.init_cstr_storage()
 
-        self.init_cost_component()
+        self._init_cost_component()
 
     @property
     def slots_map(self):
@@ -317,7 +317,7 @@ class Storage(asset.Asset):
                 cstr.expr = expr
                 self.cstr_pwrerg[slot] = cstr
 
-    def init_cost_component(self):
+    def _init_cost_component(self):
         '''
         Set constant and linear components of variable costs.
         '''
@@ -325,7 +325,7 @@ class Storage(asset.Asset):
         self.cc = self.energy_cost * sum(self.e.values())
 
 
-    def get_component_hash_name(self):
+    def _get_component_hash_name(self):
         ''' Expand component hash.
 
         Storage has additional attributes which need to be included in the
@@ -335,7 +335,7 @@ class Storage(asset.Asset):
         * `slots_map`
         '''
 
-        hash_name_0 = super().get_component_hash_name()
+        hash_name_0 = super()._get_component_hash_name()
         hash_input = [str(self.slots_map),
                       '{:.20f}'.format(self.energy_cost),
                       str(self.energy_cost)]

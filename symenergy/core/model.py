@@ -977,6 +977,6 @@ class Model:
 
     def get_model_hash_name(self):
 
-        hash_input = ''.join(comp.get_component_hash_name()
+        hash_input = ''.join(comp._get_component_hash_name()
                              for comp in self.comps.values())
         return md5(hash_input.encode('utf-8')).hexdigest()

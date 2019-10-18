@@ -206,7 +206,7 @@ class Component():
                 if hasattr(self, var)
                 for vv in getattr(self, var).values()]
 
-    def get_component_hash_name(self):
+    def _get_component_hash_name(self):
 
 
         hash_input = sorted(

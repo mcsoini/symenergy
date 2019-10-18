@@ -35,9 +35,9 @@ class Constraint():
         self.multiplier_name = multiplier_name
         self.var_name = var_name
 
-        self.init_shadow_price()
-        self.init_column_name()
-        self.init_expression()
+        self._init_shadow_price()
+        self._init_column_name()
+        self._init_expression()
 
 
     @property
@@ -57,14 +57,14 @@ class Constraint():
             self._expr *= self.mlt
 
 
-    def init_shadow_price(self):
+    def _init_shadow_price(self):
         '''
         Sympy symbol
         '''
         self.mlt = sp.symbols('%s_%s'%(self.multiplier_name, self.base_name))
 
 
-    def init_expression(self):
+    def _init_expression(self):
         '''
         Component-specific definition of the sympy expression.
         Implemented there.
@@ -72,7 +72,7 @@ class Constraint():
         self.expr = None
 
 
-    def init_column_name(self):
+    def _init_column_name(self):
         '''
         The column name used by the Model class to generate the constraint
         combination DataFrame.

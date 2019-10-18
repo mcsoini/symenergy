@@ -59,7 +59,7 @@ class Slot(component.Component):
 
     def get_component_hash_name(self):
 
-        hash_name_0 = super().get_component_hash_name()
+        hash_name_0 = super()._get_component_hash_name()
         hash_input = ['{}-{:d}'.format(self.block, self.repetitions)]
 
         logger.debug('Generating time slot hash.')
