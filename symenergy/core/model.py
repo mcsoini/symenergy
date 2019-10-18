@@ -106,6 +106,16 @@ class Model:
 
         self.cache = io.Cache(self.get_model_hash_name())
 
+
+    @wrapt.decorator
+    def _check_component_replacement(f, self, args, kwargs):
+        print(kwargs['name'], self.comps, self.slot_blocks)
+        assert kwargs['name'] not in {**self.comps, **self.slot_blocks}, (
+                'A component or slot_block `%s` has already been '
+                         'defined.')%kwargs['name']
+
+        return f(*args, **kwargs)
+
         # check validity of time slot block definition
         if (self.slot_blocks and (len(self.slots) > 4 or
             (len(self.comps) > len(self.slots)) and len(self.slots) < 4)):
@@ -144,12 +154,14 @@ class Model:
             self.ncomb = len(self._df_comb)
 
 
+    @_check_component_replacement
     def add_slot_block(self, name, repetitions):
 
         self.slot_blocks.update({name: SlotBlock(name, repetitions)})
 
     @_update_component_list
     @_add_slots_to_kwargs
+    @_check_component_replacement
     def add_storage(self, name, *args, **kwargs):
         ''''''
 
@@ -160,12 +172,14 @@ class Model:
 
     @_update_component_list
     @_add_slots_to_kwargs
+    @_check_component_replacement
     def add_plant(self, name, *args, **kwargs):
 
         self.plants.update({name: Plant(name, **kwargs)})
 
 
     @_update_component_list
+    @_check_component_replacement
     def add_slot(self, name, *args, **kwargs):
 
         if self.slot_blocks and not 'block' in kwargs:
