@@ -161,7 +161,7 @@ class Component():
         # TODO: implemented constraint iterator collection which is
         # instantiated by components; replaces this whole method
         if len(constrs) > 1:
-            if not comp_names:
+            if not comp_names and not names:
                 constrs = list(zip(*sorted((cstr.base_name, cstr)
                                for cstr in constrs)))[1]
 
