@@ -136,7 +136,7 @@ class Model:
             assert len(self.slot_blocks) in [0, 2], \
                         'Number of slot blocks must be 0 or 2.'
 
-        if len(self.comps) > len(self.slots):
+        if self.slot_blocks and len(self.comps) > len(self.slots):
             assert all([len([slot_ref for slot_ref in self.slots.values()
                              if slot_ref.block == slot.block]) == 2
                        for slot in self.slots.values()]), \
