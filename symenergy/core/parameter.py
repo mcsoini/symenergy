@@ -23,9 +23,10 @@ class Parameter():
         self.slot = slot
         self.value = value
 
-        self._fixed_value = False
+        self._frozen_value = False
 
         self.init_symbol()
+
 
     @property
     def symb(self):
@@ -33,21 +34,41 @@ class Parameter():
         Return sympy symbol by default or value if symbol value is fixed.
         '''
 
-        return self._symb if not self._fixed_value else self.value
+        return self._symb if not self._frozen_value else self.value
+
 
     @symb.setter
     def symb(self, symb):
 
         self._symb = symb
 
+
+    @property
+    def value(self):
+
+        return self._value
+
+
+    @value.setter
+    def value(self, val):
+
+        if self._frozen_value:
+            raise RuntimeError('Trying to redefine value of frozen parameter '
+                               '%s with current value %s'%(self.name, ))
+        else:
+            self._value = val
+
+
     def init_symbol(self):
 
         self.symb = sp.symbols(self.name)
 
-    def _fix_value(self):
+
+    def _freeze_value(self):
 
         logger.debug('Fixing value of parameter %s.'%self.name)
-        self._fixed_value = True
+        self._frozen_value = True
+
 
     def __repr__(self):
 

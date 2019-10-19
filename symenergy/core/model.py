@@ -120,7 +120,7 @@ class Model:
 
 
     @_update_component_list
-    def fix_parameters(self):
+    def freeze_parameters(self):
         '''
         Switch from variable to numerical value for all model parameters.
 
@@ -132,13 +132,13 @@ class Model:
         '''
 
         for comp in self.comps.values():
-            comp.fix_all_parameters()
+            comp.freeze_all_parameters()
 
 
     @_update_component_list
-    def fix_parameter_value(self, param:Parameter):
+    def freeze_parameter_value(self, param:Parameter):
 
-        param._fix_value()
+        param._freeze_value()
 
 
     def _assert_slot_block_validity(self):
