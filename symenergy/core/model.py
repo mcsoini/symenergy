@@ -147,10 +147,13 @@ class Model:
         each is implemented.
         '''
 
+        # adding first non-slot/non-slot_block component
+        slots_done = len(self.comps) > len(self.slots) + len(self.slot_blocks)
+
+
         # check validity of time slot block definition
         if (self.slot_blocks and (
-            len(self.slots) > 4 or
-            (len(self.comps) > len(self.slots)) and len(self.slots) < 4)):
+            len(self.slots) > 4 or (slots_done and len(self.slots) < 4))):
 
             raise RuntimeError('Number of time slots must be equal to 4 '
                                'if time slot blocks are used.')
@@ -159,7 +162,7 @@ class Model:
             assert len(self.slot_blocks) in [0, 2], \
                         'Number of slot blocks must be 0 or 2.'
 
-        if self.slot_blocks and len(self.comps) > len(self.slots):
+        if self.slot_blocks and slots_done:
             assert all([len([slot_ref for slot_ref in self.slots.values()
                              if slot_ref.block == slot.block]) == 2
                        for slot in self.slots.values()]), \
