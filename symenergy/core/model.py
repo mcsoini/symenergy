@@ -168,6 +168,7 @@ class Model:
                        for slot in self.slots.values()]), \
                 'Each slot block must be associated with exactly 2 slots.'
 
+
     def _init_curtailment(self):
 
         if self.curtailment:
@@ -184,6 +185,7 @@ class Model:
     @property
     def df_comb(self):
         return self._df_comb
+
 
     @df_comb.setter
     def df_comb(self, df_comb):
@@ -205,7 +207,6 @@ class Model:
     def add_storage(self, name, *args, **kwargs):
         ''''''
 
-        kwargs['_slot_blocks'] = self.slot_blocks
         self.storages.update({name: Storage(name, **kwargs)})
 
 
@@ -222,8 +223,9 @@ class Model:
     def add_slot(self, name, *args, **kwargs):
 
         if self.slot_blocks and not 'block' in kwargs:
-            raise RuntimeError('If any of the slots is assigned to a block, '
-                               'all slots must be.')
+            raise RuntimeError(('Error in `add_slot(%s)`: If any of the slots '
+                                'are assigned to a block, all slots must be.'
+                               )%name)
 
         if 'block' in kwargs:
             bk = kwargs['block']
@@ -233,9 +235,7 @@ class Model:
         if not 'weight' in kwargs:  # use default weight parameter
             kwargs['weight'] = self._slot_weights
 
-        new_slot = Slot(name, **kwargs)
-
-        self.slots.update({name: new_slot})
+        self.slots.update({name: Slot(name, **kwargs)})
 
 
     def init_total_param_values(self):
@@ -251,6 +251,7 @@ class Model:
                                                       'value')).items()}
 
         self.param_values.update({self.vre_scale.symb: self.vre_scale.value})
+
 
     def init_total_cost(self):
 
@@ -279,7 +280,6 @@ class Model:
                     self.get_supply_constraint_expr(cstr_supply)
 
             self.cstr_supply[cstr_supply] = slot
-
 
 
     def get_supply_constraint_expr(self, cstr):

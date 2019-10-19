@@ -56,7 +56,7 @@ def log_time_progress(f):
     Decorator for progress logging.
     Note: Due to multiprocessing, this can't be used as an actual decorator.
     https://stackoverflow.com/questions/9336646/python-decorator-with-multiprocessing-fails
-    Using explicit wrappers instead.
+    Using explicit wrappers for each method instead.
     '''
 
     def wrapper(self, df, name, ntot, *args):
