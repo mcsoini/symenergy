@@ -93,6 +93,7 @@ class Model:
         self.comps = self.plants.copy()
         self.comps.update(self.slots)
         self.comps.update(self.storages)
+        self.comps.update(self.slot_blocks)
         self._init_curtailment()
 
         self.collect_component_constraints()
@@ -115,6 +116,29 @@ class Model:
                          'defined.')%kwargs['name']
 
         return f(*args, **kwargs)
+
+
+
+    @_update_component_list
+    def fix_parameters(self):
+        '''
+        Switch from variable to numerical value for all model parameters.
+
+        Example
+
+
+        Calls the :func:`symenergy.core.component.Component.fix_all_parameters`
+        method for all parameters.
+        '''
+
+        for comp in self.comps.values():
+            comp.fix_all_parameters()
+
+
+    @_update_component_list
+    def fix_parameter_value(self, param:Parameter):
+
+        param._fix_value()
 
 
     def _assert_slot_block_validity(self):

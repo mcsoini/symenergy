@@ -8,6 +8,10 @@ Part of symenergy. Copyright 2018 authors listed in AUTHORS.
 
 import sympy as sp
 
+from symenergy import _get_logger
+
+logger = _get_logger(__name__)
+
 class Parameter():
     '''
     Container class for parameter specification.
@@ -19,11 +23,31 @@ class Parameter():
         self.slot = slot
         self.value = value
 
+        self._fixed_value = False
+
         self.init_symbol()
+
+    @property
+    def symb(self):
+        '''
+        Return sympy symbol by default or value if symbol value is fixed.
+        '''
+
+        return self._symb if not self._fixed_value else self.value
+
+    @symb.setter
+    def symb(self, symb):
+
+        self._symb = symb
 
     def init_symbol(self):
 
         self.symb = sp.symbols(self.name)
+
+    def _fix_value(self):
+
+        logger.debug('Fixing value of parameter %s.'%self.name)
+        self._fixed_value = True
 
     def __repr__(self):
 

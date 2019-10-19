@@ -48,6 +48,11 @@ class Component():
                 for param_name in self.PARAMS
                 if hasattr(self, param_name)]
 
+    def fix_all_parameters(self):
+
+        for param in self.get_params():
+            param._fix_value()
+
 
     def get_params_dict(self, attr=tuple()):
 

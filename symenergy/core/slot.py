@@ -16,7 +16,7 @@ from symenergy import _get_logger
 logger = _get_logger(__name__)
 
 
-class SlotBlock():
+class SlotBlock(component.Component):
 
     PARAMS = ['rp']
     VARIABS = []
