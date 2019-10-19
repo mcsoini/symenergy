@@ -19,9 +19,10 @@ class Component():
     '''
     Base class for components.
 
-    This serves as parent class for
+    This serves as parent class for:
 
     - time slots (:class:`symenergy.core.slot.Slot`)
+    - time slot_blocks (:class:`symenergy.core.slot.SlotBlock`)
     - assets (:class:`symenergy.core.asset.Asset`)
 
     It is not instantiated directly.
