@@ -19,11 +19,11 @@ class Parameter():
 
     def __init__(self, name, slot, value):
 
+        self._frozen_value = False
+
         self.name = name
         self.slot = slot
         self.value = value
-
-        self._frozen_value = False
 
         self.init_symbol()
 
