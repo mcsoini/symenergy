@@ -54,7 +54,8 @@ class Parameter():
 
         if self._frozen_value:
             raise RuntimeError('Trying to redefine value of frozen parameter '
-                               '%s with current value %s'%(self.name, ))
+                               '%s with current value %s'%(self.name,
+                                                           self.value))
         else:
             self._value = val
 

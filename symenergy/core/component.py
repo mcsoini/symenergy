@@ -226,6 +226,9 @@ class Component():
         return md5(str(hash_input).encode('utf-8')).hexdigest()
 
 
+    def __repr__(self):
+
+        return '{} `{}`'.format(self.__class__.__name__, self.name)
 
 
 

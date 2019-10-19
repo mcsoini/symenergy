@@ -72,11 +72,6 @@ class Slot(component.Component):
         self.repetitions = repetitions
 
 
-    def __repr__(self):
-
-        return 'Slot %s'%str(self.name)# + (', weight %s'%self.weight)
-
-
     def _get_component_hash_name(self):
 
         hash_name_0 = super()._get_component_hash_name()
@@ -96,7 +91,7 @@ class NoneSlot():
         self.name = str(None)
 
     def __repr__(self):
-        return 'Slot %s'%str(self.name)
+        return 'NoneSlot id=%d'%id(self)
 
 noneslot = NoneSlot()
 

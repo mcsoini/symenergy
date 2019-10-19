@@ -250,10 +250,6 @@ class Asset(component.Component):
 
         return symb
 
-    def __repr__(self):
-
-        return '%s %s'%(self.__class__, str(self.name))
-
 
     def _get_component_hash_name(self):
 
