@@ -6,6 +6,7 @@
 
 
 import itertools
+from orderedset import OrderedSet
 from symenergy.core.parameter import Parameter
 from symenergy.core.variable import Variable
 from symenergy.core.constraint import Constraint
@@ -73,7 +74,7 @@ class AttributeCollection():
         return_list = [get_retattr(el) for el in self._elements if filt(el)]
 
         if unique:
-            return_list = list(set(return_list))
+            return_list = list(OrderedSet(return_list))
 
         if squeeze and len(return_attribute) == 1:
             return_list = list(itertools.chain.from_iterable(return_list))
@@ -158,7 +159,8 @@ class AttributeCollection():
                 dict_struct = {(struct_key,): dict_struct[struct_key]}
 
             # select top level key
-            unique_keys = set(self.tolist(*dict_struct.keys(), squeeze=False))
+            unique_keys = OrderedSet(self.tolist(*dict_struct.keys(),
+                                                 squeeze=False))
 
             dict_level = dict()
             for key_slct in unique_keys:
