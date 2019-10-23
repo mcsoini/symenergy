@@ -4,15 +4,11 @@
 @author: user
 """
 
-
 import itertools
 from orderedset import OrderedSet
 from symenergy.core.parameter import Parameter
 from symenergy.core.variable import Variable
 from symenergy.core.constraint import Constraint
-from sympy.core.symbol import Symbol
-
-
 
 
 class AttributeCollection():
@@ -23,15 +19,14 @@ class AttributeCollection():
     def __init__(self, name):
 
         self._name = name
-
         self._elements = []
 
 
     def append(self, el):
 
         type_args = type(el), str(self), type(el), self._expected_type
-        assert isinstance(el, self._expected_type), ('Invalid type {} '
-                         'appended to {}; got {}, expected {}').format(*type_args)
+        assert isinstance(el, self._expected_type), ('Invalid type {} appended'
+                         ' to {}; got {}, expected {}').format(*type_args)
 
         self._elements.append(el)
 
@@ -105,7 +100,7 @@ class AttributeCollection():
         if tself != tothr:
             raise TypeError('Trying to add %s and %s' % (tself, tothr))
 
-        sum_ = self.__class__(name='model')  # added collections are model attributes
+        sum_ = self.__class__(name='model')  # sums of collections are always model attributes
         sum_._elements = self._elements.copy() + othr._elements.copy()
 
         return sum_
@@ -121,7 +116,7 @@ class AttributeCollection():
 
         Returns a dictionary defined by the `dict_struct` parameter. This
         parameter is an arbitrarly nested dictionary with keys corresponding
-        to tuples of element attribute names:
+        to (tuples of) element attribute names:
         `{('attr1', 'attr2'): {'attr3': {('attr4', 'attr5'): 'attr6'}}}`
         returns the values of `'attr6'` for all combinations of the other
         attributes.
@@ -129,8 +124,6 @@ class AttributeCollection():
         Example
         -------
         >>> `dict_struct={('base_name', 'comp_name'): {'slot': ''}}`
-
-
 
         If `dict_struct` is a string (name of element attribute), `to_dict`
         acts as a wrapper of
@@ -142,7 +135,9 @@ class AttributeCollection():
 
         '''
 
-        dict_struct = dict_struct.copy() if isinstance(dict_struct, dict) else dict_struct
+        dict_struct = (dict_struct.copy()
+                       if isinstance(dict_struct, dict)
+                       else dict_struct)
 
         tuple_keys = not squeeze
 
@@ -165,11 +160,12 @@ class AttributeCollection():
             dict_level = dict()
             for key_slct in unique_keys:
                 # update kwargs with selected keys
-                kwargs_all = {**kwargs, **dict(zip(*dict_struct.keys(), key_slct))}
+                kwargs_all = {**kwargs,
+                              **dict(zip(*dict_struct.keys(), key_slct))}
                 # recursive call for next-lower dict level and key value filter
-                new_value = self.to_dict(dict_struct=dict_struct[list(dict_struct.keys())[0]],
-                                         squeeze=squeeze,
-                                         **kwargs_all)
+                new_dict_struct = dict_struct[list(dict_struct.keys())[0]]
+                new_value = self.to_dict(dict_struct=new_dict_struct,
+                                         squeeze=squeeze, **kwargs_all)
 
                 if not (isinstance(new_value, (tuple, list, set))
                         and not new_value):
@@ -206,9 +202,6 @@ if __name__ == '__main__':
 class ParameterCollection(AttributeCollection):
     '''
     Collection of type :class:`symenergy.core.parameter.Parameter`
-
-    Note: This is the only `AttributeCollection` child which is not a
-    collection of dicts.
     '''
 
     _expected_type = Parameter
@@ -224,7 +217,7 @@ class ConstraintCollection(AttributeCollection):
 
 class VariableCollection(AttributeCollection):
     '''
-    Collection of type `dict(`:class:`sympy.core.symbol.Symbol``)`
+    Collection of type :class:`sympy.core.symbol.Symbol`
     '''
     _expected_type = Variable
 

@@ -342,7 +342,7 @@ class Model:
 
             cstr = Constraint('supply', expr_func=self.supply_cstr_expr_func,
                               slot=slot, is_equality_constraint=True,
-                              expr_args=(slot,))
+                              expr_args=(slot,), comp_name=slot.name)
 
             self.constraints.append(cstr)
 
@@ -838,9 +838,6 @@ class Model:
                 interdependency: drop solution; NaN: empty solution set
         '''
 
-#        check_vars_left = lambda x: any(var in x.result.free_symbols
-#                                        for var in x.variabs_multips)
-#        mask_lindep = self.df_comb.apply(check_vars_left, axis=1)
 
         # get residual variables
         if __name__ == '__main__':
@@ -860,9 +857,6 @@ class Model:
         res_vars.loc[mask_valid, 'res_vars'] = \
                 self.df_comb.loc[mask_valid].apply(get_residual_vars, axis=1)
 
-        if __name__ == '__main__':
-            x = res_vars.iloc[0]
-
         # add solution variable itself to all non-empty lists
         def add_solution_var(x):
             return tuple(x.res_vars[nres_vars]
@@ -879,35 +873,38 @@ class Model:
                             }
 
         def get_comps(x):
-            return tuple((list(set([dict_varmtp_comp[var]
-                                    for var in res_vars])))
-                                    for res_vars in x if res_vars)
+            return tuple(list(set(dict_varmtp_comp[var]
+                                   for var in rv)) for rv in x if rv)
         res_vars.loc[mask_valid, 'res_comps'] = \
                 res_vars.loc[mask_valid].res_vars.apply(get_comps)
 
         # maximum unique component number
         def get_max_ncompunq(x):
             nmax = 0
-            if x.res_comps:
-                nmax = max(len(set(comp_list)) for comp_list in x.res_comps)
+            if x:
+                nmax = max(len(set(comp_list)) for comp_list in x)
             return nmax
         res_vars.loc[mask_valid, 'ncompunq'] = \
-                res_vars.loc[mask_valid].apply(get_max_ncompunq, axis=1)
+                res_vars.loc[mask_valid].res_comps.apply(get_max_ncompunq)
+
+        dict_comp_class = {c.name: c.__class__ for c in self.comps.values()}
+
+        def get_classes(x):
+            return set([dict_comp_class[cmp] for cmp in
+                        itertools.chain.from_iterable(x)])
+
+        res_vars.loc[mask_valid, 'res_classes'] = \
+                res_vars.loc[mask_valid].res_comps.apply(get_classes)
 
         # maximum unique component class number
         def get_max_ncompclassunq(x):
-            nmax = 0
-            if x.res_comps:
-                nmax = len(set([x.__class__ for x in
-                                itertools.chain.from_iterable(x.res_comps)]))
-            return nmax
+            return len(x) if x else 0
+
         res_vars.loc[mask_valid, 'ncompclassesunq'] = \
-                res_vars.loc[mask_valid].apply(get_max_ncompclassunq, axis=1)
+                res_vars.loc[mask_valid].res_classes.apply(get_max_ncompclassunq)
 
         # generate lindep codes
         res_vars['code_lindep'] = 0
-
-
         res_vars.loc[res_vars.ncompunq < 2, 'code_lindep'] = 1
         res_vars.loc[(res_vars.ncompunq >= 2)
                      & (res_vars.ncompclassesunq >= 2 ), 'code_lindep'] = 2
