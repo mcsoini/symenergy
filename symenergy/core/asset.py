@@ -14,6 +14,7 @@ import itertools
 import symenergy.core.component as component
 from symenergy.core.constraint import Constraint
 from symenergy.core.parameter import Parameter
+from symenergy.core.variable import Variable
 from symenergy.core.slot import noneslot
 
 from symenergy import _get_logger
@@ -32,6 +33,7 @@ class UnexpectedSymbolError(Exception):
 def _expand_class_attrs(cls):
     cls._add_default_cap_constr_sgn()
     return cls
+
 
 @_expand_class_attrs
 class Asset(component.Component):
@@ -104,40 +106,42 @@ class Asset(component.Component):
         return cap_var
 
 
+    def expr_func_capacity(self, slot, var_name, capacity_name, sgn):
+        # define expression
+        var = getattr(self, var_name)[slot]
+        cap = getattr(self, capacity_name).symb
+
+        # subtract retired capacity if applicable
+        if (hasattr(self, capacity_name + '_ret')
+            # ... not for retired capacity constraint
+            and not capacity_name + '_ret' == var_name):
+            cap -= getattr(self, capacity_name + '_ret')[noneslot]
+
+        return sgn * var - cap
+
+
     def _init_single_cstr_capacity(self, var_name, capacity_name, sgn):
 
         slot_objs = (self.slots.values() if self.get_flag_timedep(var_name)
              else [noneslot])
 
-        cstr_name = 'cstr_%s_cap_%s'%(var_name + ('_neg' if sgn == -1 else ''),
-                                      capacity_name)
-        setattr(self, cstr_name, {})  # initialize instance dict attribute
-        cstr_dict = getattr(self, cstr_name)
-
         var_attr = getattr(self, var_name)
 
+
+
         for slot in set(slot_objs) & set(var_attr):
-            base_name = '%s_%s_cap%s_%s_%s'%(self.name, var_name,
+            base_name = '%s_%s_cap%s_%s'%(self.name, var_name,
                                            {-1: 'neg', +1: ''}[sgn],
-                                           capacity_name,
-                                           str(slot.name))
+                                           capacity_name)
 
             cstr = Constraint(base_name=base_name, slot=slot,
+                              expr_func=self.expr_func_capacity,
+                              expr_args=(slot, var_name, capacity_name, sgn),
+                              comp_name=self.name,
+                              is_capacity_constraint=True,
                               var_name=str(var_attr[slot]))
 
-            # define expression
-            var = getattr(self, var_name)[slot]
-            cap = getattr(self, capacity_name).symb
-
-            # subtract retired capacity if applicable
-            if (hasattr(self, capacity_name + '_ret')
-                # ... not for retired capacity constraint
-                and not capacity_name + '_ret' == var_name):
-                cap -= getattr(self, capacity_name + '_ret')[noneslot]
-
-            cstr.expr = sgn * var - cap
-
-            cstr_dict[slot] = cstr
+            self.constraints.append(cstr)
 
 
     def _init_cstr_capacity(self, capacity_name):
@@ -161,31 +165,36 @@ class Asset(component.Component):
                 self._init_single_cstr_capacity(var_name, capacity_name, sgn)
 
 
-    def init_cstr_positive(self, variable):
+
+
+    def expr_func_positive(self, slot, var_attr):
+        return var_attr[slot]
+
+
+    def _init_cstr_positive(self, variable):
         '''
         Instantiates a dictionary {slot symbol: Constraint}.
         '''
 
-        slot_objs = (self.slots.values() if self.get_flag_timedep(variable)
+        slot_objs = (self.slots.values()
+                     if self.get_flag_timedep(variable)
                      else [noneslot])
-
-        setattr(self, 'cstr_pos_%s'%variable, dict())
-        cstr_dict = getattr(self, 'cstr_pos_%s'%variable)
 
         var_attr = getattr(self, variable)
 
+        self.variables.to_dict({'slot': ''})
+
         for slot in set(slot_objs) & set(var_attr):
 
-            base_name = '%s_pos_%s_%s'%(self.name, variable, str(slot.name))
+            base_name = '%s_pos_%s'%(self.name, variable)
 
             cstr = Constraint(base_name=base_name, slot=slot,
+                              expr_func=self.expr_func_positive,
                               var_name=str(var_attr[slot]),
-                              is_positivity_constraint=True)
+                              is_positivity_constraint=True,
+                              comp_name=self.name, expr_args=(slot, var_attr))
 
-            var = var_attr[slot]
-            cstr.expr = var
-
-            cstr_dict[slot] = cstr
+            self.constraints.append(cstr)
 
 
     def get_flag_timedep(self, variable):
@@ -212,7 +221,7 @@ class Asset(component.Component):
         return flag_timedep
 
 
-    def init_symbol_operation(self, variable, slotsslct=None):
+    def _init_symbol_operation(self, variable, slotsslct=None):
         '''
         Sets operational variables, i.e. power (generation,
         charging, discharging) and stored energy.
@@ -230,20 +239,27 @@ class Asset(component.Component):
         flag_timedep = self.get_flag_timedep(variable)
 
         if not flag_timedep:
-            symb = sp.symbols('%s_%s_%s'%(self.name, variable, str(None)))
+            symb = sp.symbols('%s_%s_%s'%(self.name, variable, noneslot.name))
             setattr(self, variable, {noneslot: symb})
 
         else:
-            slots = ({slot_name: slot for slot_name, slot in self.slots.items()
-                      if slot_name in slotsslct}
-                     if slotsslct else self.slots)
-            var_obj = {slot: sp.symbols('%s_%s_%s'%(self.name, variable,
-                                        str(slot.name)))
-                       for slot in slots.values()}
-            setattr(self, variable, var_obj)
+            if slotsslct:
+                slots = [slot for slot_name, slot in self.slots.items()
+                          if slot_name in slotsslct]
+            else:
+                slots = list(self.slots.values())
+
+            for slot in slots:
+                self.variables.append(Variable(variable, slot, self.name))
+
+            setattr(self, variable,
+                    self.variables.to_dict({'slot': 'symb'},
+                                           name_no_comp=variable))
+
 
     def init_symbols_costs(self):
         ''' Overridden by children, if applicable. '''
+
 
     def _subs_cost(self, symb, *args, **kwargs):
         ''' Overridden by children, if applicable. '''

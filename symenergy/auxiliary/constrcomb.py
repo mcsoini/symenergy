@@ -48,14 +48,17 @@ class CstrCombBase():
 
         Parameters
         ----------
-        mename -- str
-            Name of mutually exclusive constraint combination. Probably the
-            keys of the `MUTUALLY_EXCLUSIVE` class attribute dictionaries
-        list_cstrs --
-        slots_def -- list or dict
+        mename : str
+            name of mutually exclusive constraint combination; keys of the
+            `MUTUALLY_EXCLUSIVE` class attribute dictionaries
+        list_cstrs :
+        slots_def : list or dict
             list of slots (used for power plants) or
             dictionary like {slot: previous slot} for storage
-        dict_cstrs --
+        constraints : dict
+            dictionary of constraint objects of type
+            `{'name_no_comp': {'slot': ''}}`
+
         '''
 
         self.mename = mename
@@ -70,8 +73,7 @@ class CstrCombBase():
         if not flag_valid:
             raise ValueError('list_cstrs needs to be tuples of tuples')
 
-        self.list_cstrs = [('cstr_%s'%name, relslot, bool_act)
-                           for name, relslot, bool_act in list_cstrs]
+        self.list_cstrs = list_cstrs
 
         if isinstance(slots_def, list):
             self.dict_prev_slot = {slot: slot for slot in slots_def}
@@ -126,7 +128,8 @@ class CstrCombBase():
             slottype = comb[1]
             ar_slots_cstr = np.array(list(cstr.keys()))
 
-            map_slots = np.isin(dict_slots[slottype], ar_slots_cstr)
+            map_slots = np.isin(np.array(dict_slots[slottype]),
+                                ar_slots_cstr)
             dict_slots[slottype] = dict_slots[slottype][map_slots]
 
 
@@ -183,6 +186,9 @@ class CstrCombBase():
         '''
         Note: Returns [] if the storage energy variable e is defined only for
         the noneslot.
+
+        Note: Ok for all the slot_block case.
+
         TODO: Implement separate case which covers e being defined for the
         noneslot only.
         '''
@@ -232,24 +238,17 @@ class CstrCombBase():
         # dictionary constraint spec from const comb --> constraint dict by slot
         map_constr = dict(zip(self.list_cstrs, dict_cstrs))
 
-        ar_slots = np.array(list(self.dict_prev_slot))
-        nslots = len(ar_slots)
-
-        # setup basic slot-slot index map
-        rng = np.expand_dims(np.arange(nslots), 1)
-        map_last = np.concatenate([rng, np.roll(rng, 1)], axis=1)
-
         list_combs = []
-        for n_this in range(nslots):  # loop over all slot indices (shift loop)
+        for slot_this, slot_last in self.dict_prev_slot.items():
 
-            dict_slots = {'last': np.array([ar_slots[map_last[n_this, -1]]]),
-                          'this': np.array([ar_slots[n_this]])}
+            dict_slots = {'last': np.array([slot_last]),
+                          'this': np.array([slot_this])}
 
             self._remove_nonexistent_slots(dict_slots, map_constr)
 
             # only proceed if constraint combination is valid given
             # remaining slots
-            flag_valid = all(val.size > 0 for val in dict_slots.values())
+            flag_valid = all(len(val) for val in dict_slots.values())
 
             if flag_valid:
 
@@ -257,12 +256,12 @@ class CstrCombBase():
                 for comb, cstr in map_constr.items():
 
                     comb_slots_slct = dict_slots[comb[1]]
-                    list_comb += tuple((cstr[slot].col, comb[-1]) for slot in comb_slots_slct)
+                    list_comb += tuple((cstr[slot].col, comb[-1])
+                                       for slot in comb_slots_slct)
 
                 list_combs.append(list_comb)
 
         return list_combs
-
 
 
     def expand_slots_this(self):
@@ -283,10 +282,13 @@ class CstrCombBase():
 
         return list_col_names
 
+
     @none_if_invalid
     def gen_col_combs(self):
 
         list_code_rel_slot = set(cs[1] for cs in self.list_cstrs)
+
+        logger.debug(list_code_rel_slot)
 
         if list_code_rel_slot == {'anyprev', 'lasts', 'this'}:
 

@@ -58,10 +58,15 @@ class Evaluator():
 
         self.dfev = self.model.df_comb.copy()
 
-        self.model.init_total_param_values()
-        self.is_positive = self.model.get_all_is_positive()
+        self.dict_param_values = self.model.parameters.to_dict({'symb': 'value'})
 
-        self._get_evaluated_lambdas()
+        self.param_values = self.model
+
+        # attribute name must match self.df_exp columns name
+        self.is_positive = self.model.constraints('expr_0',
+                                               is_positivity_constraint=True)
+
+#        self._get_evaluated_lambdas()
 
     @property
     def x_vals(self):
@@ -74,6 +79,10 @@ class Evaluator():
         if x_keys_old:
             assert x_keys == x_keys_old, \
                 'Keys of x_vals attribute must not change.'
+
+        frozen_params = [x.name for x in x_vals if x._is_frozen]
+        assert not frozen_params, ('Encountered frozen parameters %s in '
+                                   'x_vals.') % str(frozen_params)
 
         self._x_vals = x_vals#self.sanitize_x_vals(x_vals)
         self.x_symb = [x.symb for x in self._x_vals.keys()]
@@ -92,12 +101,15 @@ class Evaluator():
 
     def _get_list_dep_var(self, skip_multipliers=False):
 
-        list_dep_var = list(map(str, list(self.model.variabs.keys())
-                                   + list(self.model.multips.keys())))
+        list_dep_var = list(map(str, self.model.constraints('mlt')
+                                     + self.model.variables('symb')))
+
         list_dep_var += ['tc']
 
         if skip_multipliers:
-            list_dep_var = [v for v in list_dep_var if not 'lb_' in v]
+            list_dep_var = [v for v in list_dep_var
+                            if (not 'lb_' in v and not 'pi_' in v)
+                            or 'supply' in v]
 
         return list_dep_var
 
@@ -116,14 +128,11 @@ class Evaluator():
         # get dependent variables (variabs and multips)
         list_dep_var = self._get_list_dep_var(skip_multipliers)
 
-        slct_eq_0 = ('n_p_day' if 'n_p_day' in list_dep_var
+        slct_eq = ('n_p_day' if 'n_p_day' in list_dep_var
                      else list_dep_var[0])
-        for slct_eq_0 in list_dep_var:
+        for slct_eq in list_dep_var:
 
-            logger.info('Generating lambda functions for %s.'%slct_eq_0)
-
-            slct_eq = (slct_eq_0.name if not isinstance(slct_eq_0, str)
-                       else slct_eq_0)
+            logger.info('Generating lambda functions for %s.'%slct_eq)
 
             if slct_eq != 'tc':
                 # function idx depends on constraint, since not all constraints
@@ -207,7 +216,7 @@ class Evaluator():
             return np.nan
         else:
             x_ret = x.subs({kk: vv for kk, vv
-                            in self.model.param_values.items()
+                            in self.dict_param_values.items()
                             if not kk in [select_x.symb
                                           for select_x
                                           in self.x_vals.keys()]})
@@ -295,10 +304,9 @@ class Evaluator():
                                                  on=ind)
 
         def sanitize_unexpected_zeros(df):
-            dict_col_func = {cstr.col: cstr.base_name
-                             for cstr in self.model.constrs
-                             if cstr.is_positivity_constraint}
-            for col, func in dict_col_func.items():
+            map_col_func = self.model.constraints(('col', 'base_name'),
+                                              is_positivity_constraint=True)
+            for col, func in map_col_func:
                 df.loc[(df.func == func + '_lam_plot')
                        & (df[col] != 1)
                        & (df['lambd'] == 0), 'lambd'] = np.nan
@@ -326,12 +334,12 @@ class Evaluator():
         '''
 
         # keeping pos cols to sanitize zero equality constraints
-        constrs_cols_pos = [cstr for cstr in self.model.constrs_cols_neq
-                            if '_pos_' in cstr]
+        constrs_cols_pos = self.model.constraints('col',
+                                                  is_positivity_constraint=True)
 
         # keeping cap cols to sanitize cap equality constraints
-        constrs_cols_cap = [cstr for cstr in self.model.constrs_cols_neq
-                            if '_cap_' in cstr]
+        constrs_cols_cap = self.model.constraints('col',
+                                                  is_capacity_constraint=True)
 
         keep_cols = (['func', 'lambd_func', 'idx']
                      + constrs_cols_pos + constrs_cols_cap)
@@ -493,7 +501,7 @@ class Evaluator():
         # if ev.select_x == m.scale_vre: join to df_bal and adjust all vre
         if self.model.vre_scale in self.x_vals:
             mask_vre = df_bal.func.str.contains('vre')
-            df_bal.loc[mask_vre, 'lambd'] *= df_bal.loc[mask_vre, 'vre_scale']
+            df_bal.loc[mask_vre, 'lambd'] *= df_bal.loc[mask_vre, 'vre_scale_none']
 
         # negative by func_no_slot
         varpar_neg = ['l', 'curt_p']

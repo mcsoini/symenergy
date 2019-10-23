@@ -6,7 +6,24 @@ Contains the Constraint class.
 Part of symenergy. Copyright 2018 authors listed in AUTHORS.
 """
 
+import re
 import sympy as sp
+
+#
+#class ConstraintCollection(list):
+#
+#    def __init__(self):
+#        pass
+#
+#
+#    def
+#
+#
+#cc = ConstraintCollection()
+#
+#cc.append('a')
+#cc.append('b')
+#cc
 
 class Constraint():
 
@@ -18,9 +35,15 @@ class Constraint():
         * constraint matches any of the asset.MULTIPS
     '''
 
-    def __init__(self, base_name, slot, multiplier_name='lb',
+    dict_mult_name = {True: 'pi',  # equality constraints
+                      False: 'lb'}  # inequality constraints
+
+
+    def __init__(self, base_name, slot, expr_func,
                  is_equality_constraint=False, var_name=None,
-                 is_positivity_constraint=False):
+                 is_positivity_constraint=False,
+                 is_capacity_constraint=False, comp_name='model',
+                 expr_args=tuple()):
         '''
         Arguments:
             * base_name -- string
@@ -29,15 +52,41 @@ class Constraint():
         '''
 
         self.slot = slot
-        self.is_equality_constraint = is_equality_constraint
+        self._expr_func = expr_func
+
         self.is_positivity_constraint = is_positivity_constraint
+        self.is_equality_constraint = is_equality_constraint
+        self.is_capacity_constraint = is_capacity_constraint
+
+        self.multiplier_name = self.dict_mult_name[is_equality_constraint]
+
         self.base_name = base_name
-        self.multiplier_name = multiplier_name
         self.var_name = var_name
+        self.name = '%s_%s' % (base_name, slot.name)
+
+        if not is_equality_constraint:
+            assert comp_name, ('No comp_name supplied to constraint %s. '
+                               'Inequality constraints must be associated '
+                               'with a component.') % self.name
+
+        self.comp_name = comp_name
+
+        self.name_no_comp = None
+        if self.comp_name:
+            self.name_no_comp = re.sub(self.comp_name + '_', '', self.base_name)
+
+        self.expr_args = expr_args
 
         self._init_shadow_price()
         self._init_column_name()
-        self._init_expression()
+        self.make_expr()
+
+
+    def make_expr(self):
+        '''
+        Uses the expression function to generate the expression.
+        '''
+        self.expr = self._expr_func(*self.expr_args)
 
 
     @property
@@ -45,6 +94,7 @@ class Constraint():
         if not self._expr:
             raise RuntimeError('Constraint %s: expr undefined'%self.base_name)
         return self._expr
+
 
     @expr.setter
     def expr(self, expr):
@@ -61,16 +111,8 @@ class Constraint():
         '''
         Sympy symbol
         '''
-        self.mlt = sp.symbols('%s_%s'%(self.multiplier_name, self.base_name))
-
-
-    def _init_expression(self):
-        '''
-        Component-specific definition of the sympy expression.
-        Defined by components. Note that the multiplier is automatically
-        included in the expression in the `expr.setter`.
-        '''
-        self.expr = None
+        self.mlt = sp.symbols('%s_%s_%s'%(self.multiplier_name, self.base_name,
+                                          self.slot.name))
 
 
     def _init_column_name(self):
@@ -79,8 +121,10 @@ class Constraint():
         combination DataFrame.
         '''
 
-        self.col = 'act_{mult}_{base}'.format(mult=self.multiplier_name,
-                                                 base=self.base_name)
+        name_dict = dict(mult=self.multiplier_name, base=self.base_name,
+                         slot=self.slot.name)
+        self.col = 'act_{mult}_{base}_{slot}'.format(**name_dict)
+
 
     def __repr__(self):
 

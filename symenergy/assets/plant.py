@@ -25,12 +25,8 @@ class Plant(asset.Asset):
         * value capacity
         * multiplier power p <= capacity C
     '''
-    PARAMS = ['vc0', 'vc1', 'C', 'fcom']
-    PARAMS_TIME = []
     VARIABS = ['C_ret']
     VARIABS_TIME = ['p']
-
-    VARIABS_POSITIVE = ['p', 'C_ret', 'C_add']
 
     # mutually exclusive constraint combinations
     MUTUALLY_EXCLUSIVE = {
@@ -63,18 +59,21 @@ class Plant(asset.Asset):
         super().__init__(name)
 #        self.name = name
 
-        self.slots = slots if slots else {'0': Slot('0', 0, 0)}
+        self.slots = slots if slots else noneslot
 
-        self.init_symbol_operation('p')
+        self._init_symbol_operation('p')
 
         self.vc0 = Parameter('vc0_%s'%self.name, noneslot, vc0)
+        self.parameters.append(self.vc0)
         if vc1:
             self.vc1 = Parameter('vc1_%s'%self.name, noneslot, vc1)
+            self.parameters.append(self.vc1)
 
-        self.init_cstr_positive('p')
+        self._init_cstr_positive('p')
 
         if fcom:
             self.fcom = Parameter('fcom_%s'%self.name, noneslot, fcom)
+            self.parameters.append(self.fcoms)
 
         if cap_ret:
             # needs to be initialized before _init_cstr_capacity('C')!
@@ -83,12 +82,13 @@ class Plant(asset.Asset):
 
         if capacity:
             self.C = Parameter('C_%s'%self.name, noneslot, capacity)
+            self.parameters.append(self.C)
             self._init_cstr_capacity('C')
 
-        self.init_cost_component()
+        self._init_cost_component()
 
 
-    def init_cost_component(self):
+    def _init_cost_component(self):
         '''
         Set constant and linear components of variable costs.
         '''

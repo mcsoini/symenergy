@@ -18,17 +18,17 @@ logger = _get_logger(__name__)
 
 class SlotBlock(component.Component):
 
-    PARAMS = ['rp']
     VARIABS = []
     VARIABS_TIME = []
-    VARIABS_POSITIVE = []
     MAP_CAPACITY = {}
     MUTUALLY_EXCLUSIVE = {}
 
     def __init__(self, name, repetitions):
 
+        super().__init__(name)
+
         self.name = name
-        self.rp = Parameter('rp_%s'%self.name, self, repetitions)
+        self.rp = self.parameters.append(Parameter('rp', noneslot, repetitions))
 
     def _get_hash_name(self):
 
@@ -43,11 +43,8 @@ class Slot(component.Component):
     '''
     '''
 
-    PARAMS = ['vre', 'l', 'w']
     VARIABS = []
     VARIABS_TIME = []
-
-    VARIABS_POSITIVE = []
 
     MAP_CAPACITY = {}
 
@@ -59,14 +56,13 @@ class Slot(component.Component):
 
         super().__init__(name)
 
-        self.l = Parameter('l_%s'%self.name, self, load)
-        self.vre = Parameter('vre_%s'%self.name, self, vre)
+        self.l = self.parameters.append(Parameter('l', self, load))
+        self.vre = self.parameters.append(Parameter('vre', self, vre))
 
         if isinstance(weight, int):
-            self.w = Parameter('w_%s'%self.name, self, weight)
-
+            self.w = self.parameters.append(Parameter('w', self, weight))
         elif isinstance(weight, Parameter):
-            self.w = weight
+            self.w = self.parameters.append(weight)
 
         self.block = block
         self.repetitions = repetitions
@@ -88,7 +84,7 @@ class NoneSlot():
     '''
 
     def __init__(self):
-        self.name = str(None)
+        self.name = 'none'
 
     def __repr__(self):
         return 'NoneSlot id=%d'%id(self)

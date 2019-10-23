@@ -50,28 +50,22 @@ class Storage(asset.Asset):
 
     '''
 
-    PARAMS = ['eff', 'C', 'E']
-    PARAMS_TIME = []
     VARIABS = ['et']
     VARIABS_TIME = ['pchg', 'pdch', 'e']
-
-    VARIABS_POSITIVE = ['p', 'e', 'C_ret', 'C_add', 'pchg', 'pdch']
 
     MUTUALLY_EXCLUSIVE = {
         'Empty storage stays empty w/o charging_0':
             (('pos_e', 'anyprev', True), ('pos_pchg', 'lasts', True), ('pos_e', 'this', False)),
         'Empty storage stays empty w/o charging_1':
+            (('pos_e', 'anyprev', True), ('pos_pchg', 'lasts', False), ('pos_e', 'this', True)),
 #        'Empty storage stays empty w/o charging_2':  # << this combination is wrong and deletes valid solutions
 #            (('pos_e', 'last', False), ('pos_pchg', 'this', True), ('pos_e', 'this', True)),
-
-            (('pos_e', 'anyprev', True), ('pos_pchg', 'lasts', False), ('pos_e', 'this', True)),
         'Full storage stays full w/o discharging_0':
             (('e_cap_E', 'anyprev', True), ('pos_pdch', 'lasts', True), ('e_cap_E', 'this', False)),
         'Full storage stays full w/o discharging_1':
+            (('e_cap_E', 'anyprev', True), ('pos_pdch', 'lasts', False), ('e_cap_E', 'this', True)),
 #        'Full storage stays full w/o discharging_2':  # << this combination is wrong and deletes valid solutions
 #            (('e_cap_E', 'last', False), ('pos_pdch', 'this', True), ('e_cap_E', 'this', True)),
-
-            (('e_cap_E', 'anyprev', True), ('pos_pdch', 'lasts', False), ('e_cap_E', 'this', True)),
         'Full storage can`t charge':
             (('e_cap_E', 'last', True), ('pos_pchg', 'this', False)),
         'Empty storage can`t discharge':
@@ -105,7 +99,6 @@ class Storage(asset.Asset):
             (('pos_e', 'all', True), ('pos_pchg', 'this', False)),
         'All energy zero -> each discharging cannot be non-zero':
             (('pos_e', 'all', True), ('pos_pdch', 'this', False)),
-
         }
 
     def __init__(self, name, eff, slots_map=None, slots=None,
@@ -126,34 +119,34 @@ class Storage(asset.Asset):
 
         self.energy_cost = energy_cost
 
-        # only one power for each slot, ... charging or discharging is
-        # determined in the constraints depending on the specification in
-        # the slots_map
-
         for cd_slct in ['chg', 'dch']:
             slotsslct = self.slots_map[cd_slct]
-            self.init_symbol_operation('p%s'%cd_slct, slotsslct)
-        self.init_symbol_operation('e')
+            self._init_symbol_operation('p%s'%cd_slct, slotsslct)
+        self._init_symbol_operation('e')
 
-        self.init_cstr_positive('pchg')
-        self.init_cstr_positive('pdch')
-        self.init_cstr_positive('e')
+        self._init_cstr_positive('pchg')
+        self._init_cstr_positive('pdch')
+        self._init_cstr_positive('e')
 
-        self.eff = Parameter('%s_%s'%('eff', self.name), noneslot, eff)
+        param_args = ('%s_%s'%('eff', self.name), noneslot, eff)
+        self.eff = self.parameters.append(Parameter(*param_args))
 
         if self._slot_blocks:
-            self.init_symbol_operation('et')
+            self._init_symbol_operation('et')
             self._init_cstr_slot_blocks_storage()
+            self._remove_mut_excl_anyprev()
 
         if capacity:
-            self.C = Parameter('C_%s'%self.name, noneslot, capacity)
+            param_args = ('C_%s'%self.name, noneslot, capacity)
+            self.C = self.parameters.append(Parameter(*param_args))
             self._init_cstr_capacity('C')
 
         if energy_capacity:
-            self.E = Parameter('E_%s'%self.name, noneslot, energy_capacity)
+            param_args = ('E_%s'%self.name, noneslot, energy_capacity)
+            self.E = self.parameters.append(Parameter(*param_args))
             self._init_cstr_capacity('E')
 
-        self.init_cstr_storage()
+        self._init_cstr_storage()
 
         self._init_cost_component()
 
@@ -177,10 +170,21 @@ class Storage(asset.Asset):
         self._slots_map = slots_map
 
 
+    def _remove_mut_excl_anyprev(self):
+        '''
+        Mutually exclusive constraint combination definitions with `'anyprev'`
+        relative slot keyword are not valid if slot blocks are used.
+        '''
+
+        self.MUTUALLY_EXCLUSIVE = dict(me for me in
+                                       self.MUTUALLY_EXCLUSIVE.items()
+                                       if not any('anyprev' == cstr[1]
+                                                  for cstr in me[1]))
+
+
     def _init_prev_slot(self):
         '''
         Defines a dictionary with the previous slot for each time slot.
-        Default case: All
         '''
 
         if not self._slot_blocks:
@@ -228,7 +232,7 @@ class Storage(asset.Asset):
 
             list_cstrs = me
             slots_def = self._dict_prev_slot
-            dict_cstrs = self.get_constraints(by_slot=False, names=True)
+            dict_cstrs = self.constraints.to_dict(dict_struct={'name_no_comp': {'slot': ''}})
 
             ccb = CstrCombBase(mename, list_cstrs, slots_def, dict_cstrs)
 
@@ -239,31 +243,72 @@ class Storage(asset.Asset):
 
         return list_col_names
 
+
+    def expr_func_slot_blocks(self, slot):
+
+            list_slots = list(self.slots.values())[:2]
+            eff = self.eff.symb
+            reps = self._slot_blocks[list_slots[0].block.name].rp.symb
+
+            chg = sum(self.pchg[slot] * slot.w.symb
+                      for slot in list_slots if slot in self.pchg)
+            dch = sum(self.pdch[slot] * slot.w.symb
+                      for slot in list_slots if slot in self.pdch)
+
+            et = self.et[noneslot]
+
+            return et - (chg * eff**(1/2) - dch / eff**(1/2)) * reps
+
+
     def _init_cstr_slot_blocks_storage(self):
         '''
         Defines the variable `et` as the first block's charging surplus.
         '''
 
-        name = '%s_%s_%s'%(self.name, 'def_et', noneslot.name)
-        cstr = Constraint(name, slot=noneslot, is_equality_constraint=True)
-
-        list_slots = list(self.slots.values())[:2]
-        eff = self.eff.symb
-        reps = self._slot_blocks[list_slots[0].block.name].rp.symb
-
-        chg = sum(self.pchg[slot] * slot.w.symb
-                  for slot in list_slots if slot in self.pchg)
-        dch = sum(self.pdch[slot] * slot.w.symb
-                  for slot in list_slots if slot in self.pdch)
-
-        et = self.et[noneslot]
-
-        cstr.expr = et - (chg * eff**(1/2) - dch / eff**(1/2)) * reps
-
-        self.cstr_def_et = {noneslot: cstr}
+        name = '%s_%s'%(self.name, 'def_et')
 
 
-    def init_cstr_storage(self):
+        cstr = Constraint(name, slot=noneslot,
+                          expr_func=self.expr_func_slot_blocks,
+                          is_equality_constraint=True, comp_name=self.name,
+                          expr_args=(noneslot,))
+
+        self.constraints.append(cstr)
+
+
+
+    def expr_func_storage_noslots(self, slot, cd, sgn):
+        expr = (sum(p * slot.w.symb
+                for slot, p in getattr(self, 'p%s'%cd).items())
+            * self.eff.symb**(sgn * 1/2)
+            - self.e[noneslot])
+        return expr
+
+
+    def expr_func_storage_slots(self, slot):
+
+        pchg = self.pchg[slot] if slot in self.pchg else 0
+        pdch = self.pdch[slot] if slot in self.pdch else 0
+        e = self.e[slot]
+        e_prev = self.e[self._dict_prev_slot[slot]]
+
+        slot_w = slot.w.symb
+        expr = (e_prev
+                + pchg * slot_w * self.eff.symb**(1/2)
+                - pdch * slot_w * self.eff.symb**(-1/2)
+                - e)
+
+        # first slot of first block --> subtract `et`
+        # note: this needs to be consistent with the `cstr_def_et`
+        # constraint
+        if self._slot_blocks and list(self.slots.values())[0] is slot:
+            expr -= self.et[noneslot] / slot.block.rp.symb
+        elif self._slot_blocks and list(self.slots.values())[2] is slot:
+            expr += self.et[noneslot] / slot.block.rp.symb
+
+        return expr
+
+    def _init_cstr_storage(self):
         '''
         Initialize storage constraints.
         '''
@@ -272,50 +317,35 @@ class Storage(asset.Asset):
         # power to energy #
         if len(self.e) < 2:
             for cd, sgn in [('chg', +1), ('dch', -1)]:
-                name = '%s_%s_%s'%(self.name, 'pwrerg_%s'%cd, noneslot.name)
-                cstr_pwrerg = Constraint(name, slot=noneslot,
-                                         is_equality_constraint=True)
 
-                expr = (sum(p * slot.w.symb
-                            for slot, p in getattr(self, 'p%s'%cd).items())
-                        * self.eff.symb**(sgn * 1/2)
-                        - self.e[noneslot])
-                cstr_pwrerg.expr = expr
 
-                setattr(self, 'cstr_pwrerg_%s'%cd, {noneslot: cstr_pwrerg})
+                name = '%s_%s'%(self.name, 'pwrerg_%s'%cd)
+                cstr = Constraint(name, slot=noneslot,
+                                  expr_func=self.expr_func_storage_noslots,
+                                  expr_args=(noneslot, cd, sgn),
+                                  is_equality_constraint=True,
+                                  comp_name=self.name)
+
+                self.constraints.append(cstr)
 
         else:
             # e_t = e_t-1 + sqrt(eta) * pchg_t - 1 / sqrt(eta) * pdch_t
 
             self.cstr_pwrerg = {}
 
+
+
             for slot_name, slot in self.slots.items():
 
-                name = '%s_%s_%s'%(self.name, 'pwrerg', slot.name)
+                name = '%s_%s'%(self.name, 'pwrerg')
 
-                cstr = Constraint(name, slot=slot, is_equality_constraint=True)
+                cstr = Constraint(name, slot=slot,
+                                  expr_func=self.expr_func_storage_slots,
+                                  expr_args=(slot,),
+                                  is_equality_constraint=True,
+                                  comp_name=self.name)
 
-                pchg = self.pchg[slot] if slot in self.pchg else 0
-                pdch = self.pdch[slot] if slot in self.pdch else 0
-                e = self.e[slot]
-                e_prev = self.e[self._dict_prev_slot[slot]]
-
-                slot_w = slot.w.symb
-                expr = (e_prev
-                        + pchg * slot_w * self.eff.symb**(1/2)
-                        - pdch * slot_w * self.eff.symb**(-1/2)
-                        - e)
-
-                # first slot of first block --> subtract `et`
-                # note: this needs to be consistent with the `cstr_def_et`
-                # constraint
-                if self._slot_blocks and list(self.slots.values())[0] is slot:
-                    expr -= self.et[noneslot] / slot.repetitions
-                elif self._slot_blocks and list(self.slots.values())[2] is slot:
-                    expr += self.et[noneslot] / slot.repetitions
-
-                cstr.expr = expr
-                self.cstr_pwrerg[slot] = cstr
+                self.constraints.append(cstr)
 
     def _init_cost_component(self):
         '''

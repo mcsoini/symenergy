@@ -9,6 +9,7 @@ import sys
 
 from pathlib import Path
 import itertools
+from collections import Counter
 import pandas as pd
 import sympy as sp
 import wrapt
@@ -16,6 +17,8 @@ import numpy as np
 import time
 from hashlib import md5
 from sympy.tensor.array import derive_by_array
+
+from sympy.solvers import solveset
 
 from symenergy.assets.plant import Plant
 from symenergy.assets.storage import Storage
@@ -28,13 +31,18 @@ from symenergy.auxiliary.parallelization import MP_COUNTER, MP_EMA
 from symenergy.auxiliary.parallelization import log_time_progress
 from symenergy import _get_logger
 from symenergy.patches.sympy_linsolve import linsolve
+from symenergy.patches.sympy_linear_coeffs import linear_coeffs
 from symenergy.auxiliary.constrcomb import filter_constraint_combinations
 from symenergy.auxiliary import io
+
 
 logger = _get_logger(__name__)
 
 logger.warning('!!! Monkey-patching sympy.linsolve !!!')
 sp.linsolve = linsolve
+
+logger.warning('!!! Monkey-patching sympy.solvers.solveset.linear_coeffs !!!')
+solveset.linear_coeffs = linear_coeffs
 
 
 if __name__ == '__main__': sys.exit()
@@ -96,18 +104,22 @@ class Model:
         self.comps.update(self.slot_blocks)
         self._init_curtailment()
 
-        self.collect_component_constraints()
-        self.init_supply_constraints()
-        self.init_total_param_values()
-        self.get_variabs_params()
-        self.init_total_cost()
+        self.parameters = sum(c.parameters.copy() for c in self.comps.values())
+        self.parameters.append(self.vre_scale)
+        self.variables = sum(c.variables.copy() for c in self.comps.values())
+        self.constraints = sum(c.constraints.copy()
+                               for c in self.comps.values())
 
-        self.init_supply_constraints()
+        self._init_supply_constraints()
+
+        self._init_total_cost()
 
         self.cache = io.Cache(self.get_model_hash_name())
 
         self._assert_slot_block_validity()
 
+        self.constrs_cols_neq = self.constraints.tolist('col',
+                                            is_equality_constraint=False)
 
     @wrapt.decorator
     def _check_component_replacement(f, self, args, kwargs):
@@ -118,9 +130,8 @@ class Model:
         return f(*args, **kwargs)
 
 
-
     @_update_component_list
-    def freeze_parameters(self):
+    def freeze_parameters(self, exceptions=None):
         '''
         Switch from variable to numerical value for all model parameters.
 
@@ -131,8 +142,21 @@ class Model:
         method for all parameters.
         '''
 
-        for comp in self.comps.values():
-            comp.freeze_all_parameters()
+        exceptions = [] if not exceptions else exceptions
+
+        list_valid = self.parameters('name')
+        list_invalid = set(exceptions) - set(list_valid)
+
+        assert not list_invalid, ('Invalid names %s in exceptions parameter. '
+                                  'Valid options are %s.'
+                                  )%(', '.join(list_invalid),
+                                     ', '.join(list_valid))
+
+        param_list = [param for param, name in self.parameters(('', 'name'))
+                      if not name in exceptions]
+
+        for param in param_list:
+            param._freeze_value()
 
 
     @_update_component_list
@@ -148,8 +172,8 @@ class Model:
         '''
 
         # adding first non-slot/non-slot_block component
-        slots_done = len(self.comps) > len(self.slots) + len(self.slot_blocks)
-
+        slots_done = (len(self.comps) - hasattr(self, 'curt')
+                      > len(self.slots) + len(self.slot_blocks))
 
         # check validity of time slot block definition
         if (self.slot_blocks and (
@@ -162,10 +186,10 @@ class Model:
             assert len(self.slot_blocks) in [0, 2], \
                         'Number of slot blocks must be 0 or 2.'
 
+
         if self.slot_blocks and slots_done:
-            assert all([len([slot_ref for slot_ref in self.slots.values()
-                             if slot_ref.block == slot.block]) == 2
-                       for slot in self.slots.values()]), \
+            slots_per_block = Counter(s.block for s in self.slots.values())
+            assert set(slots_per_block.values()) == set((2,)), \
                 'Each slot block must be associated with exactly 2 slots.'
 
 
@@ -181,6 +205,7 @@ class Model:
 
         kwargs.update(dict(slots=self.slots))
         return f(*args, **kwargs)
+
 
     @property
     def df_comb(self):
@@ -206,7 +231,7 @@ class Model:
     @_check_component_replacement
     def add_storage(self, name, *args, **kwargs):
         ''''''
-
+        kwargs['_slot_blocks'] = self.slot_blocks
         self.storages.update({name: Storage(name, **kwargs)})
 
 
@@ -238,76 +263,91 @@ class Model:
         self.slots.update({name: Slot(name, **kwargs)})
 
 
-    def init_total_param_values(self):
+#    def init_total_param_values(self):
+#        '''
+#        Generates dictionary {parameter object: parameter value}
+#        for all parameters for all components.
+#        '''
+#
+#        self.param_values = {symb: val
+#                             for comp in self.comps.values()
+#                             for symb, val
+#                             in comp.get_params_dict(('symb',
+#                                                      'value')).items()}
+#
+#        self.param_values.update({self.vre_scale.symb: self.vre_scale.value})
+
+
+    def _init_total_cost(self):
         '''
-        Generates dictionary {parameter object: parameter value}
-        for all parameters for all components.
+        Generate total cost and base lagrange attributes.
+
+        Collects all cost components to calculate their total sum `tc`. Adds
+        the equality constraints to the model's total cost to generate the base
+        lagrange function `lagrange_0`.
+
+        Costs and constraint expression of all components are re-initialized.
+        This is important in case parameter values are frozen.
         '''
 
-        self.param_values = {symb: val
-                             for comp in self.comps.values()
-                             for symb, val
-                             in comp.get_params_dict(('symb',
-                                                      'value')).items()}
+        comp_list = list(self.plants.values()) + list(self.storages.values())
 
-        self.param_values.update({self.vre_scale.symb: self.vre_scale.value})
+        for comp in comp_list:
+            comp._init_cost_component()
+            comp._reinit_all_constraints()
 
+        eq_cstrs = self.constraints.tolist('expr', is_equality_constraint=True)
 
-    def init_total_cost(self):
-
-        self.tc = sum(p.cc for p in
-                      list(self.plants.values())
-                           + list(self.storages.values()))
-        self.lagrange_0 = (self.tc
-                           + sum([cstr.expr for cstr in self.cstr_supply]))
-        self.lagrange_0 += sum([cstr.expr for cstr in self.constrs
-                                if cstr.is_equality_constraint])
+        self.tc = sum(p.cc for p in comp_list)
+        self.lagrange_0 = self.tc + sum(eq_cstrs)
 
 
-    def init_supply_constraints(self):
+    def supply_cstr_expr_func(self, slot):
+            '''
+            Initialize the load constraints for a given time slot.
+            Note: this accesses all plants, therefore method of the model class.
+            '''
+
+            total_chg = sum(store.pchg[slot]
+                            for store in self.storages.values()
+                            if slot in store.pchg)
+            total_dch = sum(store.pdch[slot]
+                            for store in self.storages.values()
+                            if slot in store.pdch)
+
+
+            equ = (slot.l.symb
+                   - slot.vre.symb * self.vre_scale.symb
+                   + total_chg
+                   - total_dch
+                   - sum(plant.p[slot] for plant in self.plants.values()))
+
+            if self.curtailment:
+                equ += self.curt.p[slot]
+
+            return equ
+
+
+    def _init_supply_constraints(self):
         '''
         Defines a dictionary cstr_load {slot: supply constraint}
         '''
 
-        self.cstr_supply = {}
-
         for slot in self.slots.values():
 
-            cstr_supply = Constraint('load_%s'%(slot.name),
-                                     multiplier_name='pi', slot=slot,
-                                     is_equality_constraint=True)
-            cstr_supply.expr = \
-                    self.get_supply_constraint_expr(cstr_supply)
+            cstr = Constraint('supply', expr_func=self.supply_cstr_expr_func,
+                              slot=slot, is_equality_constraint=True,
+                              expr_args=(slot,))
 
-            self.cstr_supply[cstr_supply] = slot
+            print('------->', slot.constraints.tolist(), id(slot.constraints._elements))
+            print('------->', self.constraints.tolist(), id(self.constraints._elements))
+
+            self.constraints.append(cstr)
 
 
-    def get_supply_constraint_expr(self, cstr):
-        '''
-        Initialize the load constraints for a given time slot.
-        Note: this accesses all plants, therefore method of the model class.
-        '''
-
-        slot = cstr.slot
-
-        total_chg = sum(store.pchg[slot]
-                        for store in self.storages.values()
-                        if slot in store.pchg)
-        total_dch = sum(store.pdch[slot]
-                        for store in self.storages.values()
-                        if slot in store.pdch)
-
-        equ = (slot.l.symb
-               - slot.vre.symb * self.vre_scale.symb
-               + total_chg
-               - total_dch
-               - sum(plant.p[slot] for plant
-                     in self.plants.values()))
-
-        if self.curtailment:
-            equ += self.curt.p[slot]
-
-        return equ
+            print('~' * 100)
+            print(slot.name)
+            print(slot.constraints.tolist())
 
     def generate_solve(self):
 
@@ -322,22 +362,22 @@ class Model:
             self.cache.write(self.df_comb)
 
 
-    def collect_component_constraints(self):
-        '''
-        Note: Doesn't include supply constraints, which are a model attribute.
-        '''
-
-        self.constrs = {}
-        for comp in self.comps.values():
-            for cstr in comp.get_constraints(by_slot=True, names=False):
-                self.constrs[cstr] = comp
-
-        # dictionary {column name: constraint object}
-        self.constrs_dict = {cstr.col: cstr for cstr in self.constrs.keys()}
-
-        # list of constraint columns
-        self.constrs_cols_neq = [cstr.col for cstr in self.constrs
-                                 if not cstr.is_equality_constraint]
+#    def collect_component_constraints(self):
+#        '''
+#        Note: Doesn't include supply constraints, which are a model attribute.
+#        '''
+#
+#        self.constrs = {}
+#        for comp in self.comps.values():
+#            for cstr in comp.get_constraints(by_slot=True, names=False):
+#                self.constrs[cstr] = comp
+#
+#        # dictionary {column name: constraint object}
+#        self.constrs_dict = {cstr.col: cstr for cstr in self.constrs.keys()}
+#
+#        # list of constraint columns
+#        self.constrs_cols_neq = [cstr.col for cstr in self.constrs
+#                                 if not cstr.is_equality_constraint]
 
 
     def _get_model_mutually_exclusive_cols(self):
@@ -356,22 +396,19 @@ class Model:
         '''
 
         list_col_names = []
+
+        dict_struct = {('comp_name', 'base_name'): {('slot',): ''}}
+        cstrs_all = self.constraints.to_dict(dict_struct=dict_struct)
+
         for mename, me in self._MUTUALLY_EXCLUSIVE.items():
-
-            # identify relevant constraints of all components
-            cstrs_all = [comp.get_constraints(False, True, True)
-                         for comp in self.comps.values()]
-            cstrs_all = dict(pair for d in cstrs_all for pair in d.items())
-            cstrs_all = {(key[0], '{}_{}'.format(key[0],
-                                        key[1].replace('cstr_', ''))): val
-                         for key, val in cstrs_all.items()}
-
             # expand to all components
             me_exp = [tuple((cstrs, name_cstr[0], me_slct[-1])
                        for name_cstr, cstrs in cstrs_all.items()
                        if name_cstr[1].endswith(me_slct[0]))
                       for me_slct in me]
+
             # all components of the combination's two constraints
+            # for example, ('n', 'g'), 'curt' --> ('n', curt), ('g', curt)
             me_exp = list(itertools.product(*me_exp))
 
             # remove double components, also: remove component names
@@ -442,29 +479,29 @@ class Model:
 
         self.ncomb = len(self.df_comb)
 
-
-    def get_variabs_params(self):
-        '''
-        Generate lists of parameters and variables.
-
-        Gathers all parameters and variables from its components.
-        This is needed for the definition of the linear equation system.
-        '''
-
-        self.params = {par: comp
-                       for comp in self.comps.values()
-                       for par in comp.get_params_dict()}
-
-        # add time-dependent variables
-        self.variabs = {var: comp
-                        for comp in self.comps.values()
-                        for var in comp.get_variabs()}
-
-        # parameter multips
-        self.multips = {cstr.mlt: comp for cstr, comp in self.constrs.items()}
-        # supply multips
-        self.multips.update({cstr.mlt: slot
-                             for cstr, slot in self.cstr_supply.items()})
+#
+#    def get_variabs_params(self):
+#        '''
+#        Generate lists of parameters and variables.
+#
+#        Gathers all parameters and variables from its components.
+#        This is needed for the definition of the linear equation system.
+#        '''
+#
+##        self.params = {par: comp
+##                       for comp in self.comps.values()
+##                       for par in comp.get_params_dict()}
+#
+#        # add time-dependent variables
+##        self.variabs = {var: comp
+##                        for comp in self.comps.values()
+##                        for var in comp.get_variabs()}
+#
+#        # parameter multips
+##        self.multips = {cstr.mlt: comp for cstr, comp in self.constrs.items()}
+#        # supply multips
+##        self.multips.update({cstr.mlt: slot
+##                             for slot, cstr in self.cstr_supply.items()})
 
 
 
@@ -475,10 +512,10 @@ class Model:
     def solve(self, x):
 
         # substitute variables with binding positivitiy constraints
+        cpos = self.constraints.tolist(('col', ''),
+                                       is_positivity_constraint=True)
         subs_zero = {cstr.expr_0: sp.Integer(0) for col, cstr
-                     in self.constrs_dict.items()
-                     if cstr.is_positivity_constraint
-                     and x[cstr.col]}
+                     in cpos if x[cstr.col]}
 
         mat = derive_by_array(x.lagrange, x.variabs_multips)
         mat = sp.Matrix(mat).expand()
@@ -498,11 +535,9 @@ class Model:
 
             # init with zeros
             solution_dict = dict.fromkeys(x.variabs_multips, sp.Integer(0))
-
             # update with solutions
             solution_dict.update(dict(zip(variabs_multips_slct,
                                           list(solution_0)[0])))
-
             solution = tuple(solution_dict.values())
 
             return solution
@@ -526,7 +561,6 @@ class Model:
 
         if __name__ == '__main__':
             x = self.df_comb.iloc[0]
-#            lagrange, variabs_multips_slct, index =
 
         if not self.nthreads:
             self.df_comb['result'] = self.call_solve_df(self.df_comb)
@@ -586,10 +620,11 @@ class Model:
     def construct_lagrange(self, row):
 
         lagrange = self.lagrange_0
-
         active_cstrs = row[row == 1].index.values
-        lagrange += sum(self.constrs_dict[cstr_name].expr
-                        for cstr_name in active_cstrs)
+        lagrange += sum(expr for col, expr
+                        in self.constraints.tolist(('col', 'expr'))
+                        if col in active_cstrs)
+
         MP_COUNTER.increment()
 
         return lagrange
@@ -632,7 +667,9 @@ class Model:
 
         lfs = lagrange.free_symbols
         MP_COUNTER.increment()
-        return [ss for ss in lfs if ss in self.variabs or ss in self.multips]
+        return [ss for ss in lfs
+                if ss in self.variables.tolist('symb')
+                       + self.constraints.tolist('mlt')]
 
 
     def call_get_variabs_multips_slct(self, df):
@@ -826,7 +863,7 @@ class Model:
                 self.df_comb.loc[mask_valid].apply(get_residual_vars, axis=1)
 
         if __name__ == '__main__':
-            x = res_vars.iloc[1]
+            x = res_vars.iloc[0]
 
         # add solution variable itself to all non-empty lists
         def add_solution_var(x):
@@ -838,17 +875,17 @@ class Model:
         res_vars.loc[mask_valid, 'res_vars'] = \
                 res_vars.loc[mask_valid].apply(add_solution_var, axis=1)
 
-        # get component corresponding to variable
-        comp_dict_varmtp = self.multips.copy()
-        comp_dict_varmtp.update(self.variabs)
+        # get component corresponding to variable and multiplier symbols
+        dict_varmtp_comp = {**self.variables.to_dict({('symb',): 'comp_name'}),
+                            **self.constraints.to_dict({('mlt', ): 'comp_name'})
+                            }
 
         def get_comps(x):
-            return tuple((list(set([comp_dict_varmtp[var]
-                                              for var in res_vars])))
-                                    for res_vars in x.res_vars
-                                    if res_vars)
+            return tuple((list(set([dict_varmtp_comp[var]
+                                    for var in res_vars])))
+                                    for res_vars in x if res_vars)
         res_vars.loc[mask_valid, 'res_comps'] = \
-                res_vars.loc[mask_valid].apply(get_comps, axis=1)
+                res_vars.loc[mask_valid].res_vars.apply(get_comps)
 
         # maximum unique component number
         def get_max_ncompunq(x):
@@ -944,21 +981,21 @@ class Model:
         ret = str(self.__class__)
         return ret
 
-    def get_all_is_capacity_constrained(self):
-        ''' Collects capacity constrained variables of all components. '''
+#    def get_all_is_capacity_constrained(self):
+#        ''' Collects capacity constrained variables of all components. '''
+#
+#        return [var
+#                for comp in self.comps.values()
+#                for var in comp.get_is_capacity_constrained()]
 
-        return [var
-                for comp in self.comps.values()
-                for var in comp.get_is_capacity_constrained()]
-
-    def get_all_is_positive(self):
-        ''' Collects positive variables of all components. '''
-
-        is_positive_comps = [var
-                             for comp in self.comps.values()
-                             for var in comp.get_is_positive()]
-
-        return is_positive_comps
+#    def get_all_is_positive(self):
+#        ''' Collects positive variables of all components. '''
+#
+#        is_positive_comps = [var
+#                             for comp in self.comps.values()
+#                             for var in comp.get_is_positive()]
+#
+#        return is_positive_comps
 
 
     def print_mutually_exclusive_post(self, logging=False):
