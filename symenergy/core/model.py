@@ -965,13 +965,15 @@ class Model:
 
     def print_results(self, df, idx):
 
-        x = df.query('idx == %d'%idx).iloc[0]
+        x = df.reset_index().query('idx == %d'%idx).iloc[0]
 
-        for var, res in dict(zip(x.variabs_multips, x.result)).items():
+        resdict = pd.DataFrame(zip(map(str, x.variabs_multips), x.result)
+                              ).sort_values(0).set_index(0).to_dict()[1]
+
+        for var, res in resdict.items():
 
             print('*'*20, var, '*'*20)
             print((res))
-
 
 
     def __repr__(self):
