@@ -242,6 +242,10 @@ class Asset(component.Component):
             symb = sp.symbols('%s_%s_%s'%(self.name, variable, noneslot.name))
             setattr(self, variable, {noneslot: symb})
 
+            self.variables.append(Variable(variable, noneslot, self.name))
+
+
+
         else:
             if slotsslct:
                 slots = [slot for slot_name, slot in self.slots.items()
@@ -252,9 +256,8 @@ class Asset(component.Component):
             for slot in slots:
                 self.variables.append(Variable(variable, slot, self.name))
 
-            setattr(self, variable,
-                    self.variables.to_dict({'slot': 'symb'},
-                                           name_no_comp=variable))
+        setattr(self, variable, self.variables.to_dict({'slot': 'symb'},
+                                                       name_no_comp=variable))
 
 
     def init_symbols_costs(self):
