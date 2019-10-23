@@ -44,9 +44,7 @@ sp.linsolve = linsolve
 logger.warning('!!! Monkey-patching sympy.solvers.solveset.linear_coeffs !!!')
 solveset.linear_coeffs = linear_coeffs
 
-
 if __name__ == '__main__': sys.exit()
-
 
 class Model:
     '''
@@ -58,7 +56,14 @@ class Model:
     constraint_filt : str
         :func:`pandas.DataFrame.query` string to filter the constraint
         activation columns of the `df_comb` dataframe
-
+    curtailment : bool
+        Allow for curtailment in each time slots. This generates a
+        :class:`symenergy.assets.curtailment.Curtailment` instance `curt`,
+        which defines positive curtailment power variables `curt.p`.
+    nthreads : int or False
+        number of threads to be used for model setup and solving; passed to the
+        :class:`multiprocessing.Pool` initializer; if False, no
+        parallelization is used.
     '''
 
 
@@ -339,15 +344,8 @@ class Model:
                               slot=slot, is_equality_constraint=True,
                               expr_args=(slot,))
 
-            print('------->', slot.constraints.tolist(), id(slot.constraints._elements))
-            print('------->', self.constraints.tolist(), id(self.constraints._elements))
-
             self.constraints.append(cstr)
 
-
-            print('~' * 100)
-            print(slot.name)
-            print(slot.constraints.tolist())
 
     def generate_solve(self):
 

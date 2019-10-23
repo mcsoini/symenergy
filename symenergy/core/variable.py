@@ -20,8 +20,6 @@ class Variable():
 
     def __init__(self, base_name, slot, comp_name):
 
-        print('Variable slot', slot, type(slot))
-
         self.slot = slot
         self.base_name = base_name
         self.comp_name = comp_name
