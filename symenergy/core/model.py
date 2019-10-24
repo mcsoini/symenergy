@@ -817,7 +817,7 @@ class Model:
         variables which we are actually solving for. To fix this, we
         differentiate between two cases:
 
-
+        0. No dependencies
         1. All corresponding solutions belong to the same component. Overspecification
            occurs if the variables of the same component
            depend on each other but are all zero. E.g. charging,
@@ -838,80 +838,58 @@ class Model:
                 interdependency: drop solution; NaN: empty solution set
         '''
 
+        res_vars = self.df_comb[['result', 'variabs_multips', 'idx']].copy()
 
-        # get residual variables
-        if __name__ == '__main__':
-            x = self.df_comb.iloc[0]
+        # map variable/multiplier -> component
+        dict_vm_cp = {**self.variables.to_dict({('symb',): 'comp_name'}),
+                      **self.constraints.to_dict({('mlt', ): 'comp_name'})}
+        dict_vm_cp = {vm: self.comps[cp] for vm, cp in dict_vm_cp.items()}
 
-        # mask with non-empty solutions
-        not_empty = lambda x: not isinstance(x, sp.sets.EmptySet)
-        mask_valid = self.df_comb.result.apply(not_empty)
+        # map variable/multipler -> component class
+        dict_vm_cl = {vm: cp.__class__ for vm, cp in dict_vm_cp.items()}
+
+        return_series = lambda *args: pd.Series(args,
+                                               index=['resvars', 'ncompunq', 'nclassunq'])
 
         # for each individual solution, get residual variables/multipliers
         def get_residual_vars(x):
-            return tuple([var for var in res.free_symbols
-                                 if var in x.variabs_multips]
-                            for nres, res in enumerate(x.result))
+            if __name__ == '__main__':
+                x = res_vars.iloc[0]
 
-        res_vars = self.df_comb[['result', 'variabs_multips', 'idx']].copy()
-        res_vars.loc[mask_valid, 'res_vars'] = \
-                self.df_comb.loc[mask_valid].apply(get_residual_vars, axis=1)
+            varmlt = x.variabs_multips
+            result = x.result
 
-        # add solution variable itself to all non-empty lists
-        def add_solution_var(x):
-            return tuple(x.res_vars[nres_vars]
-                                + [x.variabs_multips[nres_vars]]
-                            if res_vars else []
-                            for nres_vars, res_vars in enumerate(x.res_vars))
+            # identify free variables/multipliers in results
+            resvars = [r.free_symbols & set(varmlt) for r in result]
+            # add the corresponding solution variable to all non-empty sets
+            resvars = [rv | {vm} for rv, vm in zip(resvars, varmlt) if rv]
+            if not resvars:
+                return return_series(None, 0, 0)
+            # get components corresponding to symbols (unique for each result)
+            rescomps = [set(map(lambda x: dict_vm_cp[x], rv)) for rv in resvars]
+            # maximum number of distinct components
+            ncompunq = max(map(len, rescomps))
+            # get classes corresponding to symbols (unique for each result)
+            resclass = [set(map(lambda x: dict_vm_cl[x], rv)) for rv in resvars]
+            # maximum number of distinct classes
+            nclassunq = max(map(len, resclass))
 
-        res_vars.loc[mask_valid, 'res_vars'] = \
-                res_vars.loc[mask_valid].apply(add_solution_var, axis=1)
+            return return_series(res_vars, ncompunq, nclassunq)
 
-        # get component corresponding to variable and multiplier symbols
-        dict_varmtp_comp = {**self.variables.to_dict({('symb',): 'comp_name'}),
-                            **self.constraints.to_dict({('mlt', ): 'comp_name'})
-                            }
+        max_cnt = res_vars.apply(get_residual_vars, axis=1)
 
-        def get_comps(x):
-            return tuple(list(set(dict_varmtp_comp[var]
-                                   for var in rv)) for rv in x if rv)
-        res_vars.loc[mask_valid, 'res_comps'] = \
-                res_vars.loc[mask_valid].res_vars.apply(get_comps)
-
-        # maximum unique component number
-        def get_max_ncompunq(x):
-            nmax = 0
-            if x:
-                nmax = max(len(set(comp_list)) for comp_list in x)
-            return nmax
-        res_vars.loc[mask_valid, 'ncompunq'] = \
-                res_vars.loc[mask_valid].res_comps.apply(get_max_ncompunq)
-
-        dict_comp_class = {c.name: c.__class__ for c in self.comps.values()}
-
-        def get_classes(x):
-            return set([dict_comp_class[cmp] for cmp in
-                        itertools.chain.from_iterable(x)])
-
-        res_vars.loc[mask_valid, 'res_classes'] = \
-                res_vars.loc[mask_valid].res_comps.apply(get_classes)
-
-        # maximum unique component class number
-        def get_max_ncompclassunq(x):
-            return len(x) if x else 0
-
-        res_vars.loc[mask_valid, 'ncompclassesunq'] = \
-                res_vars.loc[mask_valid].res_classes.apply(get_max_ncompclassunq)
+        max_cnt.resvars.unique()
 
         # generate lindep codes
-        res_vars['code_lindep'] = 0
-        res_vars.loc[res_vars.ncompunq < 2, 'code_lindep'] = 1
-        res_vars.loc[(res_vars.ncompunq >= 2)
-                     & (res_vars.ncompclassesunq >= 2 ), 'code_lindep'] = 2
-        res_vars.loc[(res_vars.ncompunq >= 2)
-                     & (res_vars.ncompclassesunq < 2 ), 'code_lindep'] = 3
+        max_cnt['code_lindep'] = 0
+        mask_1 = (max_cnt.ncompunq < 2) & (max_cnt.ncompunq > 0)
+        max_cnt.loc[mask_1, 'code_lindep'] = 1
+        mask_2 = (max_cnt.ncompunq >= 2) & (max_cnt.nclassunq >= 2)
+        max_cnt.loc[mask_2, 'code_lindep'] = 2
+        mask_3 = (max_cnt.ncompunq >= 2) & (max_cnt.nclassunq <= 1)
+        max_cnt.loc[mask_3, 'code_lindep'] = 3
 
-        return res_vars.code_lindep
+        return max_cnt.code_lindep
 
 
     def filter_invalid_solutions(self):
