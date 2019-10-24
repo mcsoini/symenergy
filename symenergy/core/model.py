@@ -927,7 +927,7 @@ class Model:
                                 nkey2, nkey2/ncomb0*100,
                                 nkey3, nkey3/ncomb0*100))
 
-        self.df_comb = pd.concat([self.df_comb, mask_lindep], axis=1)
+        self.df_comb['code_lindep'] = mask_lindep
         self.df_comb = self.df_comb.loc[-(self.df_comb.code_lindep == 2)]
 
         self.nress = len(self.df_comb)
@@ -952,7 +952,7 @@ class Model:
         for var, res in resdict.items():
 
             print('*'*20, var, '*'*20)
-            print((res))
+            print(sp.simplify(res))
 
 
     def __repr__(self):
