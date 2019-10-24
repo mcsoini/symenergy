@@ -28,7 +28,9 @@ class SlotBlock(component.Component):
         super().__init__(name)
 
         self.name = name
-        self.rp = self.parameters.append(Parameter('rp', noneslot, repetitions))
+        self.rp = self.parameters.append(Parameter('%s_rp'%self.name, noneslot,
+                                                   repetitions))
+
 
     def _get_hash_name(self):
 
