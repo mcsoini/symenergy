@@ -250,14 +250,22 @@ class SymenergyPlotter():
 
         slct_def = self.initial_selection
 
-        self.cds_pos = (ColumnDataSource(self.data[self.cols_pos].xs(slct_def, level=self.ind_slct).reset_index())
-                        if self.cols_pos else None)
-        self.cds_neg = (ColumnDataSource(self.data[self.cols_neg].xs(slct_def, level=self.ind_slct).reset_index())
-                        if self.cols_neg else None)
-        self.cds_all_pos = (ColumnDataSource(self.data[self.cols_pos].reset_index())
+        df_all_pos = self.data[self.cols_pos].reset_index()
+        self.cds_all_pos = (ColumnDataSource(df_all_pos)
                             if self.cols_pos else None)
-        self.cds_all_neg = (ColumnDataSource(self.data[self.cols_neg].reset_index())
+        df_all_neg = self.data[self.cols_neg].reset_index()
+        self.cds_all_neg = (ColumnDataSource(df_all_neg)
                             if self.cols_neg else None)
+        if slct_def:
+            df_pos = self.data[self.cols_pos].xs(slct_def, level=self.ind_slct)
+            self.cds_pos = (ColumnDataSource(df_pos.reset_index())
+                            if self.cols_pos else None)
+            df_neg = self.data[self.cols_neg].xs(slct_def, level=self.ind_slct)
+            self.cds_neg = (ColumnDataSource(df_neg.reset_index())
+                            if self.cols_neg else None)
+        else:
+            self.cds_pos = self.cds_all_pos
+            self.cds_neg = self.cds_all_neg
 
 
     def _make_views(self):
