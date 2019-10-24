@@ -151,22 +151,22 @@ class Model:
         slots_done = len(self.comps) > len(self.slots) + len(self.slot_blocks)
 
 
-        # check validity of time slot block definition
-        if (self.slot_blocks and (
-            len(self.slots) > 4 or (slots_done and len(self.slots) < 4))):
-
-            raise RuntimeError('Number of time slots must be equal to 4 '
-                               'if time slot blocks are used.')
-
-        if len(self.comps) > 0:  # only when other components are added
-            assert len(self.slot_blocks) in [0, 2], \
-                        'Number of slot blocks must be 0 or 2.'
-
-        if self.slot_blocks and slots_done:
-            assert all([len([slot_ref for slot_ref in self.slots.values()
-                             if slot_ref.block == slot.block]) == 2
-                       for slot in self.slots.values()]), \
-                'Each slot block must be associated with exactly 2 slots.'
+#        # check validity of time slot block definition
+#        if (self.slot_blocks and (
+#            len(self.slots) > 4 or (slots_done and len(self.slots) < 4))):
+#
+#            raise RuntimeError('Number of time slots must be equal to 4 '
+#                               'if time slot blocks are used.')
+#
+#        if len(self.comps) > 0:  # only when other components are added
+#            assert len(self.slot_blocks) in [0, 2], \
+#                        'Number of slot blocks must be 0 or 2.'
+#
+#        if self.slot_blocks and slots_done:
+#            assert all([len([slot_ref for slot_ref in self.slots.values()
+#                             if slot_ref.block == slot.block]) == 2
+#                       for slot in self.slots.values()]), \
+#                'Each slot block must be associated with exactly 2 slots.'
 
 
     def _init_curtailment(self):
@@ -206,6 +206,8 @@ class Model:
     @_check_component_replacement
     def add_storage(self, name, *args, **kwargs):
         ''''''
+        if self.slot_blocks:
+            kwargs['_slot_blocks'] = self.slot_blocks
 
         self.storages.update({name: Storage(name, **kwargs)})
 
