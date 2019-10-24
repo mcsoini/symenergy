@@ -719,7 +719,11 @@ class Model:
                 free_symbs = [var for var in list_var if var in res.free_symbols]
 
                 if free_symbs:
+
                     list_res_new[nres] = sp.numbers.Zero()
+                    for res in list_res_new:
+                        res.subs(dict.fromkeys(free_symbs, sp.numbers.Zero()))
+
                     collect[list_var[nres]] = ', '.join(map(str, free_symbs))
 
             if collect:
