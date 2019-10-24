@@ -38,7 +38,6 @@ class SlotBlock(component.Component):
         return md5(str(hash_input).encode('utf-8')).hexdigest()
 
 
-
 class Slot(component.Component):
     '''
     '''

@@ -853,7 +853,7 @@ class Model:
         dict_vm_cl = {vm: cp.__class__ for vm, cp in dict_vm_cp.items()}
 
         return_series = lambda *args: pd.Series(args,
-                                               index=['resvars', 'ncompunq', 'nclassunq'])
+                                               index=['ncompunq', 'nclassunq'])
 
         # for each individual solution, get residual variables/multipliers
         def get_residual_vars(x):
@@ -868,7 +868,7 @@ class Model:
             # add the corresponding solution variable to all non-empty sets
             resvars = [rv | {vm} for rv, vm in zip(resvars, varmlt) if rv]
             if not resvars:
-                return return_series(None, 0, 0)
+                return return_series(0, 0)
             # get components corresponding to symbols (unique for each result)
             rescomps = [set(map(lambda x: dict_vm_cp[x], rv)) for rv in resvars]
             # maximum number of distinct components
@@ -878,11 +878,9 @@ class Model:
             # maximum number of distinct classes
             nclassunq = max(map(len, resclass))
 
-            return return_series(res_vars, ncompunq, nclassunq)
+            return return_series(ncompunq, nclassunq)
 
         max_cnt = res_vars.apply(get_residual_vars, axis=1)
-
-        max_cnt.resvars.unique()
 
         # generate lindep codes
         max_cnt['code_lindep'] = 0
@@ -920,9 +918,11 @@ class Model:
         mask_lindep = self.get_mask_linear_dependencies()
 
         ncomb0 = len(self.df_comb)
-        nkey1, nkey2, nkey3 = (mask_lindep == 1).sum(), (mask_lindep == 2).sum(), (mask_lindep == 3).sum()
+        nkey1, nkey2, nkey3 = ((mask_lindep == 1).sum(),
+                               (mask_lindep == 2).sum(),
+                               (mask_lindep == 3).sum())
         logger.warning(('Number of solutions with linear dependencies: '
-                       'Key 1: {:d} ({:.1f}%), Key 2: {:d} ({:.1f}%), Key 3: {:d} ({:.1f}%)'
+          'Key 1: {:d} ({:.1f}%), Key 2: {:d} ({:.1f}%), Key 3: {:d} ({:.1f}%)'
                        ).format(nkey1, nkey1/ncomb0*100,
                                 nkey2, nkey2/ncomb0*100,
                                 nkey3, nkey3/ncomb0*100))

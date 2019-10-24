@@ -230,7 +230,7 @@ class Asset(component.Component):
         ----------
         variable: str
             collective variable name to be added
-        slots: list of strings
+        slotsslct: list of strings
             list of time slot names for which the variable is to be defined;
             defaults to all time slots
 
@@ -239,12 +239,7 @@ class Asset(component.Component):
         flag_timedep = self.get_flag_timedep(variable)
 
         if not flag_timedep:
-            symb = sp.symbols('%s_%s_%s'%(self.name, variable, noneslot.name))
-            setattr(self, variable, {noneslot: symb})
-
             self.variables.append(Variable(variable, noneslot, self.name))
-
-
 
         else:
             if slotsslct:
@@ -252,7 +247,6 @@ class Asset(component.Component):
                           if slot_name in slotsslct]
             else:
                 slots = list(self.slots.values())
-
             for slot in slots:
                 self.variables.append(Variable(variable, slot, self.name))
 
