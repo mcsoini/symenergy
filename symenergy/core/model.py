@@ -18,8 +18,7 @@ import time
 from hashlib import md5
 from sympy.tensor.array import derive_by_array
 
-from sympy.solvers import solveset
-
+from symenergy.patches.symenergy_solveset import linear_eq_to_matrix
 from symenergy.assets.plant import Plant
 from symenergy.assets.storage import Storage
 from symenergy.assets.curtailment import Curtailment
@@ -31,7 +30,7 @@ from symenergy.auxiliary.parallelization import MP_COUNTER, MP_EMA
 from symenergy.auxiliary.parallelization import log_time_progress
 from symenergy import _get_logger
 from symenergy.patches.sympy_linsolve import linsolve
-from symenergy.patches.sympy_linear_coeffs import linear_coeffs
+#from symenergy.patches.sympy_linear_coeffs import linear_coeffs
 from symenergy.auxiliary.constrcomb import filter_constraint_combinations
 from symenergy.auxiliary import io
 
@@ -41,8 +40,6 @@ logger = _get_logger(__name__)
 logger.warning('!!! Monkey-patching sympy.linsolve !!!')
 sp.linsolve = linsolve
 
-logger.warning('!!! Monkey-patching sympy.solvers.solveset.linear_coeffs !!!')
-solveset.linear_coeffs = linear_coeffs
 
 if __name__ == '__main__': sys.exit()
 
@@ -521,7 +518,7 @@ class Model:
 
         variabs_multips_slct = list(set(x.variabs_multips) - set(subs_zero))
 
-        A, b = sp.linear_eq_to_matrix(mat, variabs_multips_slct)
+        A, b = linear_eq_to_matrix(mat, variabs_multips_slct)
 
         MP_COUNTER.increment()
         solution_0 = sp.linsolve((A, b), variabs_multips_slct)
