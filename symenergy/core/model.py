@@ -118,7 +118,7 @@ class Model:
 
         self.cache = io.Cache(self.get_model_hash_name())
 
-        self._assert_slot_block_validity()
+#        self._assert_slot_block_validity()
 
         self.constrs_cols_neq = self.constraints.tolist('col',
                                             is_equality_constraint=False)

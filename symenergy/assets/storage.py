@@ -11,6 +11,7 @@ import numpy as np
 import itertools
 from copy import copy
 from hashlib import md5
+from collections import Counter
 
 import symenergy.core.asset as asset
 from symenergy.core.constraint import Constraint
@@ -192,6 +193,10 @@ class Storage(asset.Asset):
             shifted_slots = np.roll(np.array(list(self.slots.values())), 1)
             dict_prev_slot = dict(zip(self.slots.values(), shifted_slots))
 
+        elif set(Counter(s.block for s in
+                         self.slots.values()).values()) == {1}:
+            dict_prev_slot = dict(zip(*([tuple(self.slots.values())] * 2)))
+
         else:
             # 2x2 time slots
             list_slots = list(self.slots.values())
@@ -246,7 +251,9 @@ class Storage(asset.Asset):
 
     def expr_func_slot_blocks(self, slot):
 
-            list_slots = list(self.slots.values())[:2]
+            list_slots = [slot for slot in self.slots.values()
+                          if slot.block
+                             == list(self._slot_blocks.values())[0]]
             eff = self.eff.symb
             reps = self._slot_blocks[list_slots[0].block.name].rp.symb
 
@@ -298,13 +305,23 @@ class Storage(asset.Asset):
                 - pdch * slot_w * self.eff.symb**(-1/2)
                 - e)
 
-        # first slot of first block --> subtract `et`
-        # note: this needs to be consistent with the `cstr_def_et`
-        # constraint
-        if self._slot_blocks and list(self.slots.values())[0] is slot:
-            expr -= self.et[noneslot] / slot.block.rp.symb
-        elif self._slot_blocks and list(self.slots.values())[2] is slot:
-            expr += self.et[noneslot] / slot.block.rp.symb
+        def get_first (iblock):
+            return [slot for slot in self.slots.values() if
+                    slot.block == list(self._slot_blocks.values())[iblock]][0]
+
+        if self._slot_blocks:
+
+            # first slot of first block
+            slot00 = get_first(0)
+            slot10 = get_first(1)
+
+            # first slot of first block --> subtract `et`
+            # note: this needs to be consistent with the `cstr_def_et`
+            # constraint
+            if slot00 is slot:
+                expr -= self.et[noneslot] / slot.block.rp.symb
+            elif slot10 is slot:
+                expr += self.et[noneslot] / slot.block.rp.symb
 
         return expr
 
@@ -333,9 +350,14 @@ class Storage(asset.Asset):
 
             self.cstr_pwrerg = {}
 
+            if set(Counter([slot.block for slot
+                            in self.slots.values()]).values()) == {1}:
+                slot_list = [list(self.slots.values())[1]]
+            else:
+                slot_list = self.slots.values()
 
 
-            for slot_name, slot in self.slots.items():
+            for slot in slot_list:
 
                 name = '%s_%s'%(self.name, 'pwrerg')
 
