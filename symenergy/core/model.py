@@ -572,9 +572,7 @@ class Model:
         Substitute result variable expressions into total costs
         '''
 
-        df = list(zip(self.df_comb.result,
-                      self.df_comb.variabs_multips,
-                      self.df_comb.idx))
+        df = self.df_comb[['result', 'variabs_multips', 'idx']]
 
         if not self.nthreads:
             self.df_comb['tc'] = self.call_subs_tc(df)
@@ -582,11 +580,13 @@ class Model:
             func = self.wrapper_call_subs_tc
             self.df_comb['tc'] = parallelize_df(df, func, self.nthreads)
 
-    def subs_total_cost(self, res, var, idx):
+    def subs_total_cost(self, x):
         '''
         Substitutes solution into TC variables.
         This expresses the total cost as a function of the parameters.
         '''
+
+        res, var, idx = x.result, x.variabs_multips, x.idx
 
         dict_var = {var: res[ivar]
                     if not isinstance(res, sp.sets.EmptySet)
@@ -600,7 +600,8 @@ class Model:
 
     def call_subs_tc(self, df):
 
-        return [self.subs_total_cost(res, var, idx) for res, var, idx in df]
+        return df.apply(self.subs_total_cost, axis=1)
+
 
     def wrapper_call_subs_tc(self, df, *args):
 
@@ -669,9 +670,9 @@ class Model:
 
     def call_get_variabs_multips_slct(self, df):
 
-        res = list(map(self.get_variabs_multips_slct, df))
+#        res = list(map(self.get_variabs_multips_slct, df))
+        return df.apply(self.get_variabs_multips_slct)
 
-        return res
 
     def wrapper_call_get_variabs_multips_slct(self, df, *args):
 
