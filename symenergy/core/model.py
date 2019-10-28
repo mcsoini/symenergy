@@ -10,6 +10,7 @@ import sys
 from pathlib import Path
 import itertools
 from collections import Counter
+from orderedset import OrderedSet
 import pandas as pd
 import sympy as sp
 import wrapt
@@ -516,7 +517,7 @@ class Model:
         mat = sp.Matrix(mat).expand()
         mat = mat.subs(subs_zero)
 
-        variabs_multips_slct = list(set(x.variabs_multips) - set(subs_zero))
+        variabs_multips_slct = list(OrderedSet(x.variabs_multips) - OrderedSet(subs_zero))
 
         A, b = linear_eq_to_matrix(mat, variabs_multips_slct)
 
@@ -663,9 +664,10 @@ class Model:
 
         lfs = lagrange.free_symbols
         MP_COUNTER.increment()
-        return [ss for ss in lfs
-                if ss in self.variables.tolist('symb')
-                       + self.constraints.tolist('mlt')]
+        list_vm = [ss for ss in lfs
+                   if ss in self.variables.tolist('symb')
+                          + self.constraints.tolist('mlt')]
+        return sorted(list_vm, key=str)
 
 
     def call_get_variabs_multips_slct(self, df):
