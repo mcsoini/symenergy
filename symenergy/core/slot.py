@@ -51,7 +51,7 @@ class Slot(component.Component):
 
     MUTUALLY_EXCLUSIVE = {}
 
-    def __init__(self, name, load, vre, weight=1, block=None, repetitions=1):
+    def __init__(self, name, load, vre, weight=1, block=None):
 
         assert isinstance(name, str), 'Slot name must be string.'
 
@@ -66,7 +66,6 @@ class Slot(component.Component):
             self.w = self.parameters.append(weight)
 
         self.block = block
-        self.repetitions = repetitions
 
 
     def _get_component_hash_name(self):
