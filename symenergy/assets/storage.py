@@ -192,22 +192,20 @@ class Storage(asset.Asset):
         Defines a dictionary with the previous slot for each time slot.
         '''
 
+        def get_prev(slot_list):
+            shifted_slots = np.roll(np.array(list(slot_list)), 1)
+            return dict(zip(slot_list, shifted_slots))
+
         if not self._slot_blocks:
-
-            shifted_slots = np.roll(np.array(list(self.slots.values())), 1)
-            dict_prev_slot = dict(zip(self.slots.values(), shifted_slots))
-
-        elif set(Counter(s.block for s in
-                         self.slots.values()).values()) == {1}:
-            dict_prev_slot = dict(zip(*([tuple(self.slots.values())] * 2)))
+            dict_prev_slot = get_prev(self.slots.values())
 
         else:
-            # 2x2 time slots
-            list_slots = list(self.slots.values())
-            dict_prev_slot = {list_slots[0]: list_slots[1],
-                              list_slots[1]: list_slots[0],
-                              list_slots[2]: list_slots[3],
-                              list_slots[3]: list_slots[2],}
+            slots_by_block = {block: [slot for slot in self.slots.values()
+                                      if slot.block == block]
+                              for block in self._slot_blocks.values()}
+            dict_prev_slot = dict(itertools.chain.from_iterable(
+                                  [get_prev(slots).items()
+                                   for slots in slots_by_block.values()]))
 
         self._dict_prev_slot = dict_prev_slot
 
