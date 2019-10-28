@@ -54,23 +54,9 @@ class Storage(asset.Asset):
     VARIABS = ['et']
     VARIABS_TIME = ['pchg', 'pdch', 'e']
 
-    MUTUALLY_EXCLUSIVE = {
-        'Empty storage stays empty w/o charging_0':
-            (('pos_e', 'anyprev', True), ('pos_pchg', 'lasts', True), ('pos_e', 'this', False)),
-        'Empty storage stays empty w/o charging_1':
-            (('pos_e', 'anyprev', True), ('pos_pchg', 'lasts', False), ('pos_e', 'this', True)),
-#        'Empty storage stays empty w/o charging_2':  # << this combination is wrong and deletes valid solutions
-#            (('pos_e', 'last', False), ('pos_pchg', 'this', True), ('pos_e', 'this', True)),
-        'Full storage stays full w/o discharging_0':
-            (('e_cap_E', 'anyprev', True), ('pos_pdch', 'lasts', True), ('e_cap_E', 'this', False)),
-        'Full storage stays full w/o discharging_1':
-            (('e_cap_E', 'anyprev', True), ('pos_pdch', 'lasts', False), ('e_cap_E', 'this', True)),
-#        'Full storage stays full w/o discharging_2':  # << this combination is wrong and deletes valid solutions
-#            (('e_cap_E', 'last', False), ('pos_pdch', 'this', True), ('e_cap_E', 'this', True)),
+    mutually_exclusive = {
         'Full storage can`t charge':
             (('e_cap_E', 'last', True), ('pos_pchg', 'this', False)),
-        'Empty storage can`t discharge':
-            (('pos_e', 'last', True), ('pos_pdch', 'this', False)),
 
         'No simultaneous non-zero charging and non-zero discharging':
             (('pos_pchg', 'this', False), ('pos_pdch', 'this', False)),
@@ -87,17 +73,35 @@ class Storage(asset.Asset):
         'All charging zero -> each discharging cannot be non-zero':
             (('pos_pchg', 'all', True), ('pos_pdch', 'this', False)),
 
+        'All discharging zero -> each charging cannot be non-zero':
+            (('pos_pdch', 'all', True), ('pos_pchg', 'this', False)),
+
         'All charging zero -> each energy cannot be non-zero':
             (('pos_pchg', 'all', True), ('pos_e', 'this', False)),
 
         'All discharging zero -> each energy cannot be non-zero':
             (('pos_pdch', 'all', True), ('pos_e', 'this', False)),
+        }
+    mutually_exclusive_no_blocks = {
+        'Empty storage stays empty w/o charging_0':
+            (('pos_e', 'anyprev', True), ('pos_pchg', 'lasts', True), ('pos_e', 'this', False)),
+        'Empty storage stays empty w/o charging_1':
+            (('pos_e', 'anyprev', True), ('pos_pchg', 'lasts', False), ('pos_e', 'this', True)),
+#        'Empty storage stays empty w/o charging_2':  # << this combination is wrong and deletes valid solutions
+#            (('pos_e', 'last', False), ('pos_pchg', 'this', True), ('pos_e', 'this', True)),
+        'Full storage stays full w/o discharging_0':
+            (('e_cap_E', 'anyprev', True), ('pos_pdch', 'lasts', True), ('e_cap_E', 'this', False)),
+        'Full storage stays full w/o discharging_1':
+            (('e_cap_E', 'anyprev', True), ('pos_pdch', 'lasts', False), ('e_cap_E', 'this', True)),
+##        'Full storage stays full w/o discharging_2':  # << this combination is wrong and deletes valid solutions
+##            (('e_cap_E', 'last', False), ('pos_pdch', 'this', True), ('e_cap_E', 'this', True)),
 
-        'All discharging zero -> each charging cannot be non-zero':
-            (('pos_pdch', 'all', True), ('pos_pchg', 'this', False)),
+        'Empty storage can`t discharge':
+            (('pos_e', 'last', True), ('pos_pdch', 'this', False)),
 
         'All energy zero -> each charging cannot be non-zero':
             (('pos_e', 'all', True), ('pos_pchg', 'this', False)),
+
         'All energy zero -> each discharging cannot be non-zero':
             (('pos_e', 'all', True), ('pos_pdch', 'this', False)),
         }
@@ -118,6 +122,8 @@ class Storage(asset.Asset):
         self._update_class_attrs()
         self._init_prev_slot()
 
+        self._make_mutually_exclusive_dict()
+
         self.energy_cost = energy_cost
 
         for cd_slct in ['chg', 'dch']:
@@ -135,7 +141,6 @@ class Storage(asset.Asset):
         if self._slot_blocks:
             self._init_symbol_operation('et')
             self._init_cstr_slot_blocks_storage()
-            self._remove_mut_excl_anyprev()
 
         if capacity:
             param_args = ('C_%s'%self.name, noneslot, capacity)
@@ -171,16 +176,15 @@ class Storage(asset.Asset):
         self._slots_map = slots_map
 
 
-    def _remove_mut_excl_anyprev(self):
+    def _make_mutually_exclusive_dict(self):
         '''
-        Mutually exclusive constraint combination definitions with `'anyprev'`
-        relative slot keyword are not valid if slot blocks are used.
+        Mutually exclusive dictionary depends on whether or not the model
+        has slotblocks. The instance attribute is assembled from the class
+        attributes accordingly.
         '''
 
-        self.MUTUALLY_EXCLUSIVE = dict(me for me in
-                                       self.MUTUALLY_EXCLUSIVE.items()
-                                       if not any('anyprev' == cstr[1]
-                                                  for cstr in me[1]))
+        if not self._slot_blocks:
+            self.mutually_exclusive.update(self.mutually_exclusive_no_blocks)
 
 
     def _init_prev_slot(self):
@@ -232,8 +236,8 @@ class Storage(asset.Asset):
 
         list_col_names = []
 
-#        mename, me = list(self.MUTUALLY_EXCLUSIVE.items())[0]
-        for mename, me in self.MUTUALLY_EXCLUSIVE.items():
+#        mename, me = list(self.mutually_exclusive.items())[0]
+        for mename, me in self.mutually_exclusive.items():
 
             list_cstrs = me
             slots_def = self._dict_prev_slot

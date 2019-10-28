@@ -101,7 +101,7 @@ class Component():
 
         1. Generates full cross-product of all binding or non-binding
            inequality constraints.
-        2. Filters the resulting table based on its `_MUTUALLY_EXCLUSIVE`
+        2. Filters the resulting table based on its `mutually_exclusive`
            dictionary.
 
         Returns
@@ -205,7 +205,7 @@ class Component():
         '''
 
         list_col_names = []
-        for mename, me in self.MUTUALLY_EXCLUSIVE.items():
+        for mename, me in self.mutually_exclusive.items():
 
             ccb = CstrCombBase(mename, me, list(self.slots.values()),
                        self.constraints.to_dict(dict_struct={'name_no_comp': {'slot': ''}})

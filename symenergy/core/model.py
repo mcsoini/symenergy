@@ -65,7 +65,7 @@ class Model:
     '''
 
 
-    _MUTUALLY_EXCLUSIVE = {
+    mutually_exclusive = {
         'No power production when curtailing':
                 (('pos_p', 'this', False), ('curt_pos_p', 'this', False)),
         'No discharging when curtailing':
@@ -396,7 +396,7 @@ class Model:
         dict_struct = {('comp_name', 'base_name'): {('slot',): ''}}
         cstrs_all = self.constraints.to_dict(dict_struct=dict_struct)
 
-        for mename, me in self._MUTUALLY_EXCLUSIVE.items():
+        for mename, me in self.mutually_exclusive.items():
             # expand to all components
             me_exp = [tuple((cstrs, name_cstr[0], me_slct[-1])
                        for name_cstr, cstrs in cstrs_all.items()
@@ -441,7 +441,7 @@ class Model:
         2. Generates table corresponding to the full cross-product of all
            component constraint combinations.
         3. Filters constraint combinations according to the
-           :attr:`model._MUTUALLY_EXCLUSIVE` class attribute.
+           :attr:`model.mutually_exclusive` class attribute.
 
         This function initilizes the `symenergy.df_comb` attribute
 
@@ -463,7 +463,7 @@ class Model:
 
         logger.info('Length of merged df_comb: %d'%len(dfcomb))
 
-        # filter according to model _MUTUALLY_EXCLUSIVE
+        # filter according to model mutually_exclusive
         logger.info('*'*30 + 'model filtering' + '*'*30)
         model_mut_excl_cols = self._get_model_mutually_exclusive_cols()
         dfcomb = filter_constraint_combinations(dfcomb, model_mut_excl_cols)

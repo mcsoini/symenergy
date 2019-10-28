@@ -21,7 +21,7 @@ class SlotBlock(component.Component):
     VARIABS = []
     VARIABS_TIME = []
     MAP_CAPACITY = {}
-    MUTUALLY_EXCLUSIVE = {}
+    mutually_exclusive = {}
 
     def __init__(self, name, repetitions):
 
@@ -49,7 +49,7 @@ class Slot(component.Component):
 
     MAP_CAPACITY = {}
 
-    MUTUALLY_EXCLUSIVE = {}
+    mutually_exclusive = {}
 
     def __init__(self, name, load, vre, weight=1, block=None):
 

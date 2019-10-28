@@ -15,7 +15,7 @@ class Curtailment(asset.Asset):
     VARIABS = []
     VARIABS_TIME = ['p']
 
-    MUTUALLY_EXCLUSIVE = {}
+    mutually_exclusive = {}
 
     def __init__(self, name, slots=None):
 

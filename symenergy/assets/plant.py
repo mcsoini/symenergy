@@ -29,7 +29,7 @@ class Plant(asset.Asset):
     VARIABS_TIME = ['p']
 
     # mutually exclusive constraint combinations
-    MUTUALLY_EXCLUSIVE = {
+    mutually_exclusive = {
 # =============================================================================
 # TODO: This needs to be fixed: C_ret defined for Noneslot
 #         'Power plant retirement not simult. max end zero':
