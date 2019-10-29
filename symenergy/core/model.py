@@ -727,9 +727,10 @@ class Model:
                     collect[list_var[nres]] = ', '.join(map(str, free_symbs))
 
             if collect:
-                logger.info('idx=%d'%x.idx)
+                logger.debug('idx=%d'%x.idx)
                 for res, var in collect.items():
-                    logger.info('     Solution for %s contained variabs %s.'%(res, var))
+                    logger.debug(('     Solution for %s contained variabs '
+                                  '%s.')%(res, var))
         else:
             raise ValueError('code_lindep must be 0, 3, or 1')
 
