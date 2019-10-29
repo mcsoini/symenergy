@@ -133,12 +133,15 @@ class SymenergyPlotter():
     cols_neg = []
 
     def __init__(self, ev, ind_axx, ind_pltx, ind_plty, slct_series=None,
-                 cat_column=None):
+                 cat_column=None, plot_width=400, plot_height=300):
 
         self.ev = ev
         self.ind_pltx = ind_pltx
         self.ind_plty = ind_plty
         self.ind_axx = ind_axx
+
+        self.plot_height = plot_height
+        self.plot_width = plot_width
 
         if cat_column:
             self.cat_column = cat_column
@@ -378,7 +381,8 @@ class SymenergyPlotter():
                                           (self.ind_plty, valy)]
                                       if ind_plt)
 
-                p = figure(plot_width=400, plot_height=300, title=title_str)
+                p = figure(plot_width=self.plot_width,
+                           plot_height=self.plot_height, title=title_str)
 
                 posneg_vars = zip(['pos', 'neg'],
                                   [self.cols_pos, self.cols_neg],
