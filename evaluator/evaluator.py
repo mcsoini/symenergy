@@ -66,7 +66,7 @@ class Evaluator():
         self.is_positive = self.model.constraints('expr_0',
                                                is_positivity_constraint=True)
 
-#        self._get_evaluated_lambdas()
+        self._get_evaluated_lambdas()
 
     @property
     def x_vals(self):
