@@ -60,8 +60,8 @@ class Model:
         which defines positive curtailment power variables `curt.p`.
     nthreads : int or False
         number of threads to be used for model setup and solving; passed to the
-        :class:`multiprocessing.Pool` initializer; if False, no
-        parallelization is used.
+        :class:`multiprocessing.Pool` initializer; defaults to
+        `multiprocessing.cpu_count() - 1`; if False, no multiprocessing is used
     '''
 
 
@@ -72,7 +72,7 @@ class Model:
                 (('pos_pdch', 'this', False), ('curt_pos_p', 'this', False))
          }
 
-    def __init__(self, nthreads=None, curtailment=False,
+    def __init__(self, nthreads='default', curtailment=False,
                  slot_weight=1, constraint_filt=None):
 
         self.plants = {}

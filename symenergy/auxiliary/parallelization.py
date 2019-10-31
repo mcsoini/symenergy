@@ -16,8 +16,6 @@ from symenergy import _get_logger
 
 logger = _get_logger(__name__)
 
-CHUNKS_PER_THREAD = 2
-
 try:
     from pathos.multiprocessing import ProcessingPool as Pool
 except Exception as e: logger.info(e)
@@ -76,12 +74,15 @@ def log_time_progress(f):
     return wrapper
 
 
-def parallelize_df(df, func, nthreads, *args, use_pathos=False, **kwargs):
+def parallelize_df(df, func, *args, nthreads='default', use_pathos=False, **kwargs):
     MP_COUNTER.reset()
     MP_EMA.reset()
 
+    if nthreads == 'default':
+        nthreads = multiprocessing.cpu_count() - 1
+
     nthreads = min(nthreads, len(df))
-    nchunks = min(nthreads * CHUNKS_PER_THREAD, len(df))
+    nchunks = min(nthreads * 2, len(df))
 
     df_split = numpy.array_split(df, nchunks)
     if use_pathos:
