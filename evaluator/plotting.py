@@ -382,7 +382,9 @@ class SymenergyPlotter():
                                       if ind_plt)
 
                 p = figure(plot_width=self.plot_width,
-                           plot_height=self.plot_height, title=title_str)
+                           plot_height=self.plot_height,
+                           title=title_str,
+                           x_axis_label=self.ind_axx)
 
                 posneg_vars = zip(['pos', 'neg'],
                                   [self.cols_pos, self.cols_neg],
