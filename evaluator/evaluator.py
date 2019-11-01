@@ -242,6 +242,8 @@ class Evaluator():
     def _lambdify(self, expr):
         ''' Convert sympy expressions to function strings. '''
 
+        MP_COUNTER.increment()
+
         return lambdastr(args=self.x_symb,
                          expr=self._subs_param_values(expr),
                          dummify=False)
