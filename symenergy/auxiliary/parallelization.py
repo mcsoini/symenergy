@@ -109,10 +109,15 @@ def parallelize_df(df, func, *args, nthreads='default', concat=True, **kwargs):
     pool.join()
     logger.info('parallelize_df: concatenating ... ')
     if isinstance(results[0], (list, tuple)):
-        result = list(itertools.chain.from_iterable(results))
-    else:
-        result = pd.concat(results)
+        logger.info('parallelize_df: chaining ... ')
+        results = list(itertools.chain.from_iterable(results))
+
+    if isinstance(results[0], (pd.DataFrame, pd.Series)) and concat:
+        logger.info('parallelize_df: concatenating ... ')
+        results = pd.concat(results)
+
     logger.info('done.')
-    return result
+    return results
+
 
 
