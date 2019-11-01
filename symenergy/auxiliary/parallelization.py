@@ -71,12 +71,17 @@ def log_time_progress(f):
     return wrapper
 
 
+def get_default_nthreads():
+
+    return multiprocessing.cpu_count() - 1
+
+
 def parallelize_df(df, func, *args, nthreads='default', concat=True, **kwargs):
     MP_COUNTER.reset()
     MP_EMA.reset()
 
     if nthreads == 'default':
-        nthreads = multiprocessing.cpu_count() - 1
+        nthreads = get_default_nthreads()
 
     nthreads = min(nthreads, len(df))
     nchunks = min(nthreads * 2, len(df))
