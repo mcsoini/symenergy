@@ -242,7 +242,9 @@ class Evaluator():
     def _lambdify(self, expr):
         ''' Convert sympy expressions to function strings. '''
 
-        return lambdastr(args=self.x_symb, expr=expr, dummify=False)
+        return lambdastr(args=self.x_symb,
+                         expr=self._subs_param_values(expr),
+                         dummify=False)
 
 
     def _make_hash(self, func_str):
