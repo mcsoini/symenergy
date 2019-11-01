@@ -84,9 +84,20 @@ def parallelize_df(df, func, *args, nthreads='default', concat=True, **kwargs):
         nthreads = get_default_nthreads()
 
     nthreads = min(nthreads, len(df))
-    nchunks = min(nthreads * 2, len(df))
 
-    df_split = numpy.array_split(df, nchunks)
+    def split(df_):
+        nchunks = min(nthreads * 2, len(df_))
+        return np.array_split(df, nchunks)
+
+    if isinstance(df, (pd.DataFrame, pd.Series)):
+        df_split = split(df)
+    elif isinstance(df, list) and isinstance(df[0], (pd.DataFrame, pd.Series)):
+        df_split = df
+    elif isinstance(df, list):
+        df_split = split(df)
+    else:
+        raise ValueError('Unknown df argument type in parallelize_df')
+
 
     pool = multiprocessing.Pool(nthreads)
     if args:
