@@ -5,29 +5,28 @@ Contains the Evaluator class.
 
 Part of symenergy. Copyright 2018 authors listed in AUTHORS.
 """
-
+import os
+import py_compile
 import sympy as sp
 import numpy as np
+from importlib import reload
 import pandas as pd
 import itertools
+from hashlib import md5
+from functools import partial
 import time
+from sympy.utilities.lambdify import lambdastr
+import symenergy
+
+from symenergy.auxiliary.parallelization import parallelize_df
+from symenergy.auxiliary.parallelization import log_time_progress
+from symenergy.auxiliary.parallelization import get_default_nthreads
+from symenergy.auxiliary.parallelization import MP_COUNTER, MP_EMA
 
 from symenergy.core.model import Model
 from symenergy import _get_logger
 
 logger = _get_logger(__name__)
-
-
-
-class LambdContainer():
-
-    def __init__(self, funcs):
-        '''
-        Input arguments:
-            * funcs -- lists of tuples (name, function)
-        '''
-        for func_name, func in funcs:
-            setattr(self, func_name, func)
 
 
 class Evaluator():
@@ -56,17 +55,28 @@ class Evaluator():
 
         self.tolerance = tolerance
 
-        self.dfev = self.model.df_comb.copy()
+        self.dfev = self._get_dfev()
 
-        self.dict_param_values = self.model.parameters.to_dict({'symb': 'value'})
-
-        self.param_values = self.model
+        self.dict_param_values = self._get_param_values()
 
         # attribute name must match self.df_exp columns name
-        self.is_positive = self.model.constraints('expr_0',
-                                               is_positivity_constraint=True)
+        self.is_positive = \
+            self.model.constraints('expr_0', is_positivity_constraint=True)
 
-        self._get_evaluated_lambdas()
+#        self._get_evaluated_lambdas()
+
+
+    def _get_dfev(self):
+        ''' Returns a modified main model DataFrame `df_comb`. Variables and
+        multipliers are converted from sympy symbols to strings.'''
+
+        cols = ['variabs_multips', 'result', 'idx', 'tc']
+        dfev = self.model.df_comb[cols].copy()
+        dfev.variabs_multips = dfev.variabs_multips.apply(
+                                                lambda x: list(map(str, x)))
+
+        return dfev
+
 
     @property
     def x_vals(self):
@@ -87,6 +97,7 @@ class Evaluator():
         self._x_vals = x_vals#self.sanitize_x_vals(x_vals)
         self.x_symb = [x.symb for x in self._x_vals.keys()]
         self.x_name = [x.name for x in self.x_symb]
+        self.x_name_str = '(%s)'%','.join(self.x_name)
 
         self.df_x_vals = self._get_x_vals_combs()
 
@@ -141,8 +152,7 @@ class Evaluator():
                 self.dfev.loc[:, slct_eq] = self.dfev.apply(get_func, axis=1)
 
             logger.debug('substituting...')
-            self.dfev.loc[:, '%s_expr_plot'%slct_eq] = \
-                        self.dfev[slct_eq].apply(self._subs_param_values)
+            expr_plot = self.dfev[slct_eq].apply(self._subs_param_values)
 
             lambdify = lambda res_plot: sp.lambdify(self.x_symb, res_plot,
                                                     modules=['numpy'],
@@ -150,26 +160,294 @@ class Evaluator():
 
             logger.debug('lambdify...')
 
-            self.dfev.loc[:, slct_eq + '_lam_plot'] = (
-                            self.dfev['%s_expr_plot'%slct_eq].apply(lambdify))
+            self.dfev.loc[:, slct_eq] = expr_plot.apply(lambdify)
             logger.debug('done.')
 
-        idx = self.model.constrs_cols_neq + ['idx']
-        cols = [c for c in self.dfev.columns
-                if isinstance(c, str)
-                and '_lam_plot' in c]
-        df_lam_plot = self.dfev.set_index(idx).copy()[cols]
+        idx = ['idx']
 
-        col_names = {'level_%d'%(len(self.model.constrs_cols_neq) + 1): 'func',
+        df_lam_plot = self.dfev.set_index(idx).copy()[list_dep_var]
+
+        col_names = {'level_1': 'func',
                      0: 'lambd_func'}
         df_lam_plot = (df_lam_plot.stack().reset_index()
                                   .rename(columns=col_names))
         df_lam_plot = (df_lam_plot.reset_index(drop=True)
                                   .reset_index())
+
+        df_lam_plot = df_lam_plot.join(self.model.df_comb.set_index('idx')[self.model.constrs_cols_neq], on='idx')
         df_lam_plot = df_lam_plot.set_index(self.model.constrs_cols_neq
                                             + ['func', 'idx'])
 
         self.df_lam_plot = df_lam_plot
+
+
+    def _get_func_from_idx(self, x, slct_eq):
+        '''
+        Get result expression corresponding to the selected variable slct_eq.
+
+        From the result set of row x, get the expression corresponding to the
+        selected variable/multiplier slct_eq. This first finds the index
+        of the corresponding expression through comparison with slct_eq and
+        then returns the expression itself.
+        '''
+
+        if (slct_eq in x.variabs_multips and
+            not isinstance(x.result, sp.sets.EmptySet)):
+
+            idx = x.variabs_multips.index(slct_eq)
+            func = x.result[idx]
+
+            return func
+
+# =============================================================================
+# =============================================================================
+
+    def _expand_dfev(self, slct_eq):
+        '''
+        Returns the dfev DataFrame for a single var/mlt slct_eq.
+        '''
+
+        MP_COUNTER.increment()
+
+        df = self.dfev
+
+        get_func = partial(self._get_func_from_idx, slct_eq=slct_eq)
+        if slct_eq != 'tc':
+            df['expr'] = df.apply(get_func, axis=1)
+        else:
+            df['expr'] = df.tc
+
+        df['func'] = slct_eq
+
+        return df[['idx', 'expr', 'func']]
+
+
+    def _call_expand_dfev(self, lst_slct_eq):
+        ''' Note: here the df argument of the parallelization.parallelize_df
+        function is a list of strings, for each of which the whole self.dfev
+        is evaluated. '''
+
+        return [self._expand_dfev(slct_eq) for slct_eq in lst_slct_eq]
+
+
+    def _wrapper_call_expand_dfev(self, lst_slct_eq):
+
+        name, ntot = 'Expand by variable/multiplier', self.nparallel
+        return log_time_progress(self._call_expand_dfev)(self, lst_slct_eq,
+                                                         name, ntot)
+
+# =============================================================================
+# =============================================================================
+
+    def _lambdify(self, expr):
+        ''' Convert sympy expressions to function strings. '''
+
+        return lambdastr(args=self.x_symb, expr=expr, dummify=False)
+
+
+    def _make_hash(self, func_str):
+        ''' Generate function hash from function string. The idea is to avoid
+        multiple definitions of identical functions which return e.g. constant
+        zero.'''
+
+        return '_' + md5(func_str.encode('utf-8')).hexdigest()
+
+
+    def _call_lambdify(self, df):
+
+        df['func_str'] = df.expr.apply(self._lambdify)
+        df['func_hash'] = df.func_str.apply(self._make_hash)
+#        df.func_str = df[['func_str', 'func_hash']](self._replace_func_name)
+#        df['func_hash'] = df.func_name + df.idx.astype(str)#df.func_str.apply(self._make_hash)
+
+        return df
+
+
+    def _wrapper_call_lambdify(self, df):
+
+        name, ntot = 'Lambdify expressions', self.nparallel
+        return log_time_progress(self._call_lambdify)(self, df,
+                                                         name, ntot)
+
+
+    def _replace_func_str_name(self, x):
+        ''' Convert func_str to otop level function strings using the names
+        defined by func_hash. '''
+
+
+        func_str = x.func_str
+        func_hash = x.func_hash
+        x_name_str = self.x_name_str
+
+        func_str_new = ('def ' + func_hash + x_name_str
+                        + ':\n    return' + func_str[len(x_name_str) + 7:])
+
+        return func_str_new
+
+    def _call_evaluate_by_x_new(self, df):
+        return self._evaluate_by_x_new(df, self.df_lam_plot, False)
+
+    def _wrapper_call_evaluate_by_x_new(self, df):
+
+        name, ntot = 'Evaluate', self.nparallel
+        return log_time_progress(self._call_evaluate_by_x_new)(self, df,
+                                                         name, ntot)
+
+
+    def _get_evaluated_lambdas_parallel(self, skip_multipliers=True,
+                                        str_func=True):
+        '''
+        For each dependent variable and total cost get a lambda function
+        evaluated by constant parameters. This subsequently evaluated
+        for all x_pos.
+
+        Generated attributes:
+            - df_lam_plot: Holds all lambda functions for each dependent
+                           variable and each constraint combination.
+        '''
+
+        # df_lam_plot: m.constrs_cols_neq, func('pi_supply_wN_lam_plot'), idx, lambd_func
+        # --> add hash of function string
+
+        dfev = self.dfev
+
+        list_dep_var = self._get_list_dep_var(skip_multipliers)
+
+        self.nparallel = len(list_dep_var)
+        dfev_exp = parallelize_df(list_dep_var, self._wrapper_call_expand_dfev)
+
+        logger.info('Length expanded function DataFrame: %d'%len(dfev_exp))
+
+        self.nparallel = len(dfev_exp)
+        dfev_func_str = parallelize_df(dfev_exp, self._wrapper_call_lambdify)
+
+        logger.info('Starting _replace_func_str_name...')
+        dfev_func_str_unq = (dfev_func_str[['func_hash', 'func_str']]
+                                .drop_duplicates()
+                                .apply(self._replace_func_str_name, axis=1))
+        logger.info('... done')
+
+        logger.info('Number unique function strings: %d'%len(dfev_func_str))
+
+        module_str = '\n'.join(dfev_func_str_unq)
+        module_str = 'from numpy import sqrt\n\n' + module_str
+
+        fn = os.path.abspath(os.path.join(symenergy.__file__, '..', '..',
+                                          'evaluator', 'eval_temp.py'))
+
+        try:
+            os.remove(fn)
+        except Exception as e :
+            logger.debug(e)
+
+        with open(fn , "w") as f:
+            f.write(module_str)
+
+        py_compile.compile(fn)
+
+        import evaluator.eval_temp as eval_temp
+        reload(eval_temp)
+
+        # retrieve eval_temp functions based on hash name
+        dfev_func_str['lambd_func'] = (dfev_func_str.func_hash
+                                            .apply(lambda x: getattr(eval_temp,
+                                                                     x)))
+
+        dfev_func_str = dfev_func_str.join(self.model.df_comb.set_index('idx')[
+                                    self.model.constrs_cols_neq], on='idx')
+
+
+
+
+
+        # keeping pos cols to sanitize zero equality constraints
+        cols_pos = self.model.constraints('col', is_positivity_constraint=True)
+
+        # keeping cap cols to sanitize cap equality constraints
+        cols_cap = self.model.constraints('col', is_capacity_constraint=True)
+
+        keep_cols = (['func', 'lambd_func', 'idx'] + cols_pos + cols_cap)
+        df_lam_plot = dfev_func_str.reset_index()[keep_cols]
+
+        self.df_lam_plot = self._init_constraints_active(df_lam_plot)
+
+
+
+
+        # =============================================================================
+        # Identify groupby columns to get closest to nchunks
+        # =============================================================================
+        nthreads = get_default_nthreads()
+        nchunks = 2 * nthreads
+
+        param_combs = \
+            itertools.chain.from_iterable(itertools.combinations(self.x_vals, i)
+                                          for i in range(1, len(self.x_vals) + 1))
+        len_param_combs = {params: np.prod(list(len(self.x_vals[par])
+                                                for par in params))
+                           for params in param_combs}
+
+        dev_param_combs = {key: abs((len_ - nchunks) / nchunks)
+                           for key, len_ in len_param_combs.items()}
+
+        group_params = min(dev_param_combs, key=lambda x: dev_param_combs[x])
+        group_params = list(map(lambda x: x.name, group_params))
+
+
+        df_split = [df for _, df in (self.df_x_vals.groupby(group_params))]
+
+        t = time.time()
+        self.df_exp = parallelize_df(df=df_split, func=self._wrapper_call_evaluate_by_x_new)
+        print(time.time() - t)
+
+        self._map_func_to_slot()
+#
+#
+#
+#
+#        for slct_eq in list_dep_var:
+#
+#            logger.info('Generating lambda functions for %s.'%slct_eq)
+#
+#            if slct_eq != 'tc':
+#                # function index depends on constraint, since not all constraints
+#                # contain the same functions; i.e., variabs_multips are
+#                # not always the same; tc is a separate column already,
+#                # therefore not applicable
+#                get_func = partial(self._get_func_from_idx, slct_eq=slct_eq)
+#                expr = dfev.apply(get_func, axis=1)
+#            else:
+#                expr = dfev.tc
+#
+#            logger.debug('substituting...')
+#
+#            # sympy expressions with substituted parameter values
+#            expr_subs = expr.apply(self._subs_param_values)
+#
+#
+#
+#            logger.debug('lambdify...')
+#
+#            lam_plot = expr_subs.apply(lambdify)
+#            logger.debug('done.')
+#
+#        idx = self.model.constrs_cols_neq + ['idx']
+#        cols = [c for c in self.dfev.columns
+#                if isinstance(c, str)
+#                and '_lam_plot' in c]
+#        df_lam_plot = self.dfev.set_index(idx).copy()[cols]
+#
+#        col_names = {'level_%d'%(len(self.model.constrs_cols_neq) + 1): 'func',
+#                     0: 'lambd_func'}
+#        df_lam_plot = (df_lam_plot.stack().reset_index()
+#                                  .rename(columns=col_names))
+#        df_lam_plot = (df_lam_plot.reset_index(drop=True)
+#                                  .reset_index())
+#        df_lam_plot = df_lam_plot.set_index(self.model.constrs_cols_neq
+#                                            + ['func', 'idx'])
+#
+#        self.df_lam_plot = df_lam_plot
+
 
 
 
@@ -185,26 +463,21 @@ class Evaluator():
                             columns=[col.name for col in self.x_vals.keys()])
 
 
-    def _get_func_from_idx(self, x, slct_eq):
-        '''
-        Get result expression corresponding to the selected variable slct_eq.
 
-        From the result set of row x, get the expression corresponding to the
-        selected variable/multiplier slct_eq. This first finds the index
-        of the corresponding expression through comparison with slct_eq and
-        then returns the expression itself.
-        '''
+    def _get_param_values(self):
+        ''' Initialize dict attribute defining fixed parameter values, i.e. of
+        all parameters not in `self.x_vals`. '''
 
-        mv_list_str = [var.name for var in x.variabs_multips]
+        model = self.model
+        x_vals = self.x_vals
 
-        if (slct_eq in mv_list_str and
-            not isinstance(x.result, sp.sets.EmptySet)):
+        dict_param_values = model.parameters.to_dict({'symb': 'value'})
 
-            idx = mv_list_str.index(slct_eq)
+        dict_param_values = {kk: vv for kk, vv in dict_param_values.items()
+                             if not kk in [x.symb for x in x_vals]}
 
-            func = x.result[idx]
+        return dict_param_values
 
-            return func
 
     def _subs_param_values(self, x):
         '''
@@ -215,11 +488,7 @@ class Evaluator():
         if isinstance(x, float) and np.isnan(x):
             return np.nan
         else:
-            x_ret = x.subs({kk: vv for kk, vv
-                            in self.dict_param_values.items()
-                            if not kk in [select_x.symb
-                                          for select_x
-                                          in self.x_vals.keys()]})
+            x_ret = x.subs(self.dict_param_values)
             return x_ret
 
 
@@ -241,20 +510,20 @@ class Evaluator():
 #
 #        return pd.Series(y_vals, index=pd.Index(x_vals))
 
-    def _evaluate(self, df):
-        '''
-        Input dataframe:
-            df[['func', 'const_comb', 'lambd', 'self.x_name[0]', ...]]
-        Returns expanded data for all rows in the input dataframe.
-        '''
-
-
-        x_dict = df.iloc[0].loc[self.x_name].to_dict()
-
-        def process(x, report=None):
-            return x.lambd_func(**x_dict)
-
-        return df.apply(process, axis=1)
+#    def _evaluate(self, df):
+#        '''
+#        Input dataframe:
+#            df[['func', 'const_comb', 'lambd', 'self.x_name[0]', ...]]
+#        Returns expanded data for all rows in the input dataframe.
+#        '''
+#
+#
+#        x_dict = df.iloc[0].loc[self.x_name].to_dict()
+#
+#        def process(x, report=None):
+#            return x.lambd_func(**x_dict)
+#
+#        return df.apply(process, axis=1)
 
 
     def _get_mask_valid_solutions(self, df):
@@ -283,7 +552,9 @@ class Evaluator():
         return mask_valid
 
 
-    def call_evaluate_by_x_new(self, df_x, df_lam, verbose):
+    def _evaluate_by_x_new(self, df_x, df_lam, verbose):
+
+        MP_COUNTER.increment()
 
         t = time.time()
 
@@ -303,13 +574,14 @@ class Evaluator():
         df_result = df_result.reset_index().join(df_lam.set_index(ind)[cols],
                                                  on=ind)
 
-        def sanitize_unexpected_zeros(df):
-            map_col_func = self.model.constraints(('col', 'base_name'),
-                                              is_positivity_constraint=True)
+        map_col_func = \
+            self.model.constraints(('col', 'base_name'),
+                                   is_positivity_constraint=True)
+
+        def sanitize_unexpected_zeros(df_result):
             for col, func in map_col_func:
-                df.loc[(df.func == func + '_lam_plot')
-                       & (df[col] != 1)
-                       & (df['lambd'] == 0), 'lambd'] = np.nan
+                df_result.loc[(df_result.func == func) & (df_result[col] != 1)
+                            & (df_result['lambd'] == 0), 'lambd'] = np.nan
 
         sanitize_unexpected_zeros(df_result)
 
@@ -334,23 +606,19 @@ class Evaluator():
         '''
 
         # keeping pos cols to sanitize zero equality constraints
-        constrs_cols_pos = self.model.constraints('col',
-                                                  is_positivity_constraint=True)
+        cols_pos = self.model.constraints('col', is_positivity_constraint=True)
 
         # keeping cap cols to sanitize cap equality constraints
-        constrs_cols_cap = self.model.constraints('col',
-                                                  is_capacity_constraint=True)
+        cols_cap = self.model.constraints('col', is_capacity_constraint=True)
 
-        keep_cols = (['func', 'lambd_func', 'idx']
-                     + constrs_cols_pos + constrs_cols_cap)
+        keep_cols = (['func', 'lambd_func', 'idx'] + cols_pos + cols_cap)
         df_lam_plot = self.df_lam_plot.reset_index()[keep_cols]
-
 
         df_lam_plot = self._init_constraints_active(df_lam_plot)
 
         df_x = self.df_x_vals
         df_lam = df_lam_plot
-        df_exp_0 = self.call_evaluate_by_x_new(df_x, df_lam, verbose)
+        df_exp_0 = self._evaluate_by_x_new(df_x, df_lam, verbose)
         df_exp_0 = df_exp_0.reset_index(drop=True)
 
         self.df_exp = df_exp_0
@@ -359,24 +627,21 @@ class Evaluator():
 
         self._map_func_to_slot()
 
+
     def _init_constraints_active(self, df):
         '''
         Create binary columns depending on whether the plant constraints
         are active or not.
         '''
 
-        get_var = lambda x: x.split('_lam_')[0]
         set_constr = lambda x, lst: (1 if x in map(str, getattr(self, lst))
                                      else 0)
 
         lst = 'is_positive'
         for lst in ['is_positive']:
 
-            constr_act = (df.func.apply(get_var)
-                                 .apply(lambda x: set_constr(x, lst)))
+            constr_act = (df.func.apply(lambda x: set_constr(x, lst)))
             df[lst] = constr_act
-
-            df[[lst, 'func']].drop_duplicates()
 
         return df
 
@@ -404,7 +669,7 @@ class Evaluator():
 #            C, pp = dict_cap[0]
             for C, pp in dict_cap:
 
-                slct_func = ['%s_lam_plot'%symb.name for symb in pp]
+                slct_func = [symb.name for symb in pp]
 
                 mask_slct_func = df.func.isin(slct_func)
 
@@ -508,7 +773,7 @@ class Evaluator():
         df_bal.loc[df_bal.func_no_slot.isin(varpar_neg), 'lambd'] *= -1
 
         # negative by func
-        varpar_neg = [store.name + '_p' + chgdch + '_' + slot_name + '_lam_plot'
+        varpar_neg = [store.name + '_p' + chgdch + '_' + slot_name
                       for store in self.model.storages.values()
                       for chgdch, slots_names in store.slots_map.items()
                       for slot_name in slots_names if chgdch == 'chg']
@@ -522,7 +787,7 @@ class Evaluator():
         ''' Adds cost optimum column to the expanded dataframe. '''
 
         cols = ['lambd', 'idx'] + self.x_name
-        tc = df_result.loc[(df_result.func == 'tc_lam_plot')
+        tc = df_result.loc[(df_result.func == 'tc')
                            & df_result.mask_valid, cols].copy()
 
         if not tc.empty:
@@ -577,7 +842,7 @@ class Evaluator():
                                     if ss in func])
                     for func in func_list}
 
-        func_map = {func: func.replace('_None', '').replace(slot + '_lam_plot', '')
+        func_map = {func: func.replace('_None', '').replace(slot, '')
                     for func, slot in slot_map.items()}
         func_map = {func: func_new[:-1] if func_new.endswith('_') else func_new
                     for func, func_new in func_map.items()}
