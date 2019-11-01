@@ -1,14 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Tue Sep 10 18:32:48 2019
-
-@author: user
-"""
-
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
 Tests for constraint combination expansion.
 
 """
@@ -102,7 +94,7 @@ class TestSingleAssets(unittest.TestCase, UpDown):
         m = ModelMakerSingleAsset('plant_no_cap', 2).get_model()
         plant = m.comps['n']
 
-        dict_me = plant.MUTUALLY_EXCLUSIVE
+        dict_me = plant.mutually_exclusive
 
         mename = 'Power plant output not simult. max end zero'
         list_cstrs = dict_me[mename]
@@ -115,7 +107,7 @@ class TestSingleAssets(unittest.TestCase, UpDown):
         m = ModelMakerSingleAsset('plant', 2).get_model()
         plant = m.comps['n']
 
-        dict_me = plant.MUTUALLY_EXCLUSIVE
+        dict_me = plant.mutually_exclusive
 
         mename = 'Power plant output not simult. max end zero'
         list_cstrs = dict_me[mename]
@@ -134,7 +126,7 @@ class TestSingleAssets(unittest.TestCase, UpDown):
         m = ModelMakerSingleAsset('storage_no_cap_all_slots', 2).get_model()
         plant = m.comps['phs']
 
-        dict_me = plant.MUTUALLY_EXCLUSIVE
+        dict_me = plant.mutually_exclusive
 
         mename = 'Empty storage stays empty w/o charging_0'
         list_cstrs = dict_me[mename]
