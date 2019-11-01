@@ -246,7 +246,7 @@ class Model:
         self.plants.update({name: Plant(name, **kwargs)})
 
 
-    @_update_component_list
+    # note: no _update_component_list since slots alone make no model
     @_check_component_replacement
     def add_slot(self, name, *args, **kwargs):
 
@@ -568,18 +568,6 @@ class Model:
 # =============================================================================
 # =============================================================================
 
-    def generate_total_costs(self):
-        '''
-        Substitute result variable expressions into total costs
-        '''
-
-        df = self.df_comb[['result', 'variabs_multips', 'idx']]
-
-        if not self.nthreads:
-            self.df_comb['tc'] = self.call_subs_tc(df)
-        else:
-            func = self.wrapper_call_subs_tc
-            self.df_comb['tc'] = parallelize_df(df, func, self.nthreads)
 
     def subs_total_cost(self, x):
         '''
@@ -587,7 +575,7 @@ class Model:
         This expresses the total cost as a function of the parameters.
         '''
 
-        res, var, idx = x.result, x.variabs_multips, x.idx
+        res, var = x.result, x.variabs_multips
 
         dict_var = {var: res[ivar]
                     if not isinstance(res, sp.sets.EmptySet)
@@ -609,6 +597,21 @@ class Model:
         name = 'Substituting total cost'
         ntot = self.nress
         return log_time_progress(self.call_subs_tc)(self, df, name, ntot)
+
+
+    def generate_total_costs(self):
+        '''
+        Substitute result variable expressions into total costs
+        '''
+
+        df = self.df_comb[['result', 'variabs_multips', 'idx']]
+
+        if not self.nthreads:
+            self.df_comb['tc'] = self.call_subs_tc(df)
+        else:
+            func = self.wrapper_call_subs_tc
+            self.df_comb['tc'] = parallelize_df(df, func, self.nthreads)
+
 
 # =============================================================================
 # =============================================================================
