@@ -7,8 +7,8 @@ Part of symenergy. Copyright 2018 authors listed in AUTHORS.
 """
 
 import multiprocessing
-from multiprocessing import Process, Value, Lock
-import numpy
+from multiprocessing import Value, Lock
+import numpy as np
 import pandas as pd
 import itertools
 import time
@@ -107,7 +107,7 @@ def parallelize_df(df, func, *args, nthreads='default', concat=True, **kwargs):
 
     pool.close()
     pool.join()
-    logger.info('parallelize_df: concatenating ... ')
+
     if isinstance(results[0], (list, tuple)):
         logger.info('parallelize_df: chaining ... ')
         results = list(itertools.chain.from_iterable(results))
