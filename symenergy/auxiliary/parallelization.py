@@ -16,9 +16,6 @@ from symenergy import _get_logger
 
 logger = _get_logger(__name__)
 
-try:
-    from pathos.multiprocessing import ProcessingPool as Pool
-except Exception as e: logger.info(e)
 
 class Counter():
     def __init__(self):
@@ -74,7 +71,7 @@ def log_time_progress(f):
     return wrapper
 
 
-def parallelize_df(df, func, *args, nthreads='default', use_pathos=False, **kwargs):
+def parallelize_df(df, func, *args, nthreads='default', concat=True, **kwargs):
     MP_COUNTER.reset()
     MP_EMA.reset()
 
@@ -85,21 +82,15 @@ def parallelize_df(df, func, *args, nthreads='default', use_pathos=False, **kwar
     nchunks = min(nthreads * 2, len(df))
 
     df_split = numpy.array_split(df, nchunks)
-    if use_pathos:
-        pool = Pool(nthreads)
-        results = pool.map(func, df_split, **kwargs)
+
+    pool = multiprocessing.Pool(nthreads)
+    if args:
+        results = pool.starmap(func, itertools.product(df_split, args))
     else:
-        pool = multiprocessing.Pool(nthreads)
-        if args:
-#            print((df_split, args))
-            results = pool.starmap(func, itertools.product(df_split, args))
-        else:
-            results = pool.map(func, df_split)
+        results = pool.map(func, df_split)
+
     pool.close()
     pool.join()
-    if use_pathos:
-        pool.clear()
-        pool.restart()
     logger.info('parallelize_df: concatenating ... ')
     if isinstance(results[0], (list, tuple)):
         result = list(itertools.chain.from_iterable(results))
