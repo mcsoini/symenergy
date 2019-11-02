@@ -261,8 +261,6 @@ class Evaluator():
 
         df['func_str'] = df.expr.apply(self._lambdify)
         df['func_hash'] = df.func_str.apply(self._make_hash)
-#        df.func_str = df[['func_str', 'func_hash']](self._replace_func_name)
-#        df['func_hash'] = df.func_name + df.idx.astype(str)#df.func_str.apply(self._make_hash)
 
         return df
 
@@ -291,11 +289,12 @@ class Evaluator():
     def _call_evaluate_by_x_new(self, df):
         return self._evaluate_by_x_new(df, self.df_lam_plot, False)
 
+
     def _wrapper_call_evaluate_by_x_new(self, df):
 
         name, ntot = 'Evaluate', self.nparallel
         return log_time_progress(self._call_evaluate_by_x_new)(self, df,
-                                                         name, ntot)
+                                                               name, ntot)
 
 
     def _get_evaluated_lambdas_parallel(self, skip_multipliers=True,
@@ -309,11 +308,6 @@ class Evaluator():
             - df_lam_plot: Holds all lambda functions for each dependent
                            variable and each constraint combination.
         '''
-
-        # df_lam_plot: m.constrs_cols_neq, func('pi_supply_wN_lam_plot'), idx, lambd_func
-        # --> add hash of function string
-
-        dfev = self.dfev
 
         list_dep_var = self._get_list_dep_var(skip_multipliers)
 
@@ -405,53 +399,6 @@ class Evaluator():
         print(time.time() - t)
 
         self._map_func_to_slot()
-#
-#
-#
-#
-#        for slct_eq in list_dep_var:
-#
-#            logger.info('Generating lambda functions for %s.'%slct_eq)
-#
-#            if slct_eq != 'tc':
-#                # function index depends on constraint, since not all constraints
-#                # contain the same functions; i.e., variabs_multips are
-#                # not always the same; tc is a separate column already,
-#                # therefore not applicable
-#                get_func = partial(self._get_func_from_idx, slct_eq=slct_eq)
-#                expr = dfev.apply(get_func, axis=1)
-#            else:
-#                expr = dfev.tc
-#
-#            logger.debug('substituting...')
-#
-#            # sympy expressions with substituted parameter values
-#            expr_subs = expr.apply(self._subs_param_values)
-#
-#
-#
-#            logger.debug('lambdify...')
-#
-#            lam_plot = expr_subs.apply(lambdify)
-#            logger.debug('done.')
-#
-#        idx = self.model.constrs_cols_neq + ['idx']
-#        cols = [c for c in self.dfev.columns
-#                if isinstance(c, str)
-#                and '_lam_plot' in c]
-#        df_lam_plot = self.dfev.set_index(idx).copy()[cols]
-#
-#        col_names = {'level_%d'%(len(self.model.constrs_cols_neq) + 1): 'func',
-#                     0: 'lambd_func'}
-#        df_lam_plot = (df_lam_plot.stack().reset_index()
-#                                  .rename(columns=col_names))
-#        df_lam_plot = (df_lam_plot.reset_index(drop=True)
-#                                  .reset_index())
-#        df_lam_plot = df_lam_plot.set_index(self.model.constrs_cols_neq
-#                                            + ['func', 'idx'])
-#
-#        self.df_lam_plot = df_lam_plot
-
 
 
 
@@ -494,40 +441,6 @@ class Evaluator():
         else:
             x_ret = x.subs(self.dict_param_values)
             return x_ret
-
-
-#    def _get_expanded_row(self, lam_plot, x_vals):
-#        '''
-#        Apply single lambda function/row to the self.x_vals.
-#
-#        Input parameters:
-#            * lam_plot -- Single row of the self.df_lam_plot dataframe.
-#
-#        Return values:
-#            * Series with y values
-#        '''
-#
-#        y_vals = [lam_plot.iloc[0](*val_row) for val_row in x_vals]
-#
-#        if isinstance(y_vals, float):
-#            y_vals = np.ones(len(x_vals)) * y_vals
-#
-#        return pd.Series(y_vals, index=pd.Index(x_vals))
-
-#    def _evaluate(self, df):
-#        '''
-#        Input dataframe:
-#            df[['func', 'const_comb', 'lambd', 'self.x_name[0]', ...]]
-#        Returns expanded data for all rows in the input dataframe.
-#        '''
-#
-#
-#        x_dict = df.iloc[0].loc[self.x_name].to_dict()
-#
-#        def process(x, report=None):
-#            return x.lambd_func(**x_dict)
-#
-#        return df.apply(process, axis=1)
 
 
     def _get_mask_valid_solutions(self, df):
