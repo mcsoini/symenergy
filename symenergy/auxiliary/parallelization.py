@@ -16,6 +16,7 @@ from symenergy import _get_logger
 
 logger = _get_logger(__name__)
 
+CHUNKS_PER_THREAD = 2
 
 class Counter():
     def __init__(self):
@@ -71,22 +72,22 @@ def log_time_progress(f):
     return wrapper
 
 
-def get_default_nthreads():
+def get_default_nthreads(nthreads='default'):
 
-    return multiprocessing.cpu_count() - 1
+    if nthreads == 'default':
+        return multiprocessing.cpu_count() - 1
+    else:
+        return nthreads
 
 
 def parallelize_df(df, func, *args, nthreads='default', concat=True, **kwargs):
     MP_COUNTER.reset()
     MP_EMA.reset()
 
-    if nthreads == 'default':
-        nthreads = get_default_nthreads()
-
-    nthreads = min(nthreads, len(df))
+    nthreads = min(get_default_nthreads(nthreads), len(df))
 
     def split(df_):
-        nchunks = min(nthreads * 2, len(df_))
+        nchunks = min(nthreads * CHUNKS_PER_THREAD, len(df_))
         return np.array_split(df, nchunks)
 
     if isinstance(df, (pd.DataFrame, pd.Series)):
@@ -101,6 +102,7 @@ def parallelize_df(df, func, *args, nthreads='default', concat=True, **kwargs):
 
     pool = multiprocessing.Pool(nthreads)
     if args:
+        raise RuntimeError('error')
         results = pool.starmap(func, itertools.product(df_split, args))
     else:
         results = pool.map(func, df_split)

@@ -6,6 +6,8 @@ Contains the Evaluator class.
 Part of symenergy. Copyright 2018 authors listed in AUTHORS.
 """
 import os
+import sys
+import gc
 import py_compile
 import sympy as sp
 import numpy as np
@@ -21,7 +23,7 @@ import symenergy
 from symenergy.auxiliary.parallelization import parallelize_df
 from symenergy.auxiliary.parallelization import log_time_progress
 from symenergy.auxiliary.parallelization import get_default_nthreads
-from symenergy.auxiliary.parallelization import MP_COUNTER, MP_EMA
+from symenergy.auxiliary.parallelization import MP_COUNTER, MP_EMA, CHUNKS_PER_THREAD
 
 from symenergy.core.model import Model
 from symenergy import _get_logger
@@ -62,6 +64,15 @@ class Evaluator():
         # attribute name must match self.df_exp columns name
         self.is_positive = \
             self.model.constraints('expr_0', is_positivity_constraint=True)
+
+        self.fn_temp = os.path.abspath(os.path.join(symenergy.__file__, '..', '..',
+                                          'evaluator', 'eval_temp.py'))
+
+        try:
+            os.remove(self.fn_temp)
+        except Exception as e :
+            logger.debug(e)
+
 
 #        self._get_evaluated_lambdas()
 
@@ -254,7 +265,8 @@ class Evaluator():
         multiple definitions of identical functions which return e.g. constant
         zero.'''
 
-        return '_' + md5(func_str.encode('utf-8')).hexdigest()
+        salt = str(time.time())
+        return '_' + md5((func_str + salt).encode('utf-8')).hexdigest()
 
 
     def _call_lambdify(self, df):
@@ -271,11 +283,26 @@ class Evaluator():
         return log_time_progress(self._call_lambdify)(self, df,
                                                          name, ntot)
 
+# =============================================================================
+# =============================================================================
+
+    def _call_evaluate_by_x_new(self, df):
+        return self._evaluate_by_x_new(df, False)
+
+
+    def _wrapper_call_evaluate_by_x_new(self, df):
+
+        name, ntot = 'Evaluate', self.nparallel
+        return log_time_progress(self._call_evaluate_by_x_new)(self, df,
+                                                               name, ntot)
+
+
+# =============================================================================
+# =============================================================================
 
     def _replace_func_str_name(self, x):
-        ''' Convert func_str to otop level function strings using the names
+        ''' Convert func_str to top level function strings using the names
         defined by func_hash. '''
-
 
         func_str = x.func_str
         func_hash = x.func_hash
@@ -285,16 +312,6 @@ class Evaluator():
                         + ':\n    return' + func_str[len(x_name_str) + 7:])
 
         return func_str_new
-
-    def _call_evaluate_by_x_new(self, df):
-        return self._evaluate_by_x_new(df, self.df_lam_plot, False)
-
-
-    def _wrapper_call_evaluate_by_x_new(self, df):
-
-        name, ntot = 'Evaluate', self.nparallel
-        return log_time_progress(self._call_evaluate_by_x_new)(self, df,
-                                                               name, ntot)
 
 
     def _get_evaluated_lambdas_parallel(self, skip_multipliers=True,
@@ -308,6 +325,13 @@ class Evaluator():
             - df_lam_plot: Holds all lambda functions for each dependent
                            variable and each constraint combination.
         '''
+
+        try:
+            del self.df_lam_plot
+        except: pass
+        try:
+            del sys.modules['evaluator.eval_temp']
+        except: pass
 
         list_dep_var = self._get_list_dep_var(skip_multipliers)
 
@@ -330,53 +354,32 @@ class Evaluator():
         module_str = '\n'.join(dfev_func_str_unq)
         module_str = 'from numpy import sqrt\n\n' + module_str
 
-        fn = os.path.abspath(os.path.join(symenergy.__file__, '..', '..',
-                                          'evaluator', 'eval_temp.py'))
-
-        try:
-            os.remove(fn)
-        except Exception as e :
-            logger.debug(e)
-
-        with open(fn , "w") as f:
+        with open(self.fn_temp , "w") as f:
             f.write(module_str)
 
-        py_compile.compile(fn)
+        py_compile.compile(self.fn_temp)
 
-        import evaluator.eval_temp as eval_temp
-        reload(eval_temp)
+        et = __import__('eval_temp', level=1, globals={"__name__": __name__})
 
         # retrieve eval_temp functions based on hash name
-        dfev_func_str['lambd_func'] = (dfev_func_str.func_hash
-                                            .apply(lambda x: getattr(eval_temp,
-                                                                     x)))
+        dfev_func_str['lambd_func'] = (
+            dfev_func_str.func_hash.apply(lambda x: getattr(et, x)))
+
 
         dfev_func_str = dfev_func_str.join(self.model.df_comb.set_index('idx')[
                                     self.model.constrs_cols_neq], on='idx')
 
 
+        self.df_lam_plot = dfev_func_str
 
 
+    def _get_optimum_group_params(self, nchunks):
+        '''
+        Identify groupby columns to get closest to nchunks.
 
-        # keeping pos cols to sanitize zero equality constraints
-        cols_pos = self.model.constraints('col', is_positivity_constraint=True)
-
-        # keeping cap cols to sanitize cap equality constraints
-        cols_cap = self.model.constraints('col', is_capacity_constraint=True)
-
-        keep_cols = (['func', 'lambd_func', 'idx'] + cols_pos + cols_cap)
-        df_lam_plot = dfev_func_str.reset_index()[keep_cols]
-
-        self.df_lam_plot = self._init_constraints_active(df_lam_plot)
-
-
-
-
-        # =============================================================================
-        # Identify groupby columns to get closest to nchunks
-        # =============================================================================
-        nthreads = get_default_nthreads()
-        nchunks = 2 * nthreads
+        evaluate_by_x must be applied to full sets of constraint
+        combinations, since constraint combinations are to be compared.
+        '''
 
         param_combs = \
             itertools.chain.from_iterable(itertools.combinations(self.x_vals, i)
@@ -391,12 +394,55 @@ class Evaluator():
         group_params = min(dev_param_combs, key=lambda x: dev_param_combs[x])
         group_params = list(map(lambda x: x.name, group_params))
 
+        return group_params
 
-        df_split = [df for _, df in (self.df_x_vals.groupby(group_params))]
+
+    def expand_to_x_vals_parallel(self):
+
+        # keeping pos cols to sanitize zero equality constraints
+        cols_pos = self.model.constraints('col', is_positivity_constraint=True)
+
+        # keeping cap cols to sanitize cap equality constraints
+        cols_cap = self.model.constraints('col', is_capacity_constraint=True)
+
+        keep_cols = (['func', 'lambd_func', 'idx'] + cols_pos + cols_cap)
+        self.df_lam_plot = self.df_lam_plot.reset_index()[keep_cols]
+
+        self.df_lam_plot = self._init_constraints_active(self.df_lam_plot)
+
+
+
+
+
+        df_x = self.df_x_vals
+        df_lam = self.df_lam_plot
 
         t = time.time()
-        self.df_exp = parallelize_df(df=df_split, func=self._wrapper_call_evaluate_by_x_new)
-        print(time.time() - t)
+
+        df_result = (df_lam.groupby(['func', 'idx'])
+                           .lambd_func
+                           .apply(self._eval, df_x=df_x))
+        df_result = df_result.rename(columns={0: 'lambd'})
+        print('Time pure eval', time.time() - t,
+              'length df_lam', len(df_lam),
+              'length df_x', len(df_x),
+              flush=True)
+
+        cols = [c for c in df_lam.columns if c.startswith('act_')] + ['is_positive']
+        ind = ['func', 'idx']
+        df_result = df_result.reset_index().join(df_lam.set_index(ind)[cols],
+                                                 on=ind)
+
+
+        nchunks = get_default_nthreads() * CHUNKS_PER_THREAD
+        group_params = self._get_optimum_group_params(nchunks=nchunks)
+
+        df_split = [df for _, df in (df_result.groupby(group_params))]
+
+
+        self.nparallel = len(df_split)
+        self.df_exp = parallelize_df(df=df_split,
+                                     func=self._wrapper_call_evaluate_by_x_new)
 
         self._map_func_to_slot()
 
@@ -469,27 +515,19 @@ class Evaluator():
         return mask_valid
 
 
-    def _evaluate_by_x_new(self, df_x, df_lam, verbose):
+    def _eval(self, func, df_x):
+
+        new_index = df_x.set_index(df_x.columns.tolist()).index
+        data = func.iloc[0](*df_x.values.T)
+        if not isinstance(data, np.ndarray):  # constant value --> expand
+            data = np.ones(df_x.iloc[:, 0].values.shape) * data
+        return pd.DataFrame(data, index=new_index)
+
+
+    def _evaluate_by_x_new(self, df_result, verbose):
 
         MP_COUNTER.increment()
 
-        t = time.time()
-
-        new_index = df_x.set_index(df_x.columns.tolist()).index
-
-        def _eval(func):
-            data = func.iloc[0](*df_x.values.T)
-            if not isinstance(data, np.ndarray):  # constant value --> expand
-                data = np.ones(df_x.iloc[:, 0].values.shape) * data
-            return pd.DataFrame(data, index=new_index)
-
-        df_result = df_lam.groupby(['func', 'idx']).lambd_func.apply(_eval)
-        df_result = df_result.rename(columns={0: 'lambd'})
-
-        cols = [c for c in df_lam.columns if c.startswith('act_')] + ['is_positive']
-        ind = ['func', 'idx']
-        df_result = df_result.reset_index().join(df_lam.set_index(ind)[cols],
-                                                 on=ind)
 
         map_col_func = \
             self.model.constraints(('col', 'base_name'),
@@ -510,8 +548,6 @@ class Evaluator():
         if self.drop_non_optimum:
             df_result = df_result.loc[df_result.is_optimum]
 
-        if verbose:
-            logger.info(time.time() - t)
         return df_result
 
 
@@ -533,9 +569,28 @@ class Evaluator():
 
         df_lam_plot = self._init_constraints_active(df_lam_plot)
 
+
         df_x = self.df_x_vals
         df_lam = df_lam_plot
-        df_exp_0 = self._evaluate_by_x_new(df_x, df_lam, verbose)
+
+        t = time.time()
+
+        df_result = (df_lam.groupby(['func', 'idx'])
+                           .lambd_func
+                           .apply(self._eval, df_x=df_x))
+        df_result = df_result.rename(columns={0: 'lambd'})
+        print('Time pure eval', time.time() - t,
+              'length df_lam', len(df_lam),
+              'length df_x', len(df_x),
+              flush=True)
+
+        cols = [c for c in df_lam.columns if c.startswith('act_')] + ['is_positive']
+        ind = ['func', 'idx']
+        df_result = df_result.reset_index().join(df_lam.set_index(ind)[cols],
+                                                 on=ind)
+
+
+        df_exp_0 = self._evaluate_by_x_new(df_result, True)
         df_exp_0 = df_exp_0.reset_index(drop=True)
 
         self.df_exp = df_exp_0

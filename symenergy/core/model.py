@@ -562,8 +562,8 @@ class Model:
             self.df_comb['result'] = self.call_solve_df(self.df_comb)
         else:
             func = self.wrapper_call_solve_df
-            self.df_comb['result'] = parallelize_df(self.df_comb,
-                                                    func, self.nthreads)
+            self.df_comb['result'] = parallelize_df(self.df_comb, func,
+                                                    nthreads=self.nthreads)
 
 # =============================================================================
 # =============================================================================
@@ -610,7 +610,8 @@ class Model:
             self.df_comb['tc'] = self.call_subs_tc(df)
         else:
             func = self.wrapper_call_subs_tc
-            self.df_comb['tc'] = parallelize_df(df, func, self.nthreads)
+            self.df_comb['tc'] = parallelize_df(df, func,
+                                                nthreads=self.nthreads)
 
 
 # =============================================================================
@@ -773,7 +774,8 @@ class Model:
         else:
             func = self.wrapper_call_construct_lagrange
             nthreads = self.nthreads
-            self.df_comb['lagrange'] = parallelize_df(df, func, nthreads)
+            self.df_comb['lagrange'] = parallelize_df(df, func,
+                                                      nthreads=nthreads)
 
         logger.info('Getting selected variables/multipliers...')
         df = self.df_comb.lagrange
@@ -783,7 +785,8 @@ class Model:
         else:
             func = self.wrapper_call_get_variabs_multips_slct
             nthreads = self.nthreads
-            self.df_comb['variabs_multips'] = parallelize_df(df, func, nthreads)
+            self.df_comb['variabs_multips'] = parallelize_df(df, func,
+                                                             nthreads=nthreads)
 
         # get index
         self.df_comb = self.df_comb[[c for c in self.df_comb.columns
@@ -943,7 +946,8 @@ class Model:
         else:
             func = self.wrapper_call_fix_linear_dependencies
             nthreads = self.nthreads
-            self.df_comb['result'] = parallelize_df(self.df_comb, func, nthreads)
+            self.df_comb['result'] = parallelize_df(self.df_comb, func,
+                                                    nthreads=nthreads)
 
 
     def print_results(self, df, idx):
