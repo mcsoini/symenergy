@@ -425,12 +425,12 @@ class Evaluator():
 
         self.df_lam_plot = self._init_constraints_active(self.df_lam_plot)
 
-        logger.INFO('_call_eval')
+        logger.info('_call_eval')
         self.nparallel = len(self.df_lam_plot)
         df_result = parallelize_df(df=self.df_lam_plot[['func', 'idx', 'lambd_func']],
                                    func=self._wrapper_call_eval)
         df_result = df_result.rename(columns={0: 'lambd'})
-        logger.INFO('done _call_eval')
+        logger.info('done _call_eval')
 
 
         cols = [c for c in self.df_lam_plot.columns if c.startswith('act_')] + ['is_positive']
@@ -444,12 +444,12 @@ class Evaluator():
 
         df_split = [df for _, df in (df_result.groupby(group_params))]
 
-        logger.INFO('_wrapper_call_evaluate_by_x_new')
+        logger.info('_wrapper_call_evaluate_by_x_new')
         self.nparallel = len(df_split)
         self.df_exp = parallelize_df(df=df_split,
                                      func=self._wrapper_call_evaluate_by_x_new)
 
-        logger.INFO('done _wrapper_call_evaluate_by_x_new')
+        logger.info('done _wrapper_call_evaluate_by_x_new')
 
         self._map_func_to_slot()
 
