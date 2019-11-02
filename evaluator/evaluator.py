@@ -397,40 +397,45 @@ class Evaluator():
         return group_params
 
 
+    def _call_eval(self, df):
+
+        if __name__ == '__main__':
+            df = self.df_lam_plot[['idx', 'func', 'lambd_func']]
+
+        df_result = (df.groupby(['func', 'idx'])
+                        .lambd_func
+                        .apply(self._eval, df_x=self.df_x_vals))
+
+        return df_result
+
+
+    def _wrapper_call_eval(self, df):
+
+        name, ntot = 'Vectorized evaluation', self.nparallel
+        return log_time_progress(self._call_eval)(self, df, name, ntot)
+
+
     def expand_to_x_vals_parallel(self):
 
-        # keeping pos cols to sanitize zero equality constraints
+        # keeping pos and cap cols to sanitize zero equality constraints
         cols_pos = self.model.constraints('col', is_positivity_constraint=True)
-
-        # keeping cap cols to sanitize cap equality constraints
         cols_cap = self.model.constraints('col', is_capacity_constraint=True)
-
         keep_cols = (['func', 'lambd_func', 'idx'] + cols_pos + cols_cap)
         self.df_lam_plot = self.df_lam_plot.reset_index()[keep_cols]
 
         self.df_lam_plot = self._init_constraints_active(self.df_lam_plot)
 
-
-
-
-
-        df_x = self.df_x_vals
-        df_lam = self.df_lam_plot
-
-        t = time.time()
-
-        df_result = (df_lam.groupby(['func', 'idx'])
-                           .lambd_func
-                           .apply(self._eval, df_x=df_x))
+        logger.INFO('_call_eval')
+        self.nparallel = len(self.df_lam_plot)
+        df_result = parallelize_df(df=self.df_lam_plot[['func', 'idx', 'lambd_func']],
+                                   func=self._wrapper_call_eval)
         df_result = df_result.rename(columns={0: 'lambd'})
-        print('Time pure eval', time.time() - t,
-              'length df_lam', len(df_lam),
-              'length df_x', len(df_x),
-              flush=True)
+        logger.INFO('done _call_eval')
 
-        cols = [c for c in df_lam.columns if c.startswith('act_')] + ['is_positive']
+
+        cols = [c for c in self.df_lam_plot.columns if c.startswith('act_')] + ['is_positive']
         ind = ['func', 'idx']
-        df_result = df_result.reset_index().join(df_lam.set_index(ind)[cols],
+        df_result = df_result.reset_index().join(self.df_lam_plot.set_index(ind)[cols],
                                                  on=ind)
 
 
@@ -439,10 +444,12 @@ class Evaluator():
 
         df_split = [df for _, df in (df_result.groupby(group_params))]
 
-
+        logger.INFO('_wrapper_call_evaluate_by_x_new')
         self.nparallel = len(df_split)
         self.df_exp = parallelize_df(df=df_split,
                                      func=self._wrapper_call_evaluate_by_x_new)
+
+        logger.INFO('done _wrapper_call_evaluate_by_x_new')
 
         self._map_func_to_slot()
 
@@ -516,6 +523,12 @@ class Evaluator():
 
 
     def _eval(self, func, df_x):
+        '''
+        Parameters
+        ----------
+        func : pandas.Series
+        df_x : pandas.DataFrame
+        '''
 
         new_index = df_x.set_index(df_x.columns.tolist()).index
         data = func.iloc[0](*df_x.values.T)
@@ -602,7 +615,7 @@ class Evaluator():
 
     def _init_constraints_active(self, df):
         '''
-        Create binary columns depending on whether the plant constraints
+        Create binary columns depending on whether the constraints
         are active or not.
         '''
 
