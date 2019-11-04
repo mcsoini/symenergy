@@ -123,6 +123,7 @@ class JSCallbackCoder():
 
         return self.get_js_string()
 
+
 class SymenergyPlotter():
     '''
     Base class
@@ -184,7 +185,7 @@ class SymenergyPlotter():
 
         gpindex = self.ind_plt + self.ind_slct + [self.ind_axx]
         data = df.pivot_table(index=gpindex, columns=self.cat_column,
-                              values=self.val_column)
+                              values=self.val_column, fill_value=0)
 
         if len(self.cat_column) > 1:
             data.columns = [str(tuple(c)).replace('\'', '')
@@ -303,7 +304,8 @@ class SymenergyPlotter():
     def get_js_args(self):
 
         get_datasource = lambda name: ({name: getattr(self, name)}
-                                       if hasattr(self, name) else {})
+                                       if hasattr(self, name)
+                                       and getattr(self, name) else {})
 
         js_args = [get_datasource(name) for name
                    in ['cds_pos', 'cds_neg', 'cds_all_pos', 'cds_all_neg']]
@@ -317,8 +319,9 @@ class SymenergyPlotter():
 
     def _init_callback(self):
 
-        cols_pos = self.cols_pos + self.ind_plt + [self.ind_axx, 'index']
-        cols_neg = self.cols_neg + self.ind_plt + [self.ind_axx, 'index']
+        cols_ind = self.ind_plt + [self.ind_axx, 'index']
+        cols_pos = self.cols_pos + (cols_ind if self.cols_pos else [])
+        cols_neg = self.cols_neg + (cols_ind if self.cols_neg else [])
         js_string = JSCallbackCoder(self.ind_slct,
                                     cols_pos,
                                     cols_neg)()
