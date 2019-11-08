@@ -89,6 +89,7 @@ class Model:
         self.slot_blocks = {}
         self.storages = {}
         self.comps = {}
+        self.curt = {}
 
         self.nthreads = nthreads
         self.constraint_filt = constraint_filt
@@ -120,9 +121,13 @@ class Model:
         self.comps.update(self.slots)
         self.comps.update(self.storages)
         self.comps.update(self.slot_blocks)
-        self._init_curtailment()
 
         self.parameters = sum(c.parameters.copy() for c in self.comps.values())
+        if not 'curt' in self.comps and self.curtailment:
+            logger.debug('Auto-adding curtailment')
+            self._add_curtailment(self.slots)
+
+        self.comps.update(self.curt)
         self.parameters.append(self.vre_scale)
         self.variables = sum(c.variables.copy() for c in self.comps.values())
         self.constraints = sum(c.constraints.copy()
@@ -246,13 +251,6 @@ class Model:
                 'Each slot block must be associated with exactly 2 slots.'
 
 
-    def _init_curtailment(self):
-
-        if self.curtailment:
-            self.curt = Curtailment('curt', self.slots)
-            self.comps['curt'] = self.curt
-
-
     @wrapt.decorator
     def _add_slots_to_kwargs(f, self, args, kwargs):
 
@@ -345,6 +343,31 @@ class Model:
 #                                                      'value')).items()}
 #
 #        self.param_values.update({self.vre_scale.symb: self.vre_scale.value})
+    @_update_component_list
+    def add_curtailment(self, slots):
+        '''
+        Add curtailment to the model. Must specify the time slots.
+
+        This method is only used if curtailment is defined for a subset
+        of time slots. Use the model parameter `curtailment=True` to enable
+        curtailment globally.
+        '''
+
+        if self.curtailment:
+            raise RuntimeError('Cannot manually add curtailment if model '
+                               'level curtailment is True.')
+
+        self._add_curtailment(slots)
+
+
+    def _add_curtailment(self, slots):
+
+
+        logger.debug('_add_curtailment with slots=%s'%str(slots))
+        if not isinstance(slots, (dict)):
+            slots = {slot: self.slots[slot] for slot in slots}
+
+        self.curt.update({'curt': Curtailment('curt', slots=slots)})
 
 
     def _init_total_cost(self):
@@ -391,8 +414,8 @@ class Model:
                    - total_dch
                    - sum(plant.p[slot] for plant in self.plants.values()))
 
-            if self.curtailment:
-                equ += self.curt.p[slot]
+            if self.curt and slot in self.curt['curt'].p:
+                equ += self.curt['curt'].p[slot]
 
             return equ
 
