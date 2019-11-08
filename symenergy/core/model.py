@@ -262,7 +262,8 @@ class Model:
     @wrapt.decorator
     def _add_slots_to_kwargs(f, self, args, kwargs):
 
-        kwargs.update(dict(slots=self.slots))
+        if not 'slots' in kwargs:
+            kwargs.update(dict(slots=self.slots))
         return f(*args, **kwargs)
 
 
