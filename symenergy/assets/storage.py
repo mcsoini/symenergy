@@ -126,7 +126,7 @@ class Storage(asset.Asset):
         }
 
     def __init__(self, name, eff, slots_map=None, slots=None,
-                 capacity=False, energy_capacity=False, energy_cost=1e-3,
+                 capacity=False, energy_capacity=False, energy_cost=1e-12,
                  _slot_blocks=None):
 
         super().__init__(name)
