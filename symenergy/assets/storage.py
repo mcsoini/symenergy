@@ -70,8 +70,8 @@ class Storage(asset.Asset):
 
     '''
 
-    VARIABS = ['et']
-    VARIABS_TIME = ['pchg', 'pdch', 'e']
+    variabs = ['et']
+    variabs_time = ['pchg', 'pdch', 'e']
 
     mutually_exclusive = {
         'Full storage can`t charge':

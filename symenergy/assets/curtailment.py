@@ -12,8 +12,8 @@ from symenergy.core.slot import Slot, noneslot
 class Curtailment(asset.Asset):
     '''    '''
 
-    VARIABS = []
-    VARIABS_TIME = ['p']
+    variabs = []
+    variabs_time = ['p']
 
     mutually_exclusive = {}
 

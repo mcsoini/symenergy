@@ -28,9 +28,9 @@ class SlotBlock(component.Component):
         pattern `s1, s2, s1, s2, s1, s2`
     '''
 
-    VARIABS = []
-    VARIABS_TIME = []
-    MAP_CAPACITY = {}
+
+    variabs = []
+    variabs_time = []
     mutually_exclusive = {}
 
     def __init__(self, name, repetitions):
@@ -67,10 +67,8 @@ class Slot(component.Component):
         of the `Model.slot_blocks()` attribute)
     '''
 
-    VARIABS = []
-    VARIABS_TIME = []
-
-    MAP_CAPACITY = {}
+    variabs = []
+    variabs_time = []
 
     mutually_exclusive = {}
 

@@ -44,12 +44,14 @@ class Asset(component.Component):
     '''
 
     # capacity class map
-    MAP_CAPACITY = {'C': ['p', 'pchg', 'pdch', 'C_ret'],  # all power and retired capacity
-                    'E': ['e', 'et']}  # storage energy capacity and block transfer
+    # C -> all power and retired capacity
+    # E -> storage energy capacity and block transfer
+    map_capacity = {'C': ['p', 'pchg', 'pdch', 'C_ret'],
+                    'E': ['e', 'et']}
 
     # positive and or variable are capacity constraint; only for `et`, since it
     # can be both pos and neg
-    CAPACITY_CONSTRAINT_SIGN = {'et': [+1, -1]}  # default is [+1]
+    capacity_constraint_sign = {'et': [+1, -1]}  # default is [+1]
 
 
     def __init__(self, name):
@@ -74,10 +76,10 @@ class Asset(component.Component):
     @classmethod
     def _add_default_cap_constr_sgn(cls):
 
-        list_vars = itertools.chain.from_iterable(cls.MAP_CAPACITY.values())
+        list_vars = itertools.chain.from_iterable(cls.map_capacity.values())
         dict_cstr_sgn = dict(itertools.product(list_vars, [[+1]]))
-        dict_cstr_sgn.update(cls.CAPACITY_CONSTRAINT_SIGN)
-        cls.CAPACITY_CONSTRAINT_SIGN = dict_cstr_sgn
+        dict_cstr_sgn.update(cls.capacity_constraint_sign)
+        cls.capacity_constraint_sign = dict_cstr_sgn
 
 
     def get_constrained_variabs(self):
@@ -92,8 +94,8 @@ class Asset(component.Component):
 
         cap_var = []
 
-        c_name, variabs = list(self.MAP_CAPACITY.items())[0]
-        for c_name, variabs in self.MAP_CAPACITY.items():
+        c_name, variabs = list(self.map_capacity.items())[0]
+        for c_name, variabs in self.map_capacity.items():
             if hasattr(self, c_name):
                 cap = getattr(self, c_name)
 
@@ -156,15 +158,15 @@ class Asset(component.Component):
         than the initially installed capacity.
         '''
 
-        if not capacity_name in self.MAP_CAPACITY:
+        if not capacity_name in self.map_capacity:
             raise UnexpectedSymbolError(capacity_name)
 
-        list_var_names = self.MAP_CAPACITY[capacity_name]
+        list_var_names = self.map_capacity[capacity_name]
         list_var_names = [var for var in list_var_names if hasattr(self, var)]
 
         for var_name in list_var_names:  # loop over constrained variables
 
-            for sgn in self.CAPACITY_CONSTRAINT_SIGN[var_name]:
+            for sgn in self.capacity_constraint_sign[var_name]:
 
                 self._init_single_cstr_capacity(var_name, capacity_name, sgn)
 
@@ -207,14 +209,14 @@ class Asset(component.Component):
         '''
 
 
-        if variable in set(self.VARIABS) & set(self.VARIABS_TIME):
+        if variable in set(self.variabs) & set(self.variabs_time):
             # the variable is defined for all time slots only if there are
             # two or more time slots (used for stored energy)
 
             flag_timedep = len(self.slots) >= 2
 
-        elif variable in set(self.VARIABS) | set(self.VARIABS_TIME):
-            flag_timedep = variable in self.VARIABS_TIME
+        elif variable in set(self.variabs_time) | set(self.variabs_time):
+            flag_timedep = variable in self.variabs_time
 
         else:
             raise UnexpectedSymbolError(variable)

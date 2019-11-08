@@ -36,8 +36,8 @@ class Plant(asset.Asset):
     `vc0 + p[slot] * vc1`, with the power output `p[slot]`.
 
     '''
-    VARIABS = ['C_ret']
-    VARIABS_TIME = ['p']
+    variabs = ['C_ret']
+    variabs_time = ['p']
 
     # mutually exclusive constraint combinations
     mutually_exclusive = {
