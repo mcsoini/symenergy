@@ -61,6 +61,8 @@ class Component():
 
             setattr(self, name, self.parameters.append(newpar))
 
+            if name in self.map_capacity:
+                self._init_cstr_capacity(name)
 
 #
 #    def get_params(self):
