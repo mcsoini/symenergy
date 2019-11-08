@@ -117,20 +117,23 @@ class Model:
         '''
         f(*args, **kwargs)
 
-        self.comps = self.plants.copy()
+        self.comps = {}
+        self.comps.update(self.plants)
         self.comps.update(self.slots)
         self.comps.update(self.storages)
         self.comps.update(self.slot_blocks)
 
-        self.parameters = sum(c.parameters.copy() for c in self.comps.values())
         if not 'curt' in self.comps and self.curtailment:
             logger.debug('Auto-adding curtailment')
             self._add_curtailment(self.slots)
 
         self.comps.update(self.curt)
+
+        # aggregate all attribute collections
+        self.parameters = sum(c.parameters._copy() for c in self.comps.values())
         self.parameters.append(self.vre_scale)
-        self.variables = sum(c.variables.copy() for c in self.comps.values())
-        self.constraints = sum(c.constraints.copy()
+        self.variables = sum(c.variables._copy() for c in self.comps.values())
+        self.constraints = sum(c.constraints._copy()
                                for c in self.comps.values())
 
         self._init_supply_constraints()
