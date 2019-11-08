@@ -220,12 +220,6 @@ class Model:
             param._freeze_value()
 
 
-    @_update_component_list
-    def freeze_parameter_value(self, param:Parameter):
-
-        param._freeze_value()
-
-
     def _assert_slot_block_validity(self):
         '''
         If slot blocks are used, only the case with 2 blocks containing 2 slots
