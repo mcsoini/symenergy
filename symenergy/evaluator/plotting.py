@@ -1,9 +1,123 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Wed Oct  2 13:30:13 2019
+The plotting module contains various classes to generate typical SymEnergy
+output plots. Data update callbacks are implemented in JavaScript. This allows
+for interactive standalone plot arrays.
 
-@author: user
+Plots are arranged in 2D arrays. The two dimensions may correspond to any
+of the parameters specified by the
+:class:`symenergy.evaluator.evaluator.Evaluator`'s `x_vals` attribute.
+Plot objects are typically
+
+
+
+CustomPlot(Ev(df=df, x_name=category_cols),
+                      ind_axx='catx',
+                      ind_pltx='cat2',
+                      ind_plty=None,
+                      cat_column=['cat1'])
+
+All classes return Bokeh Layout objects. They can be displayed as
+
+- standalone html documents using `bokeh.io.output_file`
+- interactive plots in Jupyter notebooks using `bokeh.io.output_notebooks`
+
+
+
+
+Subclassing SymenergyPlotter
+----------------------------
+
+The :class:`symenergy.evaluator.plotting.SymenergyPlotter` class acts as a
+base class for the more targeted plots documented below. It takes care of
+most Bokeh logic, including the generation of JavaScript callbacks. Similar to
+the :class:`symenergy.evaluator.plotting.BalancePlot` class, it can easily be
+subclassed to generate customized plots.
+
+For this purpose, a class with two methods is defined:
+
+* the method `_select_data(self)` to obtain (filtered) data from the `ev`
+    ("Evaluator"). It must return a DataFrame with value and index
+    columns.
+* the method `_make_single_plot(self, fig, data, view, cols, color)` adds
+    bokeh plots to the figure `fig` provided as an argument. `data` is the
+    `ColumnDataSource` and is simply passed as `source` argument to the Bokeh
+    plot. The same holds for the `view` parameter, which corresponds to the
+    Bokeh plot `view` argument. `cols` and `color` are the data series and
+    the corresponding colors, respectively.
+
+The `SymenergyPlotter` is initialized with a
+:class:`symenergy.evaluator.evaluator.Evaluator` object. However, only the
+`df` (dataframe) and `x_name` (category column names) attributes are used by the plotting
+class. Because of this, a mock evaluator object can also serve as input,
+containing only these two attributes. Consequently, this plotting module can
+be used with any kind of input data, not necessarily originating from the
+`SymEnergy` model. This is shown in the example below.
+
+```python
+
+    from collections import namedtuple
+    import numpy as np
+
+    # generate input data
+    category_cols = ['cat1', 'cat2', 'cat3', 'catx']
+    cat1 = ['A', 'B', 'C']
+    cat2 = ['A1', 'A2']
+    cat3 = ['X', 'Y', 'Z']
+    catx = range(20)
+    df = pd.DataFrame(itertools.product(cat1, cat2, cat3, catx),
+                      columns=category_cols)
+    df['value'] = np.random.random(len(df)) * 20
+
+    Ev = namedtuple('Ev', ['df', 'x_name'])
+    ev = Ev(df=df, x_name=category_cols)
+
+    #
+    class CustomPlot(SymenergyPlotter):
+
+        val_column = 'value'
+        cols_neg = []
+
+        def _select_data(self):
+
+            df = self.ev.df
+            return df
+
+
+        def _make_single_plot(self, fig, data, view, cols, color):
+
+            for column_slct, color_slct in zip(cols, color):
+
+                fig.circle(x=self.ind_axx, y=column_slct, color=color_slct,
+                           source=data, view=view, line_color='DimGrey')
+                fig.line(x=self.ind_axx, y=column_slct, color=color_slct,
+                         source=data, view=view)
+
+
+
+    plot = CustomPlot(Ev(df=df, x_name=category_cols),
+                      ind_axx='catx',
+                      ind_pltx='cat2',
+                      ind_plty=None,
+                      cat_column=['cat1'])
+
+    show(plot._get_layout())
+
+```
+
+To generate stacked barplots the `_make_single_plot` method would be written
+as follows.
+
+```python
+    def _make_single_plot(self, fig, data, view, cols, color):
+
+        fig.vbar_stack(cols, x=self.ind_axx, width=0.9,
+                       color=color, source=data,
+                       legend=list(map(value, cols)),
+                       view=view)
+```
+
 """
 
 import itertools
@@ -18,11 +132,6 @@ from bokeh.core.properties import value
 from bokeh.palettes import brewer
 from bokeh.io import show
 
-from symenergy import _get_logger
-
-logger = _get_logger(__name__)
-
-logger.info('Disabling pandas chained_assignment warnings')
 pd.set_option('mode.chained_assignment', None)
 
 class JSCallbackCoder():
@@ -126,7 +235,7 @@ class JSCallbackCoder():
 
 class SymenergyPlotter():
     '''
-    Base class
+    Base class for the
     '''
 
     cat_column = None  # defined by children
@@ -469,6 +578,16 @@ class SymenergyPlotter():
 
 
 class BalancePlot(SymenergyPlotter):
+    '''
+    Generates power balance plots from the data in a
+    :class:`symenergy.evaluator.Evaluator` object.
+
+    - only the optimum solution is shown for each set of parameters
+    - demand-like power (demand, charging, curtailment) is shown negative
+    - the energy balance sums up to zero
+    - stacked area plots are used
+
+    '''
 
     cat_column = ['func_no_slot']
     val_column = 'lambd'
@@ -541,22 +660,54 @@ class GeneralBarPlot(GeneralPlot):
 
 if __name__ == '__main__':
 
-    plot = BalancePlot(ev,
-                        ind_axx='vre_scale',
-                        ind_pltx='slot',
-                        ind_plty=None,
-                        cat_column=['func_no_slot'],
-#                        slct_series=['phs_pchg', 'phs_pdch', 'batt_pchg', 'batt_pdch']
-                        )
+    #
 
-    self = plot
+    from collections import namedtuple
+    import numpy as np
+
+    category_cols = ['cat1', 'cat2', 'cat3', 'catx']
+    cat1 = ['A', 'B', 'C']
+    cat2 = ['A1', 'A2']
+    cat3 = ['X', 'Y', 'Z']
+    catx = range(20)
+    df = pd.DataFrame(itertools.product(cat1, cat2, cat3, catx),
+                      columns=category_cols)
+    df['value'] = np.random.random(len(df)) * 20
+
+
+    Ev = namedtuple('Ev', ['df', 'x_name'])
+    ev = Ev(df=df, x_name=category_cols)
+
+
+    class CustomPlot(SymenergyPlotter):
+
+        val_column = 'value'
+        cols_neg = []
+
+        def _select_data(self):
+
+            df = self.ev.df
+            return df
+
+
+        def _make_single_plot(self, fig, data, view, cols, color):
+
+            for column_slct, color_slct in zip(cols, color):
+
+                fig.circle(x=self.ind_axx, y=column_slct, color=color_slct,
+                           source=data, view=view, line_color='DimGrey')
+                fig.line(x=self.ind_axx, y=column_slct, color=color_slct,
+                         source=data, view=view)
+
+
+
+    plot = CustomPlot(Ev(df=df, x_name=category_cols),
+                      ind_axx='catx',
+                      ind_pltx='cat2',
+                      ind_plty=None,
+                      cat_column=['cat1'])
 
     show(plot._get_layout())
-
-    print(JSCallbackCoder(self.ind_slct,
-                    self.cols_pos,
-                    self.cols_neg,
-                    self.ind_plt + [self.ind_axx])())
 
 
 

@@ -14,6 +14,7 @@ import numpy as np
 from importlib import reload
 import pandas as pd
 import itertools
+import random
 from hashlib import md5
 from functools import partial
 import time
@@ -23,7 +24,8 @@ import symenergy
 from symenergy.auxiliary.parallelization import parallelize_df
 from symenergy.auxiliary.parallelization import log_time_progress
 from symenergy.auxiliary.parallelization import get_default_nthreads
-from symenergy.auxiliary.parallelization import MP_COUNTER, MP_EMA, CHUNKS_PER_THREAD
+from symenergy.auxiliary.parallelization import MP_COUNTER, MP_EMA
+from symenergy.auxiliary import parallelization
 
 from symenergy.core.model import Model
 from symenergy import _get_logger
@@ -65,7 +67,7 @@ class Evaluator():
         self.is_positive = \
             self.model.constraints('expr_0', is_positivity_constraint=True)
 
-        self.fn_temp = os.path.abspath(os.path.join(symenergy.__file__, '..', '..',
+        self.fn_temp = os.path.abspath(os.path.join(symenergy.__file__, '..',
                                           'evaluator', 'eval_temp.py'))
 
         try:
@@ -214,9 +216,7 @@ class Evaluator():
 # =============================================================================
 
     def _expand_dfev(self, slct_eq):
-        '''
-        Returns the dfev DataFrame for a single var/mlt slct_eq.
-        '''
+        ''' Returns the dfev DataFrame for a single var/mlt slct_eq. '''
 
         MP_COUNTER.increment()
 
@@ -265,7 +265,7 @@ class Evaluator():
         multiple definitions of identical functions which return e.g. constant
         zero.'''
 
-        salt = str(time.time())
+        salt = str(random.randint(0, 1e12))
         return '_' + md5((func_str + salt).encode('utf-8')).hexdigest()
 
 
@@ -280,8 +280,7 @@ class Evaluator():
     def _wrapper_call_lambdify(self, df):
 
         name, ntot = 'Lambdify expressions', self.nparallel
-        return log_time_progress(self._call_lambdify)(self, df,
-                                                         name, ntot)
+        return log_time_progress(self._call_lambdify)(self, df, name, ntot)
 
 # =============================================================================
 # =============================================================================
@@ -330,7 +329,7 @@ class Evaluator():
             del self.df_lam_plot
         except: pass
         try:
-            del sys.modules['evaluator.eval_temp']
+            del sys.modules['symenergy.evaluator.eval_temp']
         except: pass
 
         list_dep_var = self._get_list_dep_var(skip_multipliers)
@@ -341,6 +340,7 @@ class Evaluator():
         logger.info('Length expanded function DataFrame: %d'%len(dfev_exp))
 
         self.nparallel = len(dfev_exp)
+        random.seed(123)
         dfev_func_str = parallelize_df(dfev_exp, self._wrapper_call_lambdify)
 
         logger.info('Starting _replace_func_str_name...')
@@ -425,34 +425,41 @@ class Evaluator():
 
         self.df_lam_plot = self._init_constraints_active(self.df_lam_plot)
 
-        logger.info('_call_eval')
+        logger.debug('_call_eval')
+        t = time.time()
         self.nparallel = len(self.df_lam_plot)
         df_result = parallelize_df(df=self.df_lam_plot[['func', 'idx', 'lambd_func']],
                                    func=self._wrapper_call_eval)
         df_result = df_result.rename(columns={0: 'lambd'})
-        logger.info('done _call_eval')
+        logger.debug('done _call_eval in %fs, length df_lam %d, length df_x %d'%(time.time() - t, len(self.df_lam_plot), len(self.df_x_vals)))
 
-
-        cols = [c for c in self.df_lam_plot.columns if c.startswith('act_')] + ['is_positive']
+        logger.debug('expand_to_x_vals_parallel intermediate')
+        t = time.time()
+        cols = [c for c in self.df_lam_plot.columns
+                if c.startswith('act_')] + ['is_positive']
         ind = ['func', 'idx']
         df_result = df_result.reset_index().join(self.df_lam_plot.set_index(ind)[cols],
                                                  on=ind)
 
-
-        nchunks = get_default_nthreads() * CHUNKS_PER_THREAD
+        nchunks = get_default_nthreads() * parallelization.CHUNKS_PER_THREAD
         group_params = self._get_optimum_group_params(nchunks=nchunks)
 
-        df_split = [df for _, df in (df_result.groupby(group_params))]
+        logger.debug('done expand_to_x_vals_parallel intermediate in %fs'%(time.time() - t))
 
-        logger.info('_wrapper_call_evaluate_by_x_new')
+        logger.debug('_wrapper_call_evaluate_by_x_new')
+        t = time.time()
+        df_split = [df for _, df in (df_result.groupby(group_params))]
+        logger.debug('len(df_split): %d'%len(df_split))
         self.nparallel = len(df_split)
         self.df_exp = parallelize_df(df=df_split,
                                      func=self._wrapper_call_evaluate_by_x_new)
 
-        logger.info('done _wrapper_call_evaluate_by_x_new')
+        logger.debug('done _wrapper_call_evaluate_by_x_new in %fs'%(time.time() - t))
 
+        logger.debug('_map_func_to_slot')
+        t = time.time()
         self._map_func_to_slot()
-
+        logger.debug('done _map_func_to_slot in %fs'%(time.time() - t))
 
 
     def _get_x_vals_combs(self):
@@ -534,13 +541,17 @@ class Evaluator():
         data = func.iloc[0](*df_x.values.T)
         if not isinstance(data, np.ndarray):  # constant value --> expand
             data = np.ones(df_x.iloc[:, 0].values.shape) * data
-        return pd.DataFrame(data, index=new_index)
+
+
+        res = pd.DataFrame(data, index=new_index)
+        MP_COUNTER.increment()
+
+        return res
 
 
     def _evaluate_by_x_new(self, df_result, verbose):
 
         MP_COUNTER.increment()
-
 
         map_col_func = \
             self.model.constraints(('col', 'base_name'),
@@ -563,6 +574,14 @@ class Evaluator():
 
         return df_result
 
+# =============================================================================
+# =============================================================================
+# =============================================================================
+# =============================================================================
+# =============================================================================
+# =============================================================================
+# =============================================================================
+# =============================================================================
 
     def expand_to_x_vals(self, verbose=True):
         '''
@@ -586,23 +605,29 @@ class Evaluator():
         df_x = self.df_x_vals
         df_lam = df_lam_plot
 
+        logger.debug('_call_eval')
         t = time.time()
 
         df_result = (df_lam.groupby(['func', 'idx'])
                            .lambd_func
                            .apply(self._eval, df_x=df_x))
         df_result = df_result.rename(columns={0: 'lambd'})
-        print('Time pure eval', time.time() - t,
-              'length df_lam', len(df_lam),
-              'length df_x', len(df_x),
-              flush=True)
+        logger.debug('done _call_eval in %fs, length df_lam %d, length df_x %d'%(time.time() - t, len(self.df_lam_plot), len(self.df_x_vals)))
+
+
+        logger.debug('expand_to_x_vals_parallel intermediate')
+        t = time.time()
 
         cols = [c for c in df_lam.columns if c.startswith('act_')] + ['is_positive']
         ind = ['func', 'idx']
         df_result = df_result.reset_index().join(df_lam.set_index(ind)[cols],
                                                  on=ind)
 
+        logger.debug('done expand_to_x_vals_parallel intermediate in %fs'%(time.time() - t))
 
+
+        logger.debug('_wrapper_call_evaluate_by_x_new')
+        t = time.time()
         df_exp_0 = self._evaluate_by_x_new(df_result, True)
         df_exp_0 = df_exp_0.reset_index(drop=True)
 
@@ -610,7 +635,13 @@ class Evaluator():
         self.const_comb_opt = self.df_exp.loc[self.df_exp.is_optimum, 'idx'
                                              ].unique().tolist()
 
+        logger.debug('done _wrapper_call_evaluate_by_x_new in %fs'%(time.time() - t))
+
+
+        logger.debug('_map_func_to_slot')
+        t = time.time()
         self._map_func_to_slot()
+        logger.debug('done _map_func_to_slot in %fs'%(time.time() - t))
 
 
     def _init_constraints_active(self, df):
