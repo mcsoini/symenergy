@@ -71,18 +71,11 @@ class Plant(asset.Asset):
         self.slots = slots if slots else noneslot
 
         self._init_symbol_operation('p')
-
-        self.vc0 = Parameter('vc0_%s'%self.name, noneslot, vc0)
-        self.parameters.append(self.vc0)
-        if vc1:
-            self.vc1 = Parameter('vc1_%s'%self.name, noneslot, vc1)
-            self.parameters.append(self.vc1)
-
         self._init_cstr_positive('p')
 
-        if fcom:
-            self.fcom = Parameter('fcom_%s'%self.name, noneslot, fcom)
-            self.parameters.append(self.fcoms)
+        lst_par = [('vc0', vc0), ('vc1', vc1), ('fcom', fcom), ('C', capacity)]
+        for param_name, param_val in lst_par:
+            self._add_parameter(param_name, param_val, noneslot)
 
         if cap_ret:
             # needs to be initialized before _init_cstr_capacity('C')!
@@ -90,8 +83,6 @@ class Plant(asset.Asset):
             self.init_cstr_positive('C_ret')
 
         if capacity:
-            self.C = Parameter('C_%s'%self.name, noneslot, capacity)
-            self.parameters.append(self.C)
             self._init_cstr_capacity('C')
 
         self._init_cost_component()

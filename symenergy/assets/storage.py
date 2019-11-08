@@ -161,15 +161,9 @@ class Storage(asset.Asset):
             self._init_symbol_operation('et')
             self._init_cstr_slot_blocks_storage()
 
-        if capacity:
-            param_args = ('C_%s'%self.name, noneslot, capacity)
-            self.C = self.parameters.append(Parameter(*param_args))
-            self._init_cstr_capacity('C')
-
-        if energy_capacity:
-            param_args = ('E_%s'%self.name, noneslot, energy_capacity)
-            self.E = self.parameters.append(Parameter(*param_args))
-            self._init_cstr_capacity('E')
+        lst_par = [('C', capacity), ('E', energy_capacity)]
+        for param_name, param_val in lst_par:
+            self._add_parameter(param_name, param_val, noneslot)
 
         self._init_cstr_storage()
 

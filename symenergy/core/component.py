@@ -11,6 +11,7 @@ import pandas as pd
 from symenergy.auxiliary.constrcomb import CstrCombBase
 from symenergy.auxiliary.constrcomb import filter_constraint_combinations
 
+from symenergy.core.parameter import Parameter
 from symenergy.core.collections import VariableCollection
 from symenergy.core.collections import ConstraintCollection
 from symenergy.core.collections import ParameterCollection
@@ -45,6 +46,18 @@ class Component():
 
 
     def _check_attributes(self):
+    def _add_parameter(self, name, val, slot):
+        ''''Combines the definition of various parameters.'''
+
+        if val:
+            parname = '%s_%s'%(name, self.name)
+
+            if isinstance(val, Parameter):
+                newpar = val  # -> for common weight parameters of slots
+            elif isinstance(val, (float, int)):
+                newpar = Parameter(parname, slot, val)
+
+            setattr(self, name, self.parameters.append(newpar))
 
         list_attr = ('VARIABS', 'VARIABS_TIME')
         assert all(hasattr(self, attr) for attr in list_attr), (

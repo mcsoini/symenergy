@@ -78,13 +78,9 @@ class Slot(component.Component):
 
         super().__init__(name)
 
-        self.l = self.parameters.append(Parameter('l', self, load))
-        self.vre = self.parameters.append(Parameter('vre', self, vre))
-
-        if isinstance(weight, int):
-            self.w = self.parameters.append(Parameter('w', self, weight))
-        elif isinstance(weight, Parameter):
-            self.w = self.parameters.append(weight)
+        lst_par = [('l', load), ('vre', vre), ('w', weight)]
+        for param_name, param_val in lst_par:
+            self._add_parameter(param_name, param_val, noneslot)
 
         self.block = block
 
