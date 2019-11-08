@@ -107,7 +107,7 @@ class Component():
         filt = dict(is_equality_constraint=False)
         constrs_cols_neq = self.constraints.tolist('col', **filt)
 
-        mut_excl_cols = self.get_mutually_exclusive_cstrs()
+        mut_excl_cols = self._get_mutually_exclusive_cstrs()
 
         ncombs = 2**len(constrs_cols_neq)
 
@@ -124,10 +124,7 @@ class Component():
         return df_comb
 
 
-
-
-
-    def get_mutually_exclusive_cstrs(self):
+    def _get_mutually_exclusive_cstrs(self):
         '''
         Time dependent mutually inclusive constraints.
         '''

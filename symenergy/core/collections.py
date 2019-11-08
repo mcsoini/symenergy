@@ -96,7 +96,7 @@ class AttributeCollection():
         return return_list
 
 
-    def copy(self):
+    def _copy(self):
 
         new = self.__class__(self._name)
         new._elements = self._elements.copy()

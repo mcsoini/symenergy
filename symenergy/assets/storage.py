@@ -238,7 +238,7 @@ class Storage(asset.Asset):
             self.VARIABS = copy(self.VARIABS) + ['e']
 
 
-    def get_mutually_exclusive_cstrs(self):
+    def _get_mutually_exclusive_cstrs(self):
         '''
         This overwrites the symenergy.core.component method;
         For storage, CstrCombBase is initialized with `self._dict_prev_slot`

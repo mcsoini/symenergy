@@ -384,7 +384,11 @@ class Model:
         self.lagrange_0 = self.tc + sum(eq_cstrs)
 
 
-    def supply_cstr_expr_func(self, slot):
+# =============================================================================
+# =============================================================================
+
+
+    def _supply_cstr_expr_func(self, slot):
             '''
             Initialize the load constraints for a given time slot.
             Note: this accesses all plants, therefore method of the model class.
@@ -418,7 +422,7 @@ class Model:
 
         for slot in self.slots.values():
 
-            cstr = Constraint('supply', expr_func=self.supply_cstr_expr_func,
+            cstr = Constraint('supply', expr_func=self._supply_cstr_expr_func,
                               slot=slot, is_equality_constraint=True,
                               expr_args=(slot,), comp_name=slot.name)
 
@@ -724,7 +728,7 @@ class Model:
 # =============================================================================
 # =============================================================================
 
-    def get_variabs_multips_slct(self, lagrange):
+    def _get_variabs_multips_slct(self, lagrange):
         '''
         Returns all relevant variables and multipliers for this model.
 
@@ -749,17 +753,17 @@ class Model:
         return sorted(list_vm, key=str)
 
 
-    def call_get_variabs_multips_slct(self, df):
+    def _call_get_variabs_multips_slct(self, df):
 
 #        res = list(map(self.get_variabs_multips_slct, df))
-        return df.apply(self.get_variabs_multips_slct)
+        return df.apply(self._get_variabs_multips_slct)
 
 
-    def wrapper_call_get_variabs_multips_slct(self, df, *args):
+    def _wrapper_call_get_variabs_multips_slct(self, df, *args):
 
         name = 'Get variabs/multipliers'
         ntot = self.ncomb
-        func = self.call_get_variabs_multips_slct
+        func = self._call_get_variabs_multips_slct
         return log_time_progress(func)(self, df, name, ntot)
 
 # =============================================================================
@@ -858,7 +862,7 @@ class Model:
             self.list_variabs_multips = self.call_get_variabs_multips_slct(df)
             self.df_comb['variabs_multips'] = self.list_variabs_multips
         else:
-            func = self.wrapper_call_get_variabs_multips_slct
+            func = self._wrapper_call_get_variabs_multips_slct
             nthreads = self.nthreads
             self.df_comb['variabs_multips'] = parallelize_df(df, func,
                                                              nthreads=nthreads)
