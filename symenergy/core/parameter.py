@@ -73,6 +73,12 @@ class Parameter():
         self._is_frozen = True
 
 
+    def _unfreeze_value(self):
+
+        logger.debug('Unfreezing value of parameter %s.'%self.name)
+        self._is_frozen = False
+
+
     def __repr__(self):
 
         return str(self.__class__) + ' ' + self.name

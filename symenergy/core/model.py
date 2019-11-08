@@ -200,6 +200,9 @@ class Model:
 
         '''
 
+        for param in self.parameters():
+            param._unfreeze_value()
+
         exceptions = [] if not exceptions else exceptions
 
         list_valid = self.parameters('name')
