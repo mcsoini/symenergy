@@ -57,7 +57,7 @@ class Cache():
                    'Model.cache.delete_cached()'))
         smax = len(max(log_str, key=len))
         sep_str = ('*' * smax,) * 2
-        [logger.info(st) for st in sep_str + log_str + sep_str]
+        [logger.warning(st) for st in sep_str + log_str + sep_str]
 
         return pd.read_pickle(self.fn)
 
