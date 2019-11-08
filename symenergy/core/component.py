@@ -73,9 +73,7 @@ class Component():
         frozen parameters are changed.
         '''
 
-        cstrs = self.constraints()
-
-        for cstr in cstrs:
+        for cstr in self.constraints():
             cstr.make_expr()
 
 

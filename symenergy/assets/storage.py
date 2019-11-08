@@ -247,13 +247,14 @@ class Storage(asset.Asset):
 
         list_col_names = []
 
-#        mename, me = list(self.mutually_exclusive.items())[0]
+        if __name__ == '__main__':
+            mename, me = list(self.mutually_exclusive.items())[0]
         for mename, me in self.mutually_exclusive.items():
 
             list_cstrs = me
             slots_def = self._dict_prev_slot
-            dict_cstrs = self.constraints.to_dict(dict_struct={'name_no_comp': {'slot': ''}})
-
+            dict_struct = {'name_no_comp': {'slot': ''}}
+            dict_cstrs = self.constraints.to_dict(dict_struct)
             ccb = CstrCombBase(mename, list_cstrs, slots_def, dict_cstrs)
             list_col_names.append(ccb.gen_col_combs())
 

@@ -279,6 +279,7 @@ class Model:
 
         self.slot_blocks.update({name: SlotBlock(name, repetitions)})
 
+
     @_update_component_list
     @_add_slots_to_kwargs
     @_check_component_replacement
@@ -421,6 +422,9 @@ class Model:
                               expr_args=(slot,), comp_name=slot.name)
 
             self.constraints.append(cstr)
+
+# =============================================================================
+# =============================================================================
 
 
     def generate_solve(self):

@@ -119,7 +119,8 @@ class AttributeCollection():
         if tself != tothr:
             raise TypeError('Trying to add %s and %s' % (tself, tothr))
 
-        sum_ = self.__class__(name='model')  # sums of collections are always model attributes
+        # sums of collections are always model attributes
+        sum_ = self.__class__(name='model')
         sum_._elements = self._elements.copy() + othr._elements.copy()
 
         return sum_
