@@ -149,9 +149,17 @@ class Model:
 
     @wrapt.decorator
     def _check_component_replacement(f, self, args, kwargs):
-        assert kwargs['name'] not in {**self.comps, **self.slot_blocks}, (
+
+        if 'name' in kwargs:
+            name = kwargs['name']
+        elif args and isinstance(args[0], str):
+            name = args[0]
+        else:
+            raise AttributeError('Name required for all components.')
+
+        assert name  not in {**self.comps, **self.slot_blocks}, (
                 'A component or slot_block `%s` has already been '
-                         'defined.')%kwargs['name']
+                         'defined.')%name
 
         return f(*args, **kwargs)
 
