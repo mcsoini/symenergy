@@ -52,7 +52,7 @@ class Plant(asset.Asset):
         # C_ret max --> no output
         }
 
-    def __init__(self, name, vc0, vc1=None,
+    def __init__(self, name, vc0=None, vc1=None,
                  fcom=None, slots=None, capacity=False, cap_ret=False):
         '''
         Params:
@@ -97,9 +97,13 @@ class Plant(asset.Asset):
         '''
 
         def get_vc(slot):
-            return ((self.vc0.symb + self.vc1.symb * self.p[slot])
-                    if hasattr(self, 'vc1')
-                    else self.vc0.symb)
+            cost = 0
+            if hasattr(self, 'vc0'):
+                cost += self.vc0.symb
+            if hasattr(self, 'vc1'):
+                cost += self.vc1.symb * self.p[slot]
+
+            return cost
 
         self.vc = {slot: get_vc(slot) * slot.w.symb
                    * (slot.block.rp.symb if slot.block else 1)
@@ -108,7 +112,7 @@ class Plant(asset.Asset):
         self.cc = sum(sp.integrate(vc, self.p[slot])
                       for slot, vc in self.vc.items())
 
-        if 'fcom' in self.__dict__:
+        if hasattr(self, 'fcom'):
 
             cc_fcom = self.C.symb * self.fcom.symb
 
