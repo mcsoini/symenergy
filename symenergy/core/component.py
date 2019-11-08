@@ -35,17 +35,19 @@ class Component():
 
     '''
 
+    map_capacity = {}
+    variabs = []
+    variabs_time = []
+
     def __init__(self, name):
 
         self.name = name
-        self._check_attributes()
 
         self.constraints = ConstraintCollection('%s-constraints'%(self.name))
         self.parameters = ParameterCollection('%s-parameters'%(self.name))
         self.variables = VariableCollection('%s-variables'%(self.name))
 
 
-    def _check_attributes(self):
     def _add_parameter(self, name, val, slot):
         ''''Combines the definition of various parameters.'''
 
@@ -59,10 +61,6 @@ class Component():
 
             setattr(self, name, self.parameters.append(newpar))
 
-        list_attr = ('VARIABS', 'VARIABS_TIME')
-        assert all(hasattr(self, attr) for attr in list_attr), (
-            'Children of `Component` must implement all of '
-            '%s'%', '.join(list_attr))
 
 #
 #    def get_params(self):
