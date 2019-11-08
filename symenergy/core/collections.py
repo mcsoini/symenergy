@@ -202,23 +202,6 @@ class AttributeCollection():
         return self.tolist(*args, **kwargs)
 
 
-
-if __name__ == '__main__':
-
-
-    dict_struct = {('mlt',): 'comp_name'}
-
-    res_dict = m.constraints.to_dict(dict_struct=dict_struct)
-    print('#' * 30)
-    print(res_dict)
-
-    res_dict
-
-
-# %%
-
-
-
 class ParameterCollection(AttributeCollection):
     '''
     Collection of type :class:`symenergy.core.parameter.Parameter`
@@ -240,11 +223,6 @@ class VariableCollection(AttributeCollection):
     Collection of type :class:`sympy.core.symbol.Symbol`
     '''
     _expected_type = Variable
-
-
-if __name__ == '__main__':
-    pass
-    m.constraints.get_filtered(is_equality_constraint=True)
 
 
 

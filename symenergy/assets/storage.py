@@ -255,7 +255,6 @@ class Storage(asset.Asset):
             dict_cstrs = self.constraints.to_dict(dict_struct={'name_no_comp': {'slot': ''}})
 
             ccb = CstrCombBase(mename, list_cstrs, slots_def, dict_cstrs)
-
             list_col_names.append(ccb.gen_col_combs())
 
         list_col_names = list(itertools.chain.from_iterable(list_col_names))

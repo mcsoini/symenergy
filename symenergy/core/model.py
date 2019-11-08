@@ -330,19 +330,6 @@ class Model:
         self.slots.update({name: Slot(name, **kwargs)})
 
 
-#    def init_total_param_values(self):
-#        '''
-#        Generates dictionary {parameter object: parameter value}
-#        for all parameters for all components.
-#        '''
-#
-#        self.param_values = {symb: val
-#                             for comp in self.comps.values()
-#                             for symb, val
-#                             in comp.get_params_dict(('symb',
-#                                                      'value')).items()}
-#
-#        self.param_values.update({self.vre_scale.symb: self.vre_scale.value})
     @_update_component_list
     def add_curtailment(self, slots):
         '''
@@ -458,24 +445,6 @@ class Model:
             self.filter_invalid_solutions()
             self.generate_total_costs()
             self.cache.write(self.df_comb)
-
-
-#    def collect_component_constraints(self):
-#        '''
-#        Note: Doesn't include supply constraints, which are a model attribute.
-#        '''
-#
-#        self.constrs = {}
-#        for comp in self.comps.values():
-#            for cstr in comp.get_constraints(by_slot=True, names=False):
-#                self.constrs[cstr] = comp
-#
-#        # dictionary {column name: constraint object}
-#        self.constrs_dict = {cstr.col: cstr for cstr in self.constrs.keys()}
-#
-#        # list of constraint columns
-#        self.constrs_cols_neq = [cstr.col for cstr in self.constrs
-#                                 if not cstr.is_equality_constraint]
 
 
     def _get_model_mutually_exclusive_cols(self):

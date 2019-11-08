@@ -54,17 +54,6 @@ class Plant(asset.Asset):
 
     def __init__(self, name, vc0=None, vc1=None,
                  fcom=None, slots=None, capacity=False, cap_ret=False):
-        '''
-        Params:
-            * name --
-            * vc0 --
-            * vc1 --
-            * fcom -- float, O&M fixed cost
-            * slots -- iterable of time slot names
-            * capacity --
-            * cap_ret -- boolean, capacity can be retired True/False
-
-        '''
 
         super().__init__(name)
 

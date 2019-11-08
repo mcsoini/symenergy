@@ -64,12 +64,6 @@ class Component():
             if name in self.map_capacity:
                 self._init_cstr_capacity(name)
 
-#
-#    def get_params(self):
-#
-#        return [getattr(self, param_name)
-#                for param_name in self.PARAMS
-#                if hasattr(self, param_name)]
 
     def _reinit_all_constraints(self):
         '''
@@ -91,20 +85,6 @@ class Component():
             param._freeze_value()
 
 
-#    def get_params_dict(self, attr=tuple()):
-#
-#        attr = tuple(attr) if isinstance(attr, str) else attr
-#
-#        param_objs = self.get_params()
-#
-#        if len(attr) == 1:
-#            return [getattr(par, attr[0])
-#                    for par in param_objs]
-#        elif len(attr) == 2:
-#            return {getattr(par, attr[0]): getattr(par, attr[1])
-#                    for par in param_objs}
-#        else:
-#            return param_objs
 
 
     def _get_constraint_combinations(self):
@@ -144,70 +124,6 @@ class Component():
         return df_comb
 
 
-#    def get_is_capacity_constrained(self):
-#        '''
-#        Returns a tuple of all variables defined by the MAP_CAPACITY dict.
-#
-#        Only include if the capacity is defined.
-#        '''
-#
-#        return tuple(var
-#                     for cap_name, var_names in self.MAP_CAPACITY.items()
-#                     for var_name in var_names
-#                     if hasattr(self, var_name) and hasattr(self, cap_name)
-#                     for slot, var in getattr(self, var_name).items())
-#
-#    def get_is_positive(self):
-#        '''
-#        Returns a tuple of all variables defined by the VARIABS_POSITIVE list.
-#        '''
-#
-#        return tuple(var
-#                     for var_name in self.VARIABS_POSITIVE
-#                     if hasattr(self, var_name)
-#                     for slot, var in getattr(self, var_name).items())
-
-
-#    def get_constraints(self, by_slot=True, names=False, comp_names=False):
-#        '''
-#        Returns
-#        -------
-#        list of constraint objects
-#
-#        TODO: names=True only keeps single time slot
-#
-#        '''
-#
-#        constrs = {} if names else []
-#
-#        attrs = [(key, attr) for key, attr in vars(self).items() if
-#                 key.startswith('cstr_')]  # naming convention of constraint attrs;
-#                                           # values are dicts, so we can't check
-#                                           # isinstance(attr, Constraint)
-#
-#        for key, attr in attrs:
-#            key = (self.name, key) if comp_names else key
-#            if by_slot:
-#                for slot, cstr in attr.items():
-#                    if names:
-#                        constrs[key] = cstr
-#                    else:
-#                        constrs.append(cstr)
-#            else:
-#                if names:
-#                    constrs[key] = attr
-#                else:
-#                    constrs.append(attr)
-#
-#        # sort by name, otherwise the order is not consistent between runs
-#        # TODO: implemented constraint iterator collection which is
-#        # instantiated by components; replaces this whole method
-#        if len(constrs) > 1:
-#            if not comp_names and not names:
-#                constrs = list(zip(*sorted((cstr.base_name, cstr)
-#                               for cstr in constrs)))[1]
-#
-#        return constrs
 
 
 
@@ -227,19 +143,6 @@ class Component():
 
         return list_col_names
 
-
-#    def get_variabs(self):
-#        '''
-#        Collect all variables of this component.
-#
-#        Return values:
-#            list of all variable symbols
-#        '''
-#
-#        return [vv
-#                for var in self.VARIABS + self.VARIABS_TIME
-#                if hasattr(self, var)
-#                for vv in getattr(self, var).values()]
 
     def _get_component_hash_name(self):
 
