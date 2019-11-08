@@ -16,6 +16,7 @@ import sympy as sp
 import wrapt
 import numpy as np
 import time
+import textwrap
 from hashlib import md5
 from sympy.tensor.array import derive_by_array
 
@@ -46,24 +47,32 @@ if __name__ == '__main__': sys.exit()
 
 class Model:
     '''
+    Instantiate a model object. Start from here.
+
     Parameters
     ----------
-    slot_weights -- int
-      If all time slots have the same weight, instantiate a model-wide
-      parameter singleton instead of individual parameters for each time slot.
+    slot_weights : float
+        default time slot weight (hours); this instantiates a singleton
+        parameter to avoid the definition of individual parameter for each
+        slot; it can be overwritten for individual time slots if the weight
+        parameter is provided
     constraint_filt : str
         :func:`pandas.DataFrame.query` string to filter the constraint
-        activation columns of the `df_comb` dataframe
-    curtailment : bool
-        Allow for curtailment in each time slots. This generates a
+        activation columns of the `df_comb` dataframe. A list of relevant
+        column names of a model object `m` can be retrieved through
+        `m.constraints('col', is_equality_constraint=False)`
+    curtailment : bool or list of Slots, default False
+        Allow for curtailment in each time slot (True) or in a selection of
+        time slots. This generates a
         :class:`symenergy.assets.curtailment.Curtailment` instance `curt`,
-        which defines positive curtailment power variables `curt.p`.
+        which defines the positive curtailment power variables `curt.p`
+        for each of the relevant time slots.
     nthreads : int or False
-        number of threads to be used for model setup and solving; passed to the
-        :class:`multiprocessing.Pool` initializer; defaults to
-        `multiprocessing.cpu_count() - 1`; if False, no multiprocessing is used
+        number of workers to be used for parallel model setup and solving;
+        passed to the :class:`multiprocessing.Pool` initializer;
+        defaults to `multiprocessing.cpu_count() - 1`;
+        if False, no multiprocessing is used
     '''
-
 
     mutually_exclusive = {
         'No power production when curtailing':
@@ -99,6 +108,12 @@ class Model:
 
     @wrapt.decorator
     def _update_component_list(f, self, args, kwargs):
+        '''
+        Rebuild all derived model attributes.
+
+        This is triggered (decorator) every a relevant change is made to
+        the model through the public API.
+        '''
         f(*args, **kwargs)
 
         self.comps = self.plants.copy()
@@ -137,12 +152,47 @@ class Model:
     def freeze_parameters(self, exceptions=None):
         '''
         Switch from variable to numerical value for all model parameters.
+        This automatically updates the definition of all sympy expressions
+        (total cost, lagrange, ...)
+
+        Parameters
+        ----------
+        exceptions : list(str)
+            names of parameters to be excluded; corresponds to elements of the
+            list `Model.parameters('name')`
+
 
         Example
+        -------
+        .. code-block:: python
 
+            >>> from symenery.core import model
+            >>> m = model.Model()
+            >>> m.add_slot('s0', load=2, vre=3)
+            >>> m.add_plant('nuc', vc0=1, vc1=0.01)
+            >>> print(m.tc)
 
-        Calls the :func:`symenergy.core.component.Component.fix_all_parameters`
-        method for all parameters.
+            nuc_p_s0*w_none*(nuc_p_s0*vc1_nuc_none + 2*vc0_nuc_none)/2
+
+            >>> m.freeze_parameters()
+            >>> print(m.tc)
+
+            nuc_p_s0*(0.005*nuc_p_s0 + 1.0)
+
+        Here only the power output variable `nuc_p_s0` is left in the equation.
+        All other symbols (all parameters) have been substituted with their
+        respective numerical values.
+
+        Excluding parameters through the `exceptions` argument causes a
+        partial substitution:
+
+        .. code-block:: python
+
+            >>> m.freeze_parameters(exceptions=['vc0_nuc_none'])
+            >>> print(m.tc)
+
+            nuc_p_s0*(0.005*nuc_p_s0 + 1.0*vc0_nuc_none)
+
         '''
 
         exceptions = [] if not exceptions else exceptions
@@ -226,6 +276,11 @@ class Model:
 
     @_check_component_replacement
     def add_slot_block(self, name, repetitions):
+        '''
+        Add a time slot block to the model.
+
+        %s
+        '''
 
         self.slot_blocks.update({name: SlotBlock(name, repetitions)})
 
@@ -233,7 +288,13 @@ class Model:
     @_add_slots_to_kwargs
     @_check_component_replacement
     def add_storage(self, name, *args, **kwargs):
-        ''''''
+        r'''
+        Add generic storage capacity to the model.
+
+        %s
+
+        '''  # Storage docstring added
+
         kwargs['_slot_blocks'] = self.slot_blocks
         self.storages.update({name: Storage(name, **kwargs)})
 
@@ -242,6 +303,11 @@ class Model:
     @_add_slots_to_kwargs
     @_check_component_replacement
     def add_plant(self, name, *args, **kwargs):
+        r'''
+        Add a dispatchable power plant to the model.
+
+        %s
+        '''  # Plant docstring added
 
         self.plants.update({name: Plant(name, **kwargs)})
 
@@ -249,11 +315,11 @@ class Model:
     # note: no _update_component_list since slots alone make no model
     @_check_component_replacement
     def add_slot(self, name, *args, **kwargs):
+        '''
+        Add a time slot to the model.
 
-        if self.slot_blocks and not 'block' in kwargs:
-            raise RuntimeError(('Error in `add_slot(%s)`: If any of the slots '
-                                'are assigned to a block, all slots must be.'
-                               )%name)
+        %s
+        '''
 
         if 'block' in kwargs:
             bk = kwargs['block']
@@ -346,6 +412,19 @@ class Model:
 
 
     def generate_solve(self):
+        '''
+        Initialize the constraint combinations, generate the problems, and
+        solve. This calls the following methods:
+
+            - `Model.init_constraint_combinations()`
+            - `Model.define_problems()`
+            - `Model.solve_all()`
+            - `Model.filter_invalid_solutions()`
+            - `Model.generate_total_costs()`
+            - `Model.cache.write(Model.df_comb)`
+
+        '''
+
 
         if self.cache.file_exists:
             self.df_comb = self.cache.load()
@@ -951,6 +1030,29 @@ class Model:
 
 
     def print_results(self, df, idx):
+        '''
+        Print result expressions for all variables and multipliers for a
+        certain constraint combination index.
+
+        Parameters
+        ----------
+            idx : int
+                index of the constraint combination for which the results are to
+                be printed
+            df : df
+                DataFrame containing the results and the index; defaults to
+                the model's `df_comb` table
+
+
+        The input DataFrame must have the following columns:
+            - `variabs_multips`: iterable of variable and multiplier symbols
+                for which the results are to be printed
+            - `result`: list of expressions corresponding for each of the
+                `variabs_multips` symbols
+
+
+        '''
+
 
         x = df.reset_index().query('idx == %d'%idx).iloc[0]
 

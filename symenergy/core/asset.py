@@ -37,7 +37,11 @@ def _expand_class_attrs(cls):
 
 @_expand_class_attrs
 class Asset(component.Component):
-    '''Mixin class containing shared methods of plants and storage'''
+    '''
+    Mixin class containing shared methods of plants and storage.
+
+    Not instantiated directly.
+    '''
 
     # capacity class map
     MAP_CAPACITY = {'C': ['p', 'pchg', 'pdch', 'C_ret'],  # all power and retired capacity
@@ -79,7 +83,7 @@ class Asset(component.Component):
     def get_constrained_variabs(self):
         '''
         Keyword argument:
-            * cap -- string, capacity name as specified in self.MAP_CAPACITY
+            * cap -- string, capacity name as specified in self.map_capacity
 
         Returns:
             * list of tuples [(parameter object capacity,

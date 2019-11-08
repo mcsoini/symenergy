@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Contains the Storage class.
 
 Part of symenergy. Copyright 2018 authors listed in AUTHORS.
+
+Contains the Storage class describing assets which charge and discharge energy.
+
+
 """
 
 import wrapt
@@ -27,27 +30,43 @@ logger = _get_logger(__name__)
 
 
 class Storage(asset.Asset):
-    '''
-    Class describing storage assets which charge and discharge energy.
+    r'''
+    Parameters
+    ----------
+    name : str
+        storage name
+    eff : float
+        storage round-trip efficiency
+    slots_map : dict
+        optional specification during which time slots storage can
+        charge/discharge
+    capacity : float
+        Optional storage power capacity; this limits the charging and
+        discharging power. Power is unconstrained if this
+        argument is not set.
+    energy_capacity : float
+        Optional storage energy capacity; this limits the stored energy
+        content. Power is unconstrained if this argument is not set.
+
 
     The time slot order follows from the order in which they are added to the
     model instance (:func:`symenergy.core.model.Model.add_slot`).
 
-    Parameters
-    ----------
-    name : str
-        name of the new component
-    eff : float
-        round trip efficiency
-    slots_map : dict
-        dictionary `{'chg': ["slot_1", "slot_2", ...],
-                     'dch': ["slot_2", ...]}`
-    slots : dict
-        model instance slot dictionary passed to the initializer
-    capacity : float
-        storage power capacity
-    energy_capacity : float
-        storage energy capacity
+
+    The `slots_map` parameters defines during which time slots
+    storage can charge or discharge. This allows for significant
+    model simplifications. For example, the dictionary
+
+
+    .. code-block:: python
+
+         `{'chg': ['slot_1', 'slot_2'],
+           'dch': ['slot_2']}
+
+
+    allows for charging for slots `['slot_1', 'slot_2']` but limits
+    discharging to `'slot_2'`.
+
 
     '''
 
@@ -228,8 +247,9 @@ class Storage(asset.Asset):
 
     def get_mutually_exclusive_cstrs(self):
         '''
-        This overwrites the symenergy.core.component method; CstrCombBase
-        is initialized with self._dict_prev_slot instead of self.slots.
+        This overwrites the symenergy.core.component method;
+        For storage, CstrCombBase is initialized with `self._dict_prev_slot`
+        instead of `self.slots`.
         '''
 
         list_col_names = []
@@ -328,9 +348,7 @@ class Storage(asset.Asset):
         return expr
 
     def _init_cstr_storage(self):
-        '''
-        Initialize storage constraints.
-        '''
+        ''' Initialize storage constraints. '''
 
         ###################
         # power to energy #

@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-@author: user
+All constraints, parameters, and variables of the model and component objects
+can be conveniently accessed through their respective collections. The model
+class aggregates all
 """
 
 import itertools
@@ -23,6 +25,17 @@ class AttributeCollection():
 
 
     def append(self, el):
+        '''
+        Append an element (parameter, constraint, or variable) to the
+        collection. This checks for consistency, i.e. an error is thrown if
+        anything but a :class:`symenergy.core.Parameter` is appended to a
+        :class:`symenergy.core.ParameterCollection`.
+
+        Parameters
+        ----------
+        el : appropriate SymEnergy class
+            Parameter, Constraint, or Variable
+        '''
 
         type_args = type(el), str(self), type(el), self._expected_type
         assert isinstance(el, self._expected_type), ('Invalid type {} appended'
@@ -50,6 +63,12 @@ class AttributeCollection():
         ----------
         return_attribute : str
             selected attribute of the element
+        squeeze : bool
+            flatten nested return lists
+        unique : True
+            drop duplicates in return lists; note: preserves order
+        kwargs : element attributes
+            arbitrary element attributes with filtering values
 
         '''
 
@@ -107,6 +126,7 @@ class AttributeCollection():
 
 
     def __repr__(self):
+
         return '%s of %s'%(self.__class__.__name__, self._name)
 
 
@@ -132,7 +152,7 @@ class AttributeCollection():
         Parameters
         ----------
         dict_struct : dict or str
-
+            nested dictionary of strings specifying element attributes
         '''
 
         dict_struct = (dict_struct.copy()

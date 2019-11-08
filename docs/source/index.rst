@@ -20,10 +20,12 @@ Symbolic modelling of energy systems, based on SymPy.
    :caption: Contents:
 
    example_constant
+   symenergy_doc_cookbook
    doc_core_model
    doc_core_component
    doc_core_collections
    doc_auxiliary_io
+   doc_evaluator_plotting
 
 .. image:: _static/flowchart_symenergy.png
     :align: center

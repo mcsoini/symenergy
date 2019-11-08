@@ -3,7 +3,6 @@
 """
 Contains the symenergy Component class.
 
-
 Part of symenergy. Copyright 2018 authors listed in AUTHORS.
 """
 import itertools

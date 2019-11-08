@@ -13,17 +13,28 @@ from symenergy.core.parameter import Parameter
 
 class Plant(asset.Asset):
     '''
-    Implements power plants with linear cost supply curve.
+    Parameters
+    ----------
 
-    All plants have:
-        * symbol power production p
-        * symbol costs vc_0 and vc_1
-        * cost component (vc_0 + 0.5 * vc_1 * p) * p
-        * multiplier > 0
-    Some plants have:
-        * symbol capacity C
-        * value capacity
-        * multiplier power p <= capacity C
+    name : str
+        name of the power plant
+    vc0 : float
+        Optional constant factor
+    vc1 : float
+        Optional slope of variable cost supply curve
+    fcom : float
+        O&M fixed cost
+    capacity : float
+        Optional available installed capacity; this limits the power
+        output. Power production is unconstrained if this argument is not
+        set.
+    cap_ret : bool
+        Optional: power capacity can be retired if True
+
+    The cost supply curve is determined by the `vc0` and `vc1`
+    parameters. For each time `slot`, it is determined by
+    `vc0 + p[slot] * vc1`, with the power output `p[slot]`.
+
     '''
     VARIABS = ['C_ret']
     VARIABS_TIME = ['p']
@@ -53,11 +64,9 @@ class Plant(asset.Asset):
             * capacity --
             * cap_ret -- boolean, capacity can be retired True/False
 
-        TODO: Make vc1 optional.
         '''
 
         super().__init__(name)
-#        self.name = name
 
         self.slots = slots if slots else noneslot
 
@@ -91,6 +100,9 @@ class Plant(asset.Asset):
     def _init_cost_component(self):
         '''
         Set constant and linear components of variable costs.
+
+        If a fixed O&M cost parameter is defined, adds the corresponding
+        fixed cost.
         '''
 
         def get_vc(slot):
