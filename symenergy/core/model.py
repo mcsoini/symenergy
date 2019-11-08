@@ -333,6 +333,11 @@ class Model:
             assert bk in self.slot_blocks, 'Unknown block %s'%bk
             kwargs['block'] = self.slot_blocks[bk]
 
+        elif self.slot_blocks:
+            raise RuntimeError(('Error in `add_slot(%s)`: If any of the slots '
+                                'are assigned to a block, all slots must be.'
+                               )%name)
+
         if not 'weight' in kwargs:  # use default weight parameter
             kwargs['weight'] = self._slot_weights
 
