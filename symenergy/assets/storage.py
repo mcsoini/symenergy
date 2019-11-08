@@ -150,9 +150,8 @@ class Storage(asset.Asset):
             self._init_symbol_operation('p%s'%cd_slct, slotsslct)
         self._init_symbol_operation('e')
 
-        self._init_cstr_positive('pchg')
-        self._init_cstr_positive('pdch')
-        self._init_cstr_positive('e')
+        for var in ['pchg', 'e', 'pdch']:
+            self._init_cstr_positive(var)
 
         param_args = ('%s_%s'%('eff', self.name), noneslot, eff)
         self.eff = self.parameters.append(Parameter(*param_args))
