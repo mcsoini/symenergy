@@ -270,11 +270,11 @@ class CstrCombBase():
 
         list_slots = list(self.dict_prev_slot)
 
-        list_col_names = [tuple((dict_cstr[slot].col, c[-1])
-                                for c, dict_cstr
-                                in list(zip(self.list_cstrs, dict_cstrs))
-                                if slot in dict_cstr)
-                          for slot in list_slots]
+        list_col_names = []
+        for slot in list_slots:
+            for c, dict_cstr in list(zip(self.list_cstrs, dict_cstrs)):
+                if slot in dict_cstr:
+                    list_col_names.append(tuple((dict_cstr[slot].col, c[-1])))
 
         # check if all slots are contained in the list
         list_col_names = [c for c in list_col_names

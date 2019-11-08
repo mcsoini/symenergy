@@ -52,7 +52,10 @@ class Component():
         ''''Combines the definition of various parameters.'''
 
         if val:
-            parname = '%s_%s'%(name, self.name)
+            if self.name != slot.name:
+                parname = '%s_%s'%(name, self.name)
+            else:  # self is slot
+                parname = name
 
             if isinstance(val, Parameter):
                 newpar = val  # -> for common weight parameters of slots

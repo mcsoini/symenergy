@@ -80,7 +80,7 @@ class Slot(component.Component):
 
         lst_par = [('l', load), ('vre', vre), ('w', weight)]
         for param_name, param_val in lst_par:
-            self._add_parameter(param_name, param_val, noneslot)
+            self._add_parameter(param_name, param_val, self)
 
         self.block = block
 
