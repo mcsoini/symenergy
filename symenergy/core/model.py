@@ -1027,7 +1027,7 @@ class Model:
                                                     nthreads=nthreads)
 
 
-    def print_results(self, df, idx):
+    def print_results(self, idx, df=None):
         '''
         Print result expressions for all variables and multipliers for a
         certain constraint combination index.
@@ -1051,6 +1051,8 @@ class Model:
 
         '''
 
+        if not df:
+            df = self.df_comb
 
         x = df.reset_index().query('idx == %d'%idx).iloc[0]
 
