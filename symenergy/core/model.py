@@ -394,15 +394,16 @@ class Model:
                             for store in self.storages.values()
                             if slot in store.pdch)
 
-
             equ = (slot.l.symb
-                   - slot.vre.symb * self.vre_scale.symb
                    + total_chg
                    - total_dch
                    - sum(plant.p[slot] for plant in self.plants.values()))
 
             if self.curt and slot in self.curt['curt'].p:
                 equ += self.curt['curt'].p[slot]
+
+            if hasattr(slot, 'vre'):
+                equ -= slot.vre.symb * self.vre_scale.symb
 
             return equ
 

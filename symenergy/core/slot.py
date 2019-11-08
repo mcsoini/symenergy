@@ -72,7 +72,7 @@ class Slot(component.Component):
 
     mutually_exclusive = {}
 
-    def __init__(self, name, load, vre, weight=1, block=None):
+    def __init__(self, name, load=0, vre=None, weight=1, block=None):
 
         assert isinstance(name, str), 'Slot name must be string.'
 
