@@ -136,11 +136,12 @@ pd.set_option('mode.chained_assignment', None)
 
 class JSCallbackCoder():
 
-    def __init__(self, ind_slct, cols_pos, cols_neg):
+    def __init__(self, ind_slct, cols_series, cols_pos, cols_neg):
 
         self.ind_slct = ind_slct
         self.cols_pos = cols_pos
         self.cols_neg = cols_neg
+        self.cols_series = cols_series
 
         self._make_js_general_str()
         self._make_js_init_str()
@@ -153,6 +154,7 @@ class JSCallbackCoder():
 
         self.var_slct_str = '; '.join('var {inds} = slct_{inds}.value'.format(inds=inds)
                                       for inds in self.ind_slct) + ';'
+        self.series_slct_str = 'var dataseries = slct_dataseries.value' + ';'
         self.param_str = ', ' + ', '.join(self.ind_slct)
         self.match_str = ' && '.join('source.data[\'{inds}\'][i] == {inds}'.format(inds=inds)
                                      for inds in self.ind_slct)
@@ -160,14 +162,19 @@ class JSCallbackCoder():
 
     def _make_js_push_str(self):
 
-        get_push_str = lambda pn: ''.join(('cds_{pn}.data[\'{col}\']'
-                                           '.push(cds_all_{pn}.'
-                                           'data[\'{col}\'][i]); '
-                                           ).format(pn=pn, col=col)
-                                for col in getattr(self, 'cols_%s'%pn))
+        def get_push_str(pn):
+            for col in getattr(self, 'cols_%s'%pn):
+                tr_block = 'cds_all_{pn}.data[\'{col}\'][i]'
+                if col in self.cols_series:
+                    if_block = 'dataseries.includes(\'{col}\')'
+                    fa_block = '0'
+                    val = '({}) ? ({}) : ({})'.format(if_block, tr_block, fa_block)
+                else:
+                    val = tr_block
+                yield ('cds_{pn}.data[\'{col}\'].push(%s); \n'%val).format(pn=pn, col=col)
 
-        self.push_str_pos = get_push_str('pos')
-        self.push_str_neg = get_push_str('neg')
+        self.push_str_pos = ''.join(get_push_str('pos'))
+        self.push_str_neg = ''.join(get_push_str('neg'))
 
 
     def _make_js_init_str(self):
@@ -204,6 +211,7 @@ class JSCallbackCoder():
 
         js_code = """
             {var_slct_str}
+            {series_slct_str}
 
             {init_str}
             function checkMatch(i, source{param_str}) {{
@@ -214,6 +222,7 @@ class JSCallbackCoder():
 
             {emit_str}
             """.format(var_slct_str=self.var_slct_str,
+                       series_slct_str=self.series_slct_str,
                        param_str=self.param_str,
                        match_str=self.match_str,
                        init_str=self.init_str,
@@ -431,12 +440,27 @@ class SymenergyPlotter():
         cols_ind = self.ind_plt + [self.ind_axx, 'index']
         cols_pos = self.cols_pos + (cols_ind if self.cols_pos else [])
         cols_neg = self.cols_neg + (cols_ind if self.cols_neg else [])
+        cols_series = self.cols_pos + self.cols_neg
         js_string = JSCallbackCoder(self.ind_slct,
+                                    cols_series,
                                     cols_pos,
                                     cols_neg)()
 
         self.callback = CustomJS(args=self.get_js_args(),
                                  code=js_string)
+
+
+    def _get_series_multiselect(self):
+
+        list_slct = self.cols_pos + self.cols_neg
+        slct = MultiSelect(size=len(list_slct),
+                           value=list_slct, options=list_slct)
+
+        self.callback.args['slct_dataseries'] = slct
+        slct.js_on_change('value', self.callback)
+
+        return slct
+
 
     def _get_multiselects(self):
 
@@ -479,6 +503,7 @@ class SymenergyPlotter():
 
         return colors_posneg
 
+
     def _get_plot_list(self):
 
         list_p = []
@@ -513,19 +538,17 @@ class SymenergyPlotter():
 
         return list_p
 
-    def _make_layout(self):
-
-        ''''''
 
     def _get_layout(self):
 
         list_p = self._get_plot_list()
         selects = self._get_multiselects()
+        select_ds = self._get_series_multiselect()
         ncols = len(self.slct_list_dict[self.ind_pltx]) if self.ind_pltx else 1
         p_leg = self._get_legend()
 
         controls = WidgetBox(*selects)
-        layout = column(row(controls,
+        layout = column(select_ds, row(controls,
                             p_leg
                             ), gridplot(list_p, ncols=ncols))
 
