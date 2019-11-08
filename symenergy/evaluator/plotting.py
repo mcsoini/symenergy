@@ -135,6 +135,19 @@ from bokeh.io import show
 pd.set_option('mode.chained_assignment', None)
 
 class JSCallbackCoder():
+    '''
+    Parameters
+    ----------
+    ind_slct : list(str)
+        names of the indices selected through the MultiSelect widgets
+    cols_series : list(str)
+        names of all data series
+    cols_pos : list(str)
+        names of positive datasource columns (including indices)
+    cols_neg : list(str)
+        names of negative datasource columns (including indices)
+    '''
+
 
     def __init__(self, ind_slct, cols_series, cols_pos, cols_neg):
 
