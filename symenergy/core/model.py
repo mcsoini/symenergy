@@ -1154,3 +1154,25 @@ class Model:
         hash_input = ''.join(comp._get_component_hash_name()
                              for comp in self.comps.values())
         return md5(hash_input.encode('utf-8')).hexdigest()
+
+
+# add component class docs to the component adder docstrings
+
+
+
+for addermethod, compclass in [(Model.add_storage, Storage),
+                               (Model.add_plant, Plant),
+                               (Model.add_slot, Slot),
+                               (Model.add_slot_block, SlotBlock)]:
+
+    doc = addermethod.__doc__
+    classdoc = textwrap.dedent(compclass.__doc__)
+    lines = doc.split('\n')
+    ind = min(len(line) - len(line.strip(' ')) for line in lines
+              if not line == '')
+    classdoc = textwrap.indent(classdoc, ' ' * ind)
+
+    addermethod.__doc__ = doc % classdoc
+
+
+# %%
