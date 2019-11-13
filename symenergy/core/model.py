@@ -17,7 +17,6 @@ import wrapt
 import numpy as np
 import time
 import textwrap
-from hashlib import md5
 from sympy.tensor.array import derive_by_array
 
 from symenergy.patches.symenergy_solveset import linear_eq_to_matrix
@@ -30,6 +29,7 @@ from symenergy.core.parameter import Parameter
 from symenergy.auxiliary.parallelization import parallelize_df
 from symenergy.auxiliary.parallelization import MP_COUNTER, MP_EMA
 from symenergy.auxiliary.parallelization import log_time_progress
+from symenergy.auxiliary.decorators import hexdigest
 from symenergy import _get_logger
 from symenergy.patches.sympy_linsolve import linsolve
 #from symenergy.patches.sympy_linear_coeffs import linear_coeffs
@@ -1166,17 +1166,19 @@ class Model:
             data = 'l={:.1f}/vre={:.1f}'.format(slotobj.l.value, slotobj.vre.value)
             print(slot, bar, data, sep=' | ', end='\n', flush=True)
 
+
+    @hexdigest
     def get_model_hash_name(self):
 
-        hash_input = ''.join(comp._get_component_hash_name()
+        hash_input = ''.join(comp._get_hash_name()
                              for comp in self.comps.values())
-        return md5(hash_input.encode('utf-8')).hexdigest()
+        hash_input += str(self.lagrange_0)
+        hash_input += self.constraint_filt
+
+        return hash_input
 
 
 # add component class docs to the component adder docstrings
-
-
-
 for addermethod, compclass in [(Model.add_storage, Storage),
                                (Model.add_plant, Plant),
                                (Model.add_slot, Slot),

@@ -6,7 +6,6 @@ Contains the symenergy Component class.
 Part of symenergy. Copyright 2018 authors listed in AUTHORS.
 """
 import itertools
-from hashlib import md5
 import pandas as pd
 from symenergy.auxiliary.constrcomb import CstrCombBase
 from symenergy.auxiliary.constrcomb import filter_constraint_combinations
@@ -15,6 +14,7 @@ from symenergy.core.parameter import Parameter
 from symenergy.core.collections import VariableCollection
 from symenergy.core.collections import ConstraintCollection
 from symenergy.core.collections import ParameterCollection
+from symenergy.auxiliary.decorators import hexdigest
 
 from symenergy import _get_logger
 
@@ -142,20 +142,13 @@ class Component():
 
         return list_col_names
 
+    @hexdigest
+    def _get_hash_name(self):
 
-    def _get_component_hash_name(self):
-
-
-        hash_input = sorted(
-        [self.name]
-#        list(map(lambda x: x.name, self.get_params())) +
-#        list(map(lambda x: x.name, self.get_variabs())) +
-#        list(map(lambda x: '%s_%s'%(x.expr, x.mlt), self.get_constraints()))
-        )
-
-        logger.debug('Generating component hash.')
-
-        return md5(str(hash_input).encode('utf-8')).hexdigest()
+        return (str(self.name)
+                  + str(self.constraints('expr'))
+                  + str(self.parameters._get_hash_name())
+                  + str(self.variables('name')))
 
 
     def __repr__(self):

@@ -13,7 +13,6 @@ import wrapt
 import numpy as np
 import itertools
 from copy import copy
-from hashlib import md5
 from collections import Counter
 
 import symenergy.core.asset as asset
@@ -21,6 +20,7 @@ from symenergy.core.constraint import Constraint
 from symenergy.core.slot import Slot, noneslot
 from symenergy.core.parameter import Parameter
 from symenergy.auxiliary.constrcomb import CstrCombBase
+from symenergy.auxiliary.decorators import hexdigest
 
 from symenergy.core.slot import noneslot
 
@@ -390,7 +390,8 @@ class Storage(asset.Asset):
         self.cc = self.energy_cost * sum(self.e.values())
 
 
-    def _get_component_hash_name(self):
+    @hexdigest
+    def _get_hash_name(self):
         ''' Expand component hash.
 
         Storage has additional attributes which need to be included in the
@@ -400,12 +401,9 @@ class Storage(asset.Asset):
         * `slots_map`
         '''
 
-        hash_name_0 = super()._get_component_hash_name()
-        hash_input = [str(self.slots_map),
-                      '{:.20f}'.format(self.energy_cost),
-                      str(self.energy_cost)]
+        hash_name_0 = super()._get_hash_name()
+        hash_input = (str(self.slots_map)
+                      + '{:.20f}'.format(self.energy_cost))
 
-        logger.debug('Generating storage hash.')
-
-        return md5(str(hash_input + [hash_name_0]).encode('utf-8')).hexdigest()
+        return hash_input + hash_name_0
 

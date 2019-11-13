@@ -8,14 +8,16 @@ Part of symenergy. Copyright 2018 authors listed in AUTHORS.
 
 
 import sympy as sp
-from hashlib import md5
 import itertools
+from orderedset import OrderedSet
 
 import symenergy.core.component as component
 from symenergy.core.constraint import Constraint
 from symenergy.core.parameter import Parameter
 from symenergy.core.variable import Variable
 from symenergy.core.slot import noneslot
+from symenergy.auxiliary.decorators import hexdigest
+
 
 from symenergy import _get_logger
 
@@ -135,7 +137,7 @@ class Asset(component.Component):
 
 
 
-        for slot in set(slot_objs) & set(var_attr):
+        for slot in OrderedSet(slot_objs) & OrderedSet(var_attr):
             base_name = '%s_%s_cap%s_%s'%(self.name, var_name,
                                            {-1: 'neg', +1: ''}[sgn],
                                            capacity_name)
@@ -190,7 +192,7 @@ class Asset(component.Component):
 
         self.variables.to_dict({'slot': ''})
 
-        for slot in set(slot_objs) & set(var_attr):
+        for slot in OrderedSet(slot_objs) & OrderedSet(var_attr):
 
             base_name = '%s_pos_%s'%(self.name, variable)
 
@@ -209,13 +211,14 @@ class Asset(component.Component):
         '''
 
 
-        if variable in set(self.variabs) & set(self.variabs_time):
+        if variable in (OrderedSet(self.variabs)
+                        & OrderedSet(self.variabs_time)):
             # the variable is defined for all time slots only if there are
             # two or more time slots (used for stored energy)
 
             flag_timedep = len(self.slots) >= 2
 
-        elif variable in set(self.variabs_time) | set(self.variabs_time):
+        elif variable in OrderedSet(self.variabs) | OrderedSet(self.variabs_time):
             flag_timedep = variable in self.variabs_time
 
         else:
@@ -270,14 +273,15 @@ class Asset(component.Component):
         return symb
 
 
-    def _get_component_hash_name(self):
+    @hexdigest
+    def _get_hash_name(self):
 
-        hash_name_0 = super()._get_component_hash_name()
+        hash_name_0 = super()._get_hash_name()
         # adding slots
-        hash_input = list(map(lambda x: '%s'%(x.name),
-                              self.slots.values()))
+        hash_input = str(tuple(map(lambda x: '%s'%(x.name),
+                                   self.slots.values())))
 
         logger.debug('Generating asset hash.')
 
-        return md5(str(hash_input + [hash_name_0]).encode('utf-8')).hexdigest()
+        return hash_input + hash_name_0
 

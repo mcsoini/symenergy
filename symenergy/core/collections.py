@@ -11,7 +11,7 @@ from orderedset import OrderedSet
 from symenergy.core.parameter import Parameter
 from symenergy.core.variable import Variable
 from symenergy.core.constraint import Constraint
-
+from symenergy.auxiliary.decorators import hexdigest
 
 class AttributeCollection():
     '''
@@ -209,6 +209,15 @@ class ParameterCollection(AttributeCollection):
     '''
 
     _expected_type = Parameter
+
+    @hexdigest
+    def _get_hash_name(self):
+        '''
+        Parameters create their own hashes because they depend on whether or
+        not the parameter value is fixed.
+        '''
+
+        return str([param._get_hash_name() for param in self._elements])
 
 
 class ConstraintCollection(AttributeCollection):

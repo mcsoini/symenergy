@@ -6,10 +6,10 @@ Contains the Slot class. Provides a dummy slot object noneslot.
 Part of symenergy. Copyright 2018 authors listed in AUTHORS.
 """
 
-from hashlib import md5
 
 from symenergy.core import component
 from symenergy.core.parameter import Parameter
+from symenergy.auxiliary.decorators import hexdigest
 
 from symenergy import _get_logger
 
@@ -40,14 +40,6 @@ class SlotBlock(component.Component):
         self.name = name
         self.rp = self.parameters.append(Parameter('%s_rp'%self.name, noneslot,
                                                    repetitions))
-
-
-    def _get_hash_name(self):
-
-        hash_input = [self.name]
-        logger.debug('Generating time slot block hash.')
-
-        return md5(str(hash_input).encode('utf-8')).hexdigest()
 
 
 class Slot(component.Component):
@@ -85,14 +77,17 @@ class Slot(component.Component):
         self.block = block
 
 
-    def _get_component_hash_name(self):
+    @hexdigest
+    def _get_hash_name(self):
+        '''
+        Add block hash to slot hash, otherwise the time slot allocation to
+        blocks would not affect the component hashes.
+        '''
 
-        hash_name_0 = super()._get_component_hash_name()
+        hash_input_0 = super()._get_hash_name()
         hash_input = self.block._get_hash_name() if self.block else ''
 
-        logger.debug('Generating time slot hash.')
-
-        return md5(str(hash_input + hash_name_0).encode('utf-8')).hexdigest()
+        return hash_input + hash_input_0
 
 
 class NoneSlot():

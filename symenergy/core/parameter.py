@@ -8,6 +8,7 @@ Part of symenergy. Copyright 2018 authors listed in AUTHORS.
 
 import sympy as sp
 
+from symenergy.auxiliary.decorators import hexdigest
 from symenergy import _get_logger
 
 logger = _get_logger(__name__)
@@ -77,6 +78,15 @@ class Parameter():
 
         logger.debug('Unfreezing value of parameter %s.'%self.name)
         self._is_frozen = False
+
+
+    @hexdigest
+    def _get_hash_name(self):
+        '''
+        The parameter hash includes the parameter value only if it is frozen.
+        '''
+
+        return self.name + (str(self.value) if self._is_frozen else '')
 
 
     def __repr__(self):
