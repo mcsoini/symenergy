@@ -545,6 +545,8 @@ class SymenergyPlotter():
                 posneg_vars = zip(['pos', 'neg'],
                                   [self.cols_pos, self.cols_neg],
                                   [self.cds_pos, self.cds_neg])
+                posneg_vars = [vars_ for vars_ in posneg_vars
+                               if vars_[1]]  # skip if columns empty (e.g. no neg)
                 for posneg, cols, data in posneg_vars:
 
                     view = self.views[(valx, valy)][posneg]
