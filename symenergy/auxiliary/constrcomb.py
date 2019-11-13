@@ -313,17 +313,18 @@ class CstrCombBase():
 
         list_slots = list(self.dict_prev_slot)
 
-        list_col_names = []
+        list_all_slots = []
         for slot in list_slots:
+            list_combs = []
             for c, dict_cstr in list(zip(self.list_cstrs, dict_cstrs)):
                 if slot in dict_cstr:
-                    list_col_names.append(tuple((dict_cstr[slot].col, c[-1])))
+                    list_combs.append(tuple((dict_cstr[slot].col, c[-1])))
 
-        # check if all slots are contained in the list
-        list_col_names = [c for c in list_col_names
-                          if len(c) == len(self.list_cstrs)]
+            if len(list_combs) == len(self.list_cstrs):
+                # all relevant constraints exist
+                list_all_slots.append(tuple(list_combs))
 
-        return list_col_names
+        return list_all_slots
 
 
     @none_if_invalid
