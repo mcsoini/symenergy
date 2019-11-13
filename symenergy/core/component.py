@@ -8,7 +8,7 @@ Part of symenergy. Copyright 2018 authors listed in AUTHORS.
 import itertools
 import pandas as pd
 from symenergy.auxiliary.constrcomb import CstrCombBase
-from symenergy.auxiliary.constrcomb import filter_constraint_combinations
+from symenergy.auxiliary.constrcomb import filter_constraint_combinations, filter_constraint_combinations_gen
 
 from symenergy.core.parameter import Parameter
 from symenergy.core.collections import VariableCollection
