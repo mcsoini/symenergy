@@ -333,6 +333,12 @@ class SymenergyPlotter():
         self.all_series = data.columns.tolist()
 
         if self.slct_series:
+
+            missing = [c for c in self.slct_series if not c in self.all_series]
+            if missing:
+                raise IndexError(('Unknown data series %s; options are %s.'
+                                  )%(str(missing), str(self.all_series)))
+
             data = data[self.slct_series]
             data = data.loc[~data.isna().all(axis=1)]
 
