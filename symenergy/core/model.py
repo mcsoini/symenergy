@@ -15,7 +15,6 @@ import pandas as pd
 import sympy as sp
 import wrapt
 import numpy as np
-import time
 import textwrap
 from sympy.tensor.array import derive_by_array
 
@@ -568,6 +567,8 @@ class Model:
             self.df_comb = self.df_comb.query(constraint_filt)
 
         self.ncomb = len(self.df_comb)
+
+        logger.info('Remaining df_comb rows: %d' % self.ncomb)
 
 #
 #    def get_variabs_params(self):

@@ -119,7 +119,7 @@ class CstrCombBase():
         self.list_cstrs = list_cstrs
 
         if isinstance(slots_def, list):
-            self.dict_prev_slot = {slot: slot for slot in slots_def}
+            self.dict_prev_slot = dict(zip(slots_def, slots_def))
         else:
             self.dict_prev_slot = slots_def
 
