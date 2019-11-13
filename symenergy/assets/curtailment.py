@@ -18,19 +18,10 @@ class Curtailment(asset.Asset):
     mutually_exclusive = {}
 
     def __init__(self, name, slots=None):
+        '''
+        '''
 
-        '''
-        Params:
-            * name --
-            * vc0 --
-            * vc1 --
-            * fcom -- float, O&M fixed cost
-            * slots -- iterable of time slot names
-            * capacity --
-            * cap_ret -- boolean, capacity can be retired True/False
-        '''
         super().__init__(name)
-#        self.name = name
 
         self.slots = slots if slots else noneslot
         self._init_symbol_operation('p')

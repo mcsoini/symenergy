@@ -248,7 +248,7 @@ class Storage(asset.Asset):
         list_col_names = []
 
         if __name__ == '__main__':
-            mename, me = list(self.mutually_exclusive.items())[0]
+            mename, me = list(self.mutually_exclusive.items())[1]
         for mename, me in self.mutually_exclusive.items():
 
             list_cstrs = me

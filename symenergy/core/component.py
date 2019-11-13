@@ -86,8 +86,6 @@ class Component():
             param._freeze_value()
 
 
-
-
     def _get_constraint_combinations(self):
         '''
         Return all relevant constraint combinations for this component.
@@ -116,6 +114,7 @@ class Component():
         logger.info(('Component %s: Generating df_comb with length %d...'
                         )%(self.name, ncombs))
         bools = [[False, True] for cc in constrs_cols_neq]
+
         df_comb = pd.DataFrame(itertools.product(*bools),
                                columns=constrs_cols_neq, dtype=bool)
         logger.info('...done.')
@@ -131,6 +130,8 @@ class Component():
         '''
 
         list_col_names = []
+        if __name__ == '__main__':
+            mename, me = list(self.mutually_exclusive.items())[1]
         for mename, me in self.mutually_exclusive.items():
 
             ccb = CstrCombBase(mename, me, list(self.slots.values()),
