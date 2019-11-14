@@ -307,6 +307,19 @@ class CstrCombBase():
         return list_combs
 
 
+    def expand_slots_all(self):
+
+        assert len(self.list_cstrs) == 1, ('More than one cstr '
+                                           'in expand_slots_all')
+
+        bool_ = self.list_cstrs[0][-1]  # single
+
+        list_combs = [tuple((cstr.col, bool_) for cstr
+                            in self.get_cstr_objs()[0].values())]
+
+        return list_combs
+
+
     def expand_slots_this(self):
 
         dict_cstrs = self.get_cstr_objs()
@@ -329,6 +342,15 @@ class CstrCombBase():
 
     @none_if_invalid
     def gen_col_combs(self):
+        '''
+
+        Returns
+        -------
+        list of list of tuples (column_name, bool)
+        [[('col_cstr_0', True), ('col_cstr_1', False)],
+         [('col_cstr_3', True), ('col_cstr_4', False)],...]
+        '''
+
 
         list_code_rel_slot = set(cs[1] for cs in self.list_cstrs)
 
@@ -349,6 +371,10 @@ class CstrCombBase():
         elif list_code_rel_slot == {'this'}:
 
             list_col_names = self.expand_slots_this()
+
+        elif list_code_rel_slot == {'all'}:
+
+            list_col_names = self.expand_slots_all()
 
         else:
             raise ValueError('Not implemented: list_code_rel_slot='

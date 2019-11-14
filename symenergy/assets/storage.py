@@ -123,6 +123,9 @@ class Storage(asset.Asset):
 
         'All energy zero -> each discharging cannot be non-zero':
             (('pos_e', 'all', True), ('pos_pdch', 'this', False)),
+
+        'All energy non-zero':
+            (('pos_e', 'all', False),)
         }
 
     def __init__(self, name, eff, slots_map=None, slots=None,
@@ -248,7 +251,10 @@ class Storage(asset.Asset):
         list_col_names = []
 
         if __name__ == '__main__':
-            mename, me = list(self.mutually_exclusive.items())[1]
+
+            mename = "All energy non-zero"
+            me = self.mutually_exclusive[mename]
+
         for mename, me in self.mutually_exclusive.items():
 
             list_cstrs = me
