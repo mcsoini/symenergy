@@ -1045,7 +1045,7 @@ class Model:
                                                     nthreads=nthreads)
 
 
-    def print_results(self, idx, df=None):
+    def print_results(self, idx, df=None, substitute=None):
         '''
         Print result expressions for all variables and multipliers for a
         certain constraint combination index.
@@ -1071,6 +1071,8 @@ class Model:
 
         if not df:
             df = self.df_comb
+        if not substitute:
+            substitute = {}
 
         x = df.reset_index().query('idx == %d'%idx).iloc[0]
 
@@ -1080,7 +1082,7 @@ class Model:
         for var, res in resdict.items():
 
             print('*'*20, var, '*'*20)
-            print(sp.simplify(res))
+            print(sp.simplify(res.subs(substitute)))
 
 
     def __repr__(self):
