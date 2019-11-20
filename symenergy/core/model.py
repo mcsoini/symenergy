@@ -1069,19 +1069,23 @@ class Model:
 
         '''
 
+
+        if not isinstance(df, pd.DataFrame):
+            df = self.df_comb
+
         x = df.reset_index().query('idx == %d'%idx).iloc[0]
 
-        if not df:
-            df = self.df_comb
         if not substitute:
             substitute = {}
 
 
-        resdict = zip(map(str, x.variabs_multips), x.result)
+        resdict = dict(zip(map(str, x.variabs_multips), x.result))
         if slct_var_mlt:
-            resdict = {var, res for var_res in resdict if var in slct_var_mlt}
-        resdict = pd.DataFrame(residct
-                              ).sort_values(0).set_index(0).to_dict()[1]
+            resdict = {var: res for var, res in resdict.items()
+                       if var in slct_var_mlt}
+
+        resdict = pd.DataFrame.from_dict(resdict, orient='index'
+                                         ).reset_index().sort_values('index').set_index('index').to_dict()[0]
 
         for var, res in resdict.items():
 
