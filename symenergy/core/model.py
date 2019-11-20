@@ -423,7 +423,7 @@ class Model:
             if hasattr(slot, 'vre'):
                 equ -= slot.vre.symb * self.vre_scale.symb
 
-            return equ
+            return slot.w.symb * equ
 
 
     def _init_supply_constraints(self):
