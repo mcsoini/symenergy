@@ -1045,7 +1045,7 @@ class Model:
                                                     nthreads=nthreads)
 
 
-    def print_results(self, idx, df=None, substitute=None):
+    def print_results(self, idx, df=None, slct_var_mlt=None, substitute=None):
         '''
         Print result expressions for all variables and multipliers for a
         certain constraint combination index.
