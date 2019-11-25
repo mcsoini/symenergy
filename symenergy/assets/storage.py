@@ -146,7 +146,7 @@ class Storage(asset.Asset):
 
         self._make_mutually_exclusive_dict()
 
-        self.energy_cost = energy_cost
+        self._add_parameter('ec', energy_cost, noneslot)
 
         for cd_slct in ['chg', 'dch']:
             slotsslct = self.slots_map[cd_slct]
@@ -393,7 +393,7 @@ class Storage(asset.Asset):
         Set constant and linear components of variable costs.
         '''
 
-        self.cc = self.energy_cost * sum(self.e.values())
+        self.cc = self.ec.symb * sum(self.e.values())
 
 
     @hexdigest
@@ -408,8 +408,7 @@ class Storage(asset.Asset):
         '''
 
         hash_name_0 = super()._get_hash_name()
-        hash_input = (str(self.slots_map)
-                      + '{:.20f}'.format(self.energy_cost))
+        hash_input = str(self.slots_map)
 
         return hash_input + hash_name_0
 
