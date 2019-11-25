@@ -236,9 +236,9 @@ class Storage(asset.Asset):
             logger.warning(('%s: Moving variable e from VARIABS_TIME '
                            'to VARIABS')%self.name)
 
-            self.VARIABS_TIME = copy(self.VARIABS_TIME)  # copy class attr
-            self.VARIABS_TIME.remove('e')
-            self.VARIABS = copy(self.VARIABS) + ['e']
+            self.variabs_time = copy(self.variabs_time)  # copy class attr
+            self.variabs_time.remove('e')
+            self.variabs = copy(self.variabs) + ['e']
 
 
     def _get_mutually_exclusive_cstrs(self):
