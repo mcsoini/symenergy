@@ -21,44 +21,17 @@ from symenergy import _get_logger
 logger = _get_logger(__name__)
 
 
-def filter_constraint_combinations_gen(combs_gen, mutually_exclusive_cols,
-                                   column_names):
     '''
-    Low memory demand demand but slow when compared to pandas version...
-
-    Call like:
-    combs_gen = itertools.product(*bools)
-    df_comb = filter_constraint_combinations_gen(combs_gen, mutually_exclusive_cols=mut_excl_cols,
-                                                 column_names=constrs_cols_neq)
 
     '''
 
-    cols = column_names
 
-    # translate column names to column index
-    mutually_exclusive_index = [[(cols.index(col[0]), col[1])
-                                 for col in comb]
-                                for comb in mutually_exclusive_cols]
 
-    mutually_exclusive_index = [list(zip(*comb))
-                                for comb in mutually_exclusive_index]
 
-    if __name__ == '__main__':
-        combs_gen = itertools.product(*bools)
 
-    @functools.lru_cache(maxsize=1024, typed=True)
-    def get_getter(list_):
-        return operator.itemgetter(*list_)
 
-    def check_comb(comb_inp, comb_check):
-        return get_getter(comb_check[0])(comb_inp) == comb_check[1]
 
-    df = pd.DataFrame([comb_inp for comb_inp in combs_gen
-                       if not any(check_comb(comb_inp, comb_check)
-                       for comb_check in mutually_exclusive_index)],
-                       columns=cols)
 
-    return df
 
 
 
