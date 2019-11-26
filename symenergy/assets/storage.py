@@ -47,7 +47,12 @@ class Storage(asset.Asset):
     energy_capacity : float
         Optional storage energy capacity; this limits the stored energy
         content. Power is unconstrained if this argument is not set.
+    charging_to_energy_factor : str
+        options:
 
+        * `'sqrt'` -- :math:`\mathrm{e} = \sqrt{\eta} p_\mathrm{chg} - 1/\sqrt{\eta} p_\mathrm{dch}`
+        * `'eta'` -- :math:`\mathrm{e} = \eta p_\mathrm{chg} - p_\mathrm{dch}`
+        * `'1'` -- :math:`\mathrm{e} = p_\mathrm{chg} - 1/\eta * p_\mathrm{dch}`
 
     The time slot order follows from the order in which they are added to the
     model instance (:func:`symenergy.core.model.Model.add_slot`).
@@ -130,12 +135,13 @@ class Storage(asset.Asset):
 
     def __init__(self, name, eff, slots_map=None, slots=None,
                  capacity=False, energy_capacity=False, energy_cost=1e-12,
-                 _slot_blocks=None):
+                 _slot_blocks=None, charging_to_energy_factor='sqrt'):
 
         super().__init__(name)
 #        self.name = name
         self.slots = slots
         self._slot_blocks = _slot_blocks
+        self.charging_to_energy_factor = charging_to_energy_factor
 
         self.slots_map = (slots_map if slots_map
                           else {'chg': list(self.slots.keys()),
@@ -168,8 +174,8 @@ class Storage(asset.Asset):
             self._add_parameter(param_name, param_val, noneslot)
 
         self._init_cstr_storage()
-
         self._init_cost_component()
+
 
     @property
     def slots_map(self):
@@ -321,10 +327,23 @@ class Storage(asset.Asset):
         e_prev = self.e[self._dict_prev_slot[slot]]
 
         slot_w = slot.w.symb
-        expr = (e_prev
-                + pchg * slot_w * self.eff.symb**(1/2)
-                - pdch * slot_w * self.eff.symb**(-1/2)
-                - e)
+        expr = - e + e_prev
+
+        if self.charging_to_energy_factor == 'sqrt':
+            expr += (+ pchg * slot_w * self.eff.symb**(0.5)
+                     - pdch * slot_w * self.eff.symb**(-0.5))
+        elif self.charging_to_energy_factor == 'eta':
+            expr += (+ pchg * slot_w * self.eff.symb**(1.0)
+                     - pdch * slot_w)
+        elif self.charging_to_energy_factor == '1':
+            expr += (+ pchg * slot_w
+                     - pdch * slot_w * self.eff.symb**(-1.0))
+        else:
+            raise ValueError(('Unknown charging_to_energy_factor '
+                             '"{}" in storage "{}"'
+                             ).format(self.charging_to_energy_factor,
+                                      self.name))
+
 
         def get_first (iblock):
             return [slot for slot in self.slots.values() if
