@@ -21,16 +21,54 @@ from symenergy import _get_logger
 logger = _get_logger(__name__)
 
 
+def make_constraint_combination_table(n, mutually_excl):
+    '''
+    Arguments
+    ----------
+    n : int
+        number of columns of the final DataFrame
+    mutually_excl : list of lists of tuples (column_index(int), bool)
+
     '''
 
-    '''
+    mutually_excl = [dict(comb) for comb in mutually_excl]
 
+    # determine missing (unfiltered) columns
+    cols_missing = (set(range(n))
+                    - set(itertools.chain.from_iterable(mutually_excl)))
 
+    full_df = lambda cols: pd.DataFrame(
+                            itertools.product(*([[True, False]] * len(cols))),
+                            columns=cols)
 
+    # complete dataframe of unfiltered columns with column "temp" for full outer merge
+    df_comb = full_df(cols_missing).assign(temp=1)
 
+    for filt in mutually_excl:  # loop through individual filters
 
+        # get columns and bool values of this filters as two tuples with same order
+        list_col, list_bool = zip(*filt.items())
 
+        # construct dataframe
+        df = full_df(list_col)
 
+        # filter remove a *single* row (by definition)
+        df = df.loc[df.apply(tuple, axis=1) != list_bool]
+
+        # determine which rows to merge on
+        merge_cols = list(set(df.columns) & set(df_comb.columns))
+        if not merge_cols:
+            merge_cols = ['temp']
+            df['temp'] = 1
+
+        # merge with full dataframe
+        df_comb = pd.merge(df_comb, df, on=merge_cols)
+
+    df_comb.drop('temp', axis=1, inplace=True)
+    df_comb = df_comb[range(n)]
+    df_comb = df_comb.sort_values(df_comb.columns.tolist(), ascending=False)
+
+    return df_comb.reset_index(drop=True)
 
 
 
