@@ -8,7 +8,7 @@ Part of symenergy. Copyright 2018 authors listed in AUTHORS.
 import itertools
 import pandas as pd
 from symenergy.auxiliary.constrcomb import CstrCombBase
-from symenergy.auxiliary.constrcomb import filter_constraint_combinations, filter_constraint_combinations_gen
+from symenergy.auxiliary.constrcomb import make_constraint_combination_table
 
 from symenergy.core.parameter import Parameter
 from symenergy.core.collections import VariableCollection
@@ -103,25 +103,28 @@ class Component():
 
         '''
 
+        logger.info('Generating constraint combinations for "%s"' % self.name)
+
         filt = dict(is_equality_constraint=False)
         constrs_cols_neq = self.constraints.tolist('col', **filt)
+        constrs_cols_neq = {col: i for i, col in enumerate(constrs_cols_neq)}
 
-        mut_excl_cols = self._get_mutually_exclusive_cstrs()
+        if constrs_cols_neq:
 
-        ncombs = 2**len(constrs_cols_neq)
+            mut_excl_cols = self._get_mutually_exclusive_cstrs()
+            # translate to column id
+            mut_excl_cols = [[(constrs_cols_neq[col[0]], col[1])
+                             for col in comb] for comb in mut_excl_cols]
 
-        logger.info('*'*30 + self.name + '*'*30)
-        logger.info(('Component %s: Generating df_comb with length %d...'
-                        )%(self.name, ncombs))
-        bools = [[False, True] for cc in constrs_cols_neq]
 
-        df_comb = pd.DataFrame(itertools.product(*bools),
-                               columns=constrs_cols_neq, dtype=bool)
-        logger.info('...done.')
+            df_comb = make_constraint_combination_table(len(constrs_cols_neq),
+                                                mutually_excl=mut_excl_cols)
+            df_comb = df_comb.rename(columns=dict(enumerate(constrs_cols_neq)))
 
-        df_comb = filter_constraint_combinations(df_comb, mut_excl_cols)
+            return df_comb
 
-        return df_comb
+        else:
+            return pd.DataFrame()
 
 
     def _get_mutually_exclusive_cstrs(self):
