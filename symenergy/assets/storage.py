@@ -120,6 +120,11 @@ class Storage(asset.Asset):
 ##        'Full storage stays full w/o discharging_2':  # << this combination is wrong and deletes valid solutions
 ##            (('e_cap_E', 'last', False), ('pos_pdch', 'this', True), ('e_cap_E', 'this', True)),
 
+        'Not full storage can\'t become full w/out charging':
+            (('e_cap_E', 'last', False), ('pos_pchg', 'this', True), ('e_cap_E', 'this', True)),
+        'Not empty storage can\'t become empty w/out discharging':
+            (('pos_e', 'last', False), ('pos_pdch', 'this', True), ('pos_e', 'this', True)),
+
         'Empty storage can`t discharge':
             (('pos_e', 'last', True), ('pos_pdch', 'this', False)),
 
