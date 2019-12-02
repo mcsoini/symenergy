@@ -459,7 +459,7 @@ class SymenergyPlotter():
 
     def _init_callback(self):
 
-        cols_ind = (self.ind_plt + [self.ind_axx, 'index'] +
+        cols_ind = (self.ind_plt + [self.ind_axx, 'index']
                     + ([self.ind_axy] if self.ind_axy else []))
         cols_pos = self.cols_pos + (cols_ind if self.cols_pos else [])
         cols_neg = self.cols_neg + (cols_ind if self.cols_neg else [])
