@@ -265,12 +265,14 @@ class SymenergyPlotter():
     cols_neg = []
 
     def __init__(self, ev, ind_axx, ind_pltx, ind_plty, slct_series=None,
-                 cat_column=None, plot_width=400, plot_height=300):
+                 cat_column=None, plot_width=400, plot_height=300,
+                 ind_axy=None):
 
         self.ev = ev
         self.ind_pltx = ind_pltx
         self.ind_plty = ind_plty
         self.ind_axx = ind_axx
+        self.ind_axy = ind_axy
 
         self.plot_height = plot_height
         self.plot_width = plot_width
@@ -289,8 +291,8 @@ class SymenergyPlotter():
         self.ind_plt = list(filter(lambda x: x is not None,
                                    [self.ind_pltx, self.ind_plty]))
         self.ind_slct = [x for x in self.ev.x_name
-                         if not x in (self.ind_plt
-                                      + [self.ind_axx]
+                         if not x in (self.ind_plt + [self.ind_axx]
+                                      + ([self.ind_axy] if self.ind_axy else [])
                                       + self.cat_column)]
 
     @property
@@ -314,7 +316,8 @@ class SymenergyPlotter():
 
         df = self._select_data()
 
-        gpindex = self.ind_plt + self.ind_slct + [self.ind_axx]
+        gpindex = (self.ind_plt + self.ind_slct + [self.ind_axx]
+                   + ([self.ind_axy] if self.ind_axy else []))
         data = df.pivot_table(index=gpindex, columns=self.cat_column,
                               values=self.val_column, fill_value=0)
 
@@ -456,7 +459,8 @@ class SymenergyPlotter():
 
     def _init_callback(self):
 
-        cols_ind = self.ind_plt + [self.ind_axx, 'index']
+        cols_ind = (self.ind_plt + [self.ind_axx, 'index'] +
+                    + ([self.ind_axy] if self.ind_axy else []))
         cols_pos = self.cols_pos + (cols_ind if self.cols_pos else [])
         cols_neg = self.cols_neg + (cols_ind if self.cols_neg else [])
         cols_series = self.cols_pos + self.cols_neg
@@ -540,7 +544,9 @@ class SymenergyPlotter():
                 p = figure(plot_width=self.plot_width,
                            plot_height=self.plot_height,
                            title=title_str,
-                           x_axis_label=self.ind_axx)
+                           x_axis_label=self.ind_axx,
+                           y_axis_label=(self.ind_axy if self.ind_axy
+                                         else self.val_column))
 
                 posneg_vars = zip(['pos', 'neg'],
                                   [self.cols_pos, self.cols_neg],
