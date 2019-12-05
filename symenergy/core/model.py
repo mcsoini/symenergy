@@ -699,6 +699,8 @@ class Model:
         Substitute result variable expressions into total costs
         '''
 
+        logger.info('Generating total cost expressions...')
+
         df = self.df_comb[['result', 'variabs_multips', 'idx']]
 
         if not self.nthreads:
