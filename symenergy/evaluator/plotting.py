@@ -560,7 +560,8 @@ class SymenergyPlotter():
                     self._make_single_plot(fig=p, color=self.colors[posneg],
                                            data=data, view=view, cols=cols)
 
-                p.legend.visible = False
+                if p.legend:
+                    p.legend.visible = False
                 list_p.append(p)
 
         return list_p
