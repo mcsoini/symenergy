@@ -20,12 +20,15 @@ from functools import partial
 import time
 from sympy.utilities.lambdify import lambdastr
 import symenergy
+from sympy import lambdify
 
 from symenergy.auxiliary.parallelization import parallelize_df
 from symenergy.auxiliary.parallelization import log_time_progress
 from symenergy.auxiliary.parallelization import get_default_nthreads
 from symenergy.auxiliary.parallelization import MP_COUNTER, MP_EMA
 from symenergy.auxiliary import parallelization
+from symenergy.auxiliary.decorators import hexdigest
+from symenergy.auxiliary.io import EvaluatorCache
 
 from symenergy.core.model import Model
 from symenergy import _get_logger
@@ -57,6 +60,8 @@ class Evaluator():
         self._x_vals = None
         self.x_vals = x_vals
 
+        self.cache_lambd, self.cache_eval = self._get_caches()
+
         self.tolerance = tolerance
 
         self.dfev = self._get_dfev()
@@ -67,16 +72,16 @@ class Evaluator():
         self.is_positive = \
             self.model.constraints('expr_0', is_positivity_constraint=True)
 
+        self.fn_temp = (os.path.basename(self.cache_lambd.fn)
+                               .replace('.pickle', '_eval_temp.py'))
+
         self.fn_temp = os.path.abspath(os.path.join(symenergy.__file__, '..',
-                                          'evaluator', 'eval_temp.py'))
+                                      'evaluator', self.fn_temp))
 
-        try:
-            os.remove(self.fn_temp)
-        except Exception as e :
-            logger.debug(e)
-
-
-#        self._get_evaluated_lambdas()
+#        try:
+#            os.remove(self.fn_temp)
+#        except Exception as e :
+#            logger.debug(e)
 
 
     def _get_dfev(self):
@@ -114,6 +119,21 @@ class Evaluator():
 
         self.df_x_vals = self._get_x_vals_combs()
 
+        self.cache_lambd, self.cache_eval = self._get_caches()
+
+
+    def _get_caches(self):
+        ''' Separate cache instances'''
+
+        hash_lambd = self._get_evaluator_hash_name(include_x_vals=False)
+        cache_lambd = EvaluatorCache(hash_lambd, 'cache_lambd')
+        hash_eval = self._get_evaluator_hash_name(include_x_vals=True)
+        cache_eval = EvaluatorCache(hash_eval, 'cache_eval')
+
+
+
+        return cache_lambd, cache_eval
+
     @property
     def df_x_vals(self):
         return self._df_x_vals
@@ -125,12 +145,18 @@ class Evaluator():
 
     def _get_list_dep_var(self, skip_multipliers=False):
 
-        list_dep_var = list(map(str, self.model.constraints('mlt')
-                                     + self.model.variables('symb')))
+        list_dep_var = ['tc']
 
-        list_dep_var += ['tc']
+        list_dep_var += list(map(str, self.model.variables('symb')))
+
+        # including supply constraint even if skip_multipliers
+        list_dep_var += [mlt for mlt in map(str, self.model.constraints('mlt'))
+                         if (('supply' in mlt)  # only keep supply
+                             if skip_multipliers
+                             else True)]  # keep all
 
         if skip_multipliers:
+            # excluding supply constraint even if
             list_dep_var = [v for v in list_dep_var
                             if (not 'lb_' in v and not 'pi_' in v)
                             or 'supply' in v]
@@ -265,8 +291,8 @@ class Evaluator():
         multiple definitions of identical functions which return e.g. constant
         zero.'''
 
-        salt = str(random.randint(0, 1e12))
-        return '_' + md5((func_str + salt).encode('utf-8')).hexdigest()
+#        salt = str(random.randint(0, 1e12))
+        return '_' + md5((func_str).encode('utf-8')).hexdigest()
 
 
     def _call_lambdify(self, df):
@@ -325,12 +351,14 @@ class Evaluator():
                            variable and each constraint combination.
         '''
 
+        if self.cache_lambd.file_exists:
+            self.cache_lambd.load()
+            return
+
         try:
-            del self.df_lam_plot
-        except: pass
-        try:
-            del sys.modules['symenergy.evaluator.eval_temp']
-        except: pass
+            os.remove(self.fn_temp)
+        except Exception as e :
+            logger.debug(e)
 
         list_dep_var = self._get_list_dep_var(skip_multipliers)
 
@@ -340,7 +368,6 @@ class Evaluator():
         logger.info('Length expanded function DataFrame: %d'%len(dfev_exp))
 
         self.nparallel = len(dfev_exp)
-        random.seed(123)
         dfev_func_str = parallelize_df(dfev_exp, self._wrapper_call_lambdify)
 
         logger.info('Starting _replace_func_str_name...')
@@ -348,29 +375,39 @@ class Evaluator():
                                 .drop_duplicates()
                                 .apply(self._replace_func_str_name, axis=1))
         logger.info('... done')
-
+#
         logger.info('Number unique function strings: %d'%len(dfev_func_str))
-
+#
         module_str = '\n'.join(dfev_func_str_unq)
-        module_str = 'from numpy import sqrt\n\n' + module_str
+        module_str = f'from numpy import sqrt\n\n{module_str}'
 
         with open(self.fn_temp , "w") as f:
             f.write(module_str)
 
         py_compile.compile(self.fn_temp)
 
-        et = __import__('eval_temp', level=1, globals={"__name__": __name__})
+        et = __import__(os.path.basename(self.fn_temp).replace('.py', ''),
+                        level=1, globals={"__name__": __name__})
 
         # retrieve eval_temp functions based on hash name
         dfev_func_str['lambd_func'] = (
             dfev_func_str.func_hash.apply(lambda x: getattr(et, x)))
 
-
         dfev_func_str = dfev_func_str.join(self.model.df_comb.set_index('idx')[
                                     self.model.constrs_cols_neq], on='idx')
 
-
         self.df_lam_plot = dfev_func_str
+
+        self.cache_lambd.write(self.df_lam_plot)
+
+
+    @hexdigest
+    def _get_evaluator_hash_name(self, include_x_vals=False):
+
+        hash_input = str(self.x_vals if include_x_vals else self.x_name)
+        hash_input += str(self.model.get_model_hash_name())
+
+        return hash_input
 
 
     def _get_optimum_group_params(self, nchunks):
@@ -503,7 +540,14 @@ class Evaluator():
             return x_ret
 
 
-    def _get_mask_valid_solutions(self, df):
+    def get_full_mask_valid(self, slct_idx):
+
+        df_slct = self.df_exp.query('idx in %s' % str(slct_idx))
+
+        return self._get_mask_valid_solutions(df=df_slct, return_full=True)
+
+
+    def _get_mask_valid_solutions(self, df, return_full=False):
 
         if __name__ == '__main__':
             df = df_result.copy()
@@ -519,6 +563,9 @@ class Evaluator():
         mask_valid &= mask_capacity
 
         df.loc[:, 'mask_valid'] = mask_valid
+
+        if return_full:
+            return df
 
         # consolidate mask by constraint combination and x values
         index = self.x_name + ['idx']
@@ -557,12 +604,20 @@ class Evaluator():
             self.model.constraints(('col', 'base_name'),
                                    is_positivity_constraint=True)
 
-        def sanitize_unexpected_zeros(df_result):
-            for col, func in map_col_func:
-                df_result.loc[(df_result.func == func) & (df_result[col] != 1)
-                            & (df_result['lambd'] == 0), 'lambd'] = np.nan
+        def get_map_sanitize(df_result):
+            map_ = pd.Series([True] * len(df_result), index=df_result.index)
 
-        sanitize_unexpected_zeros(df_result)
+            for col, func in map_col_func:
+                map_new = ((df_result.func == func)
+                           & (df_result[col] != 1)
+                           & (df_result['lambd'] == 0))
+                map_ &= map_new
+
+            return map_
+
+
+        df_result['map_sanitize'] = get_map_sanitize(df_result)
+        df_result.loc[df_result.map_sanitize, 'lambd'] = np.nan
 
         mask_valid = self._get_mask_valid_solutions(df_result)
         df_result = df_result.join(mask_valid, on=mask_valid.index.names)
@@ -601,7 +656,6 @@ class Evaluator():
 
         df_lam_plot = self._init_constraints_active(df_lam_plot)
 
-
         df_x = self.df_x_vals
         df_lam = df_lam_plot
 
@@ -623,8 +677,8 @@ class Evaluator():
         df_result = df_result.reset_index().join(df_lam.set_index(ind)[cols],
                                                  on=ind)
 
-        logger.debug('done expand_to_x_vals_parallel intermediate in %fs'%(time.time() - t))
-
+        logger.debug('done expand_to_x_vals_parallel intermediate '
+                     'in %fs'%(time.time() - t))
 
         logger.debug('_wrapper_call_evaluate_by_x_new')
         t = time.time()
