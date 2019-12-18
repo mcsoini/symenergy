@@ -352,7 +352,7 @@ class Evaluator():
         '''
 
         if self.cache_lambd.file_exists:
-            self.cache_lambd.load()
+            self.df_lam_plot = self.cache_lambd.load()
             return
 
         try:
