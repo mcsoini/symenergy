@@ -1,5 +1,5 @@
 *.html
-eval_temp.py
+*_eval_temp.py
 *.csv
 cache/*
 
