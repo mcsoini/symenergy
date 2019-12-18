@@ -9,11 +9,11 @@ from symenergy import _get_logger
 logger = _get_logger('decorators')
 
 @wrapt.decorator
-def hexdigest(f, self, *args, **kwargs):
+def hexdigest(f, self, args, kwargs):
 
-    name = self.name if hasattr(self, 'name') else 'unnamed'
+    name = getattr(self, 'name', str(type(self)))
 
-    hash_input = f()
+    hash_input = f(*args, **kwargs)
     hash_ = md5(hash_input.encode('utf-8')).hexdigest()
 
     logger.debug('Generated hash %s for object %s.' % (hash_, name))
