@@ -35,6 +35,308 @@ from symenergy import _get_logger
 logger = _get_logger(__name__)
 
 
+def _eval(func, df_x):
+    '''
+    Vectorized evaluation
+
+    Parameters
+    ----------
+    func : pandas.Series
+    df_x : pandas.DataFrame
+    '''
+
+    new_index = df_x.set_index(df_x.columns.tolist()).index
+    data = func.iloc[0](*df_x.values.T)
+    if not isinstance(data, np.ndarray):  # constant value --> expand
+        data = np.ones(df_x.iloc[:, 0].values.shape) * data
+
+
+    res = pd.DataFrame(data, index=new_index)
+    MP_COUNTER.increment()
+
+    return res
+
+
+class Expander():
+    '''
+    Evaluates the functions in the `lambd_func` column of `df` with all
+    values of the x_vals dataframe.
+    '''
+
+    def __init__(self, x_vals):
+
+        self.df_x_vals = x_vals
+
+
+    def _expand(self, df):
+
+        logger.warning('_call_eval: Generating dataframe with length %d' % (
+                        len(df) * len(self.df_x_vals)))
+        self.nparallel = len(df)
+        df_result = parallelize_df(df=df[['func', 'idx', 'lambd_func']],
+                                   func=self._wrapper_call_eval)
+        return df_result.rename(columns={0: 'lambd'}).reset_index()
+
+
+    def _call_eval(self, df):
+
+        df_result = (df.groupby(['func', 'idx'])
+                        .lambd_func
+                        .apply(_eval, df_x=self.df_x_vals))
+
+        return df_result
+
+
+    def _restore_columns(self, df_result, df):
+
+        ind = ['func', 'idx']
+        cols = [c for c in df.columns if not c in ind]
+        return df_result.join(df.set_index(ind)[cols], on=ind)
+
+
+    def _wrapper_call_eval(self, df):
+
+        name, ntot = 'Vectorized evaluation', self.nparallel
+        return log_time_progress(self._call_eval)(self, df, name, ntot)
+
+
+    def run(self, df):
+
+        df_result = self._expand(df)
+        return self._restore_columns(df_result, df)
+
+
+# %% ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class EvalAnalysis():
+    '''
+    Identifies optimal and infeasible solutions.
+    '''
+
+    def __init__(self, x_vals, map_col_func, dict_cap,
+                 tolerance, drop_non_optimum):
+
+        self.x_vals = x_vals
+        self.map_col_func = map_col_func
+        self.tolerance = tolerance
+        self.drop_non_optimum = drop_non_optimum
+        self.dict_cap = dict_cap
+
+        self.x_name = list(map(lambda x: x.name, self.x_vals))
+
+
+    def run(self, df):
+
+        group_params = self._get_optimum_group_params()
+        df_split = [df for _, df in (df.groupby(group_params))]
+
+        self.nparallel = len(df_split)
+        df_exp = parallelize_df(df=df_split,
+                                func=self._wrapper_call_evaluate_by_x)
+
+        return df_exp
+
+
+    def _get_optimum_group_params(self):
+        '''
+        Identify groupby columns to get closest to nchunks.
+
+        evaluate_by_x must be applied to full sets of constraint
+        combinations, since constraint combinations are to be compared.
+        '''
+
+        nchunks = get_default_nthreads() * parallelization.CHUNKS_PER_THREAD
+
+        param_combs = \
+            itertools.chain.from_iterable(itertools.combinations(self.x_vals, i)
+                                          for i in range(1, len(self.x_vals) + 1))
+        len_param_combs = {params: np.prod(list(len(self.x_vals[par])
+                                                for par in params))
+                           for params in param_combs}
+
+        dev_param_combs = {key: abs((len_ - nchunks) / nchunks)
+                           for key, len_ in len_param_combs.items()}
+
+        group_params = min(dev_param_combs, key=lambda x: dev_param_combs[x])
+        group_params = list(map(lambda x: x.name, group_params))
+
+        return group_params
+
+
+    def _get_map_sanitize(self, df):
+        '''
+        Identify zero values with non-binding zero constraints.
+        '''
+
+        map_ = pd.Series([True] * len(df), index=df.index)
+
+        for col, func in self.map_col_func:
+            map_new = ((df.func == func)
+                       & (df[col] != 1)
+                       & (df['lambd'] == 0))
+            map_ &= map_new
+
+        return map_
+
+
+    def _evaluate_by_x_new(self, df):
+
+        MP_COUNTER.increment()
+
+        df['map_sanitize'] = self._get_map_sanitize(df)
+        df.loc[df.map_sanitize, 'lambd'] = np.nan
+
+        mask_valid = self._get_mask_valid_solutions(df)
+        df = df.join(mask_valid, on=mask_valid.index.names)
+        df.loc[:, 'lambd'] = df.lambd.astype(float)
+        df.loc[:, 'is_optimum'] = self.init_cost_optimum(df)
+
+        if self.drop_non_optimum:
+            df = df.loc[df.is_optimum]
+
+        return df
+
+#    def _call_evaluate_by_x(self, df):
+#        return self._evaluate_by_x_new(df)
+
+    def _wrapper_call_evaluate_by_x(self, df):
+
+        name, ntot = 'Evaluate', self.nparallel
+        return log_time_progress(self._evaluate_by_x_new)(self, df, name, ntot)
+
+
+    def _get_mask_valid_solutions(self, df, return_full=False):
+        '''
+        Obtain a mask identifying valid solutions for each parameter value set
+        and constraint combination.
+
+        Indexed by x_name and constraint combination idx, *not* by function.
+
+        Parameters
+        ----------
+        df : pandas.DataFrame
+        return_full : bool
+            if True, returns the full mask for debugging, i.e. indexed by
+            functions prior to consolidation
+        '''
+
+        df = df.copy() # this is important, otherwise we change the x_vals
+
+        mask_valid = pd.Series(True, index=df.index)
+        mask_valid &= self._get_mask_valid_positive(df)
+        mask_valid &= self._get_mask_valid_capacity(df.copy())
+
+        df.loc[:, 'mask_valid'] = mask_valid
+
+        if return_full:  # for debugging
+            return df
+
+        # consolidate mask by constraint combination and x values
+        index = self.x_name + ['idx']
+        mask_valid = df.pivot_table(index=index, values='mask_valid',
+                                    aggfunc=min)
+
+        return mask_valid
+
+
+    def _get_mask_valid_positive(self, df):
+        ''' Called by _get_mask_valid_solutions '''
+
+        msk_pos = df.is_positive == 1
+        mask_positive = pd.Series(True, index=df.index)
+        mask_positive.loc[msk_pos] = df.loc[msk_pos].lambd + self.tolerance >= 0
+
+        return mask_positive
+
+
+    def _get_mask_valid_capacity(self, df):
+        ''' Called by _get_mask_valid_solutions '''
+
+        mask_valid = pd.Series(True, index=df.index)
+
+        if self.dict_cap:
+
+            for C, pp in self.dict_cap:
+
+                slct_func = [symb.name for symb in pp]
+
+                mask_slct_func = df.func.isin(slct_func)
+
+                # things are different depending on whether or not select_x
+                # is the corresponding capacity
+                if C in self.x_vals.keys():
+                    val_cap = df[C.name]
+                else:
+                    val_cap = pd.Series(C.value, index=df.index)
+
+                # need to add retired and additional capacity
+                for addret, sign in {'add': +1, 'ret': -1}.items():
+                    func_C_addret = [variab for variab in slct_func
+                                     if 'C_%s_None'%addret in variab]
+                    func_C_addret = func_C_addret[0] if func_C_addret else None
+                    if func_C_addret:
+                        mask_addret = (df.func.str.contains(func_C_addret))
+                        df_C = df.loc[mask_addret].copy()
+                        df_C = (df_C.set_index(['idx'] + self.x_name)['lambd']
+                                    .rename('_C_%s'%addret))
+                        df = df.join(df_C, on=df_C.index.names)
+
+                        # doesn't apply to itself, hence -mask_addret
+                        val_cap.loc[-mask_addret] += \
+                            + sign * df.loc[-mask_addret,
+                                                     '_C_%s'%addret]
+
+                constraint_met = pd.Series(True, index=df.index)
+                constraint_met.loc[mask_slct_func] = \
+                                    (df.loc[mask_slct_func].lambd
+                                     * (1 - self.tolerance)
+                                     <= val_cap.loc[mask_slct_func])
+
+                # delete temporary columns:
+                df = df[[c for c in df.columns
+                                        if not c in ['_C_ret', '_C_add']]]
+
+                mask_valid &= constraint_met
+
+        return mask_valid
+
+
+    def init_cost_optimum(self, df_result):
+        ''' Adds binary cost optimum column to the expanded dataframe. '''
+
+        cols = ['lambd', 'idx'] + self.x_name
+        tc = df_result.loc[(df_result.func == 'tc')
+                           & df_result.mask_valid, cols].copy()
+
+        if not tc.empty:
+
+            tc_min = (tc.groupby(self.x_name, as_index=0)
+                        .apply(lambda x: x.nsmallest(1, 'lambd')))
+
+            def get_cost_optimum_single(df):
+                df = df.sort_values('lambd')
+                df.loc[:, 'is_optimum'] = False
+                df.iloc[0, -1] = True
+                return df[['is_optimum']]
+
+            mask_is_opt = (tc.set_index('idx')
+                             .groupby(self.x_name)
+                             .apply(get_cost_optimum_single))
+
+            df_result = df_result.join(mask_is_opt, on=mask_is_opt.index.names)
+
+            # mask_valid == False have is_optimum == NaN at this point
+            df_result.is_optimum.fillna(False, inplace=True)
+
+        else:
+
+            df_result.loc[:, 'is_optimum'] = False
+
+        return df_result.is_optimum
+
+
+# %% ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 class Evaluator():
     '''
     Evaluates model results for selected
@@ -54,14 +356,12 @@ class Evaluator():
 
         self.model = model
 
-        self.drop_non_optimum = drop_non_optimum
-
-        self._x_vals = None
         self.x_vals = x_vals
 
         self.cache_lambd, self.cache_eval = self._get_caches()
 
-        self.tolerance = tolerance
+        self.eval_analysis, self.expander = self._get_helpers(
+                                                drop_non_optimum, tolerance)
 
         self.dfev = self._get_dfev()
 
@@ -81,6 +381,24 @@ class Evaluator():
 #            os.remove(self.fn_temp)
 #        except Exception as e :
 #            logger.debug(e)
+
+    def _get_helpers(self, drop_non_optimum, tolerance):
+
+        map_col_func_pos = \
+            self.model.constraints(('col', 'base_name'),
+                                   is_positivity_constraint=True)
+
+        dict_cap = [(cap, val) for comp in self.model.comps.values()
+                    if not comp in self.model.slots.values()  # exclude slots
+                    for cap, val in comp.get_constrained_variabs()]
+
+        eval_analysis = EvalAnalysis(self.x_vals, map_col_func_pos, dict_cap,
+                                     tolerance=tolerance,
+                                     drop_non_optimum=drop_non_optimum)
+
+        expander = Expander(self.df_x_vals)
+
+        return eval_analysis, expander
 
 
     def _get_dfev(self):
@@ -120,6 +438,9 @@ class Evaluator():
 
         self.cache_lambd, self.cache_eval = self._get_caches()
 
+        if hasattr(self, 'eval_analysis'):
+            self.eval_analysis.x_vals = self._x_vals
+
 
     def _get_caches(self):
         ''' Separate cache instances'''
@@ -140,6 +461,8 @@ class Evaluator():
     @df_x_vals.setter
     def df_x_vals(self, df_x_vals):
         self._df_x_vals = df_x_vals.reset_index(drop=True)
+        if hasattr(self, 'expander'):
+            self.expander.df_x_vals = self._df_x_vals
 
 
     def _get_list_dep_var(self, skip_multipliers=False):
@@ -310,17 +633,6 @@ class Evaluator():
 # =============================================================================
 # =============================================================================
 
-    def _call_evaluate_by_x_new(self, df):
-        return self._evaluate_by_x_new(df, False)
-
-
-    def _wrapper_call_evaluate_by_x_new(self, df):
-
-        name, ntot = 'Evaluate', self.nparallel
-        return log_time_progress(self._call_evaluate_by_x_new)(self, df,
-                                                               name, ntot)
-
-
 # =============================================================================
 # =============================================================================
 
@@ -364,7 +676,39 @@ class Evaluator():
                                             index=df.index)
         df.drop('result_sep', axis=1, inplace=True)
 
+        logger.info('Length expanded function DataFrame: %d' % len(df))
+
         return df
+
+    @staticmethod
+    def _write_import_function_module(fn, list_func):
+        '''
+        Write and import ad-hoc module containing evaluated functions.
+
+        Parameters
+        ----------
+        list_func
+
+        Returns handle of loaded module.
+        '''
+
+        try:
+            os.remove(fn)
+        except Exception as e :
+            logger.debug(e)
+
+        module_str = '\n'.join(list_func)
+        module_str = f'from numpy import sqrt\n\n{module_str}'
+
+        with open(fn , "w") as f:
+            f.write(module_str)
+
+        py_compile.compile(fn)
+
+        et = __import__(os.path.basename(fn).replace('.py', ''),
+                        level=1, globals={"__name__": __name__})
+
+        return et
 
 
     def _get_evaluated_lambdas_parallel(self, skip_multipliers=True,
@@ -383,36 +727,18 @@ class Evaluator():
             self.df_lam_plot = self.cache_lambd.load()
             return
 
-        try:
-            os.remove(self.fn_temp)
-        except Exception as e :
-            logger.debug(e)
-
         dfev_exp = self._expand_results_df(self.dfev, skip_multipliers)
-
-        logger.info('Length expanded function DataFrame: %d'%len(dfev_exp))
 
         self.nparallel = len(dfev_exp)
         dfev_func_str = parallelize_df(dfev_exp, self._wrapper_call_lambdify)
 
-        logger.info('Starting _replace_func_str_name...')
-        dfev_func_str_unq = (dfev_func_str[['func_hash', 'func_str']]
-                                .drop_duplicates()
+        # get unique function strings with function names from hashes
+        list_func = (dfev_func_str[['func_hash', 'func_str']].drop_duplicates()
                                 .apply(self._replace_func_str_name, axis=1))
-        logger.info('... done')
-#
-        logger.info('Number unique function strings: %d'%len(dfev_func_str))
-#
-        module_str = '\n'.join(dfev_func_str_unq)
-        module_str = f'from numpy import sqrt\n\n{module_str}'
+        logger.info('Number unique function strings: %d'%len(list_func))
 
-        with open(self.fn_temp , "w") as f:
-            f.write(module_str)
-
-        py_compile.compile(self.fn_temp)
-
-        et = __import__(os.path.basename(self.fn_temp).replace('.py', ''),
-                        level=1, globals={"__name__": __name__})
+        # write to and read from module
+        et = self._write_import_function_module(self.fn_temp, list_func)
 
         # retrieve eval_temp functions based on hash name
         dfev_func_str['lambd_func'] = (
@@ -435,49 +761,45 @@ class Evaluator():
         return hash_input
 
 
-    def _get_optimum_group_params(self, nchunks):
+
+    def _init_constraints_active(self, df):
         '''
-        Identify groupby columns to get closest to nchunks.
-
-        evaluate_by_x must be applied to full sets of constraint
-        combinations, since constraint combinations are to be compared.
+        Create binary columns depending on whether the constraints
+        for each particular variable are active or not.
         '''
 
-        param_combs = \
-            itertools.chain.from_iterable(itertools.combinations(self.x_vals, i)
-                                          for i in range(1, len(self.x_vals) + 1))
-        len_param_combs = {params: np.prod(list(len(self.x_vals[par])
-                                                for par in params))
-                           for params in param_combs}
+        def set_constr(x, lst):
+            return (1 if x in map(str, getattr(self, lst)) else 0)
 
-        dev_param_combs = {key: abs((len_ - nchunks) / nchunks)
-                           for key, len_ in len_param_combs.items()}
+        lst = 'is_positive'
+        for lst in ['is_positive']:
 
-        group_params = min(dev_param_combs, key=lambda x: dev_param_combs[x])
-        group_params = list(map(lambda x: x.name, group_params))
+            constr_act = (df.func.apply(lambda x: set_constr(x, lst)))
 
-        return group_params
+            df[lst] = constr_act
 
-
-    def _call_eval(self, df):
-
-        if __name__ == '__main__':
-            df = self.df_lam_plot[['idx', 'func', 'lambd_func']]
-
-        df_result = (df.groupby(['func', 'idx'])
-                        .lambd_func
-                        .apply(self._eval, df_x=self.df_x_vals))
-
-        return df_result
-
-
-    def _wrapper_call_eval(self, df):
-
-        name, ntot = 'Vectorized evaluation', self.nparallel
-        return log_time_progress(self._call_eval)(self, df, name, ntot)
+        return df
 
 
     def expand_to_x_vals_parallel(self):
+
+        # keeping pos and cap cols to sanitize zero equality constraints
+        cols_pos = self.model.constraints('col', is_positivity_constraint=True)
+        cols_cap = self.model.constraints('col', is_capacity_constraint=True)
+        keep_cols = (['func', 'lambd_func', 'idx'] + cols_pos + cols_cap)
+        self.df_lam_plot = self.df_lam_plot.reset_index()[keep_cols]
+
+        self.df_lam_plot = self._init_constraints_active(self.df_lam_plot)
+
+        df_result = self.expander.run(self.df_lam_plot)
+
+        self.df_exp = self.eval_analysis.run(df_result)
+
+        self._map_func_to_slot()
+
+
+
+    def expand_to_x_vals_loky(self):
 
         # keeping pos and cap cols to sanitize zero equality constraints
         cols_pos = self.model.constraints('col', is_positivity_constraint=True)
@@ -565,94 +887,16 @@ class Evaluator():
             return x_ret
 
 
-    def get_full_mask_valid(self, slct_idx):
-
-        df_slct = self.df_exp.query('idx in %s' % str(slct_idx))
-
-        return self._get_mask_valid_solutions(df=df_slct, return_full=True)
-
-
-    def _get_mask_valid_solutions(self, df, return_full=False):
-
-        if __name__ == '__main__':
-            df = df_result.copy()
-        else:
-            df = df.copy() # this is important, otherwise we change the x_vals
-
-        mask_valid = pd.Series(True, index=df.index)
-
-        mask_positive = self._get_mask_valid_positive(df)
-        mask_valid = mask_valid & mask_positive
-
-        mask_capacity = self._get_mask_valid_capacity(df.copy())
-        mask_valid &= mask_capacity
-
-        df.loc[:, 'mask_valid'] = mask_valid
-
-        if return_full:
-            return df
-
-        # consolidate mask by constraint combination and x values
-        index = self.x_name + ['idx']
-        mask_valid = df.pivot_table(index=index,
-                                    values='mask_valid',
-                                    aggfunc=min)
-
-        return mask_valid
+#    def get_full_mask_valid(self, slct_idx):
+#
+#        df_slct = self.df_exp.query('idx in %s' % str(slct_idx))
+#
+#        return self._get_mask_valid_solutions(df=df_slct, return_full=True)
 
 
-    def _eval(self, func, df_x):
-        '''
-        Parameters
-        ----------
-        func : pandas.Series
-        df_x : pandas.DataFrame
-        '''
-
-        new_index = df_x.set_index(df_x.columns.tolist()).index
-        data = func.iloc[0](*df_x.values.T)
-        if not isinstance(data, np.ndarray):  # constant value --> expand
-            data = np.ones(df_x.iloc[:, 0].values.shape) * data
 
 
-        res = pd.DataFrame(data, index=new_index)
-        MP_COUNTER.increment()
 
-        return res
-
-
-    def _evaluate_by_x_new(self, df_result, verbose):
-
-        MP_COUNTER.increment()
-
-        map_col_func = \
-            self.model.constraints(('col', 'base_name'),
-                                   is_positivity_constraint=True)
-
-        def get_map_sanitize(df_result):
-            map_ = pd.Series([True] * len(df_result), index=df_result.index)
-
-            for col, func in map_col_func:
-                map_new = ((df_result.func == func)
-                           & (df_result[col] != 1)
-                           & (df_result['lambd'] == 0))
-                map_ &= map_new
-
-            return map_
-
-
-        df_result['map_sanitize'] = get_map_sanitize(df_result)
-        df_result.loc[df_result.map_sanitize, 'lambd'] = np.nan
-
-        mask_valid = self._get_mask_valid_solutions(df_result)
-        df_result = df_result.join(mask_valid, on=mask_valid.index.names)
-        df_result.loc[:, 'lambd'] = df_result.lambd.astype(float)
-        df_result.loc[:, 'is_optimum'] = self.init_cost_optimum(df_result)
-
-        if self.drop_non_optimum:
-            df_result = df_result.loc[df_result.is_optimum]
-
-        return df_result
 
 # =============================================================================
 # =============================================================================
@@ -689,7 +933,7 @@ class Evaluator():
 
         df_result = (df_lam.groupby(['func', 'idx'])
                            .lambd_func
-                           .apply(self._eval, df_x=df_x))
+                           .apply(_eval, df_x=df_x))
         df_result = df_result.rename(columns={0: 'lambd'})
         logger.debug('done _call_eval in %fs, length df_lam %d, length df_x %d'%(time.time() - t, len(self.df_lam_plot), len(self.df_x_vals)))
 
@@ -723,89 +967,6 @@ class Evaluator():
         logger.debug('done _map_func_to_slot in %fs'%(time.time() - t))
 
 
-    def _init_constraints_active(self, df):
-        '''
-        Create binary columns depending on whether the constraints
-        are active or not.
-        '''
-
-        set_constr = lambda x, lst: (1 if x in map(str, getattr(self, lst))
-                                     else 0)
-
-        lst = 'is_positive'
-        for lst in ['is_positive']:
-
-            constr_act = (df.func.apply(lambda x: set_constr(x, lst)))
-            df[lst] = constr_act
-
-        return df
-
-
-    def _get_mask_valid_positive(self, df):
-
-        msk_pos = df.is_positive == 1
-        mask_positive = pd.Series(True, index=df.index)
-        mask_positive.loc[msk_pos] = df.loc[msk_pos].lambd + self.tolerance >= 0
-
-        return mask_positive
-
-    def _get_mask_valid_capacity(self, df):
-
-        dict_cap = [(cap, val)
-                    for comp in self.model.comps.values()
-                    if hasattr(comp, 'get_constrained_variabs') # exclude slots
-                    for cap, val in comp.get_constrained_variabs()]
-
-        mask_valid = pd.Series(True, index=df.index)
-
-        if dict_cap:
-
-
-#            C, pp = dict_cap[0]
-            for C, pp in dict_cap:
-
-                slct_func = [symb.name for symb in pp]
-
-                mask_slct_func = df.func.isin(slct_func)
-
-                # things are different depending on whether or not select_x
-                # is the corresponding capacity
-                if C in self.x_vals.keys():
-                    val_cap = df[C.name]
-                else:
-                    val_cap = pd.Series(C.value, index=df.index)
-
-                # need to add retired and additional capacity
-                for addret, sign in {'add': +1, 'ret': -1}.items():
-                    func_C_addret = [variab for variab in slct_func
-                                     if 'C_%s_None'%addret in variab]
-                    func_C_addret = func_C_addret[0] if func_C_addret else None
-                    if func_C_addret:
-                        mask_addret = (df.func.str.contains(func_C_addret))
-                        df_C = df.loc[mask_addret].copy()
-                        df_C = df_C.set_index(['idx'] + self.x_name)['lambd'].rename('_C_%s'%addret)
-                        df = df.join(df_C, on=df_C.index.names)
-
-                        # doesn't apply to itself, hence -mask_addret
-                        val_cap.loc[-mask_addret] += \
-                            + sign * df.loc[-mask_addret,
-                                                     '_C_%s'%addret]
-
-                constraint_met = pd.Series(True, index=df.index)
-                constraint_met.loc[mask_slct_func] = \
-                                    (df.loc[mask_slct_func].lambd
-                                     * (1 - self.tolerance)
-                                     <= val_cap.loc[mask_slct_func])
-
-                # delete temporary columns:
-                df = df[[c for c in df.columns
-                                        if not c in ['_C_ret', '_C_add']]]
-
-                mask_valid &= constraint_met
-
-#            self.df_exp['mv_n'] = mask_valid.copy()
-
-        return mask_valid
 
     def build_supply_table(self, df=None):
         '''
@@ -878,38 +1039,6 @@ class Evaluator():
         self.df_bal = df_bal
 
 
-    def init_cost_optimum(self, df_result):
-        ''' Adds cost optimum column to the expanded dataframe. '''
-
-        cols = ['lambd', 'idx'] + self.x_name
-        tc = df_result.loc[(df_result.func == 'tc')
-                           & df_result.mask_valid, cols].copy()
-
-        if not tc.empty:
-
-            tc_min = (tc.groupby(self.x_name, as_index=0)
-                        .apply(lambda x: x.nsmallest(1, 'lambd')))
-
-            def get_cost_optimum_single(df):
-                df = df.sort_values('lambd')
-                df.loc[:, 'is_optimum'] = False
-                df.iloc[0, -1] = True
-                return df[['is_optimum']]
-
-            mask_is_opt = (tc.set_index('idx')
-                             .groupby(self.x_name)
-                             .apply(get_cost_optimum_single))
-
-            df_result = df_result.join(mask_is_opt, on=mask_is_opt.index.names)
-
-            # mask_valid == False have is_optimum == NaN at this point
-            df_result.is_optimum.fillna(False, inplace=True)
-
-        else:
-
-            df_result.loc[:, 'is_optimum'] = False
-
-        return df_result.is_optimum
 
     def drop_non_optimal_combinations(self):
         '''
