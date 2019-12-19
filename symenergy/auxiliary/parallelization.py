@@ -19,6 +19,7 @@ from multiprocessing import current_process
 logger = _get_logger(__name__)
 
 CHUNKS_PER_THREAD = 2
+NTHREADS = 'default'
 
 class Counter():
     def __init__(self):
@@ -76,19 +77,21 @@ def log_time_progress(f):
     return wrapper
 
 
-def get_default_nthreads(nthreads='default'):
+def get_default_nthreads():
 
-    if nthreads == 'default':
+    if NTHREADS == 'default':
         return multiprocessing.cpu_count() - 1
     else:
-        return nthreads
+        return NTHREADS
 
 
 def parallelize_df(df, func, *args, nthreads='default', concat=True, **kwargs):
     MP_COUNTER.reset()
     MP_EMA.reset()
 
-    nthreads = min(get_default_nthreads(nthreads), len(df))
+    logger.debug(str(('NTHREADS: ', NTHREADS)))
+
+    nthreads = min(get_default_nthreads(), len(df))
 
     def split(df_):
         nchunks = min(nthreads * CHUNKS_PER_THREAD, len(df_))
