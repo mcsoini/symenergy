@@ -417,23 +417,23 @@ class Evaluator():
     def x_vals(self):
         return self._x_vals
 
+
     @x_vals.setter
     def x_vals(self, x_vals):
-        x_keys_old = [val for val in self._x_vals] if self._x_vals else None
-        x_keys = list(x_vals)
+        x_keys_old = ([val for val in self._x_vals]
+                      if hasattr(self, '_x_vals') else None)
         if x_keys_old:
-            assert x_keys == x_keys_old, \
+            assert list(x_vals) == x_keys_old, \
                 'Keys of x_vals attribute must not change.'
 
         frozen_params = [x.name for x in x_vals if x._is_frozen]
         assert not frozen_params, ('Encountered frozen parameters %s in '
                                    'x_vals.') % str(frozen_params)
 
-        self._x_vals = x_vals#self.sanitize_x_vals(x_vals)
+        self._x_vals = x_vals
         self.x_symb = [x.symb for x in self._x_vals.keys()]
         self.x_name = [x.name for x in self.x_symb]
         self.x_name_str = '(%s)'%','.join(self.x_name)
-
         self.df_x_vals = self._get_x_vals_combs()
 
         self.cache_lambd, self.cache_eval = self._get_caches()
