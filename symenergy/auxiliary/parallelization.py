@@ -13,6 +13,8 @@ import pandas as pd
 import itertools
 import time
 from symenergy import _get_logger
+from multiprocessing import current_process
+
 
 logger = _get_logger(__name__)
 
@@ -64,9 +66,11 @@ def log_time_progress(f):
 
         vals = (name, int(MP_COUNTER.value()), ntot,
                 MP_COUNTER.value()/ntot * 100,
-                len(df), MP_EMA.value()/len(df)*1000, t*1000 / len(df))
-        logger.info(('{}: {}/{} ({:.1f}%), chunksize {}, '
-                     'tavg={:.1f}ms, tcur={:.1f}ms').format(*vals))
+                len(df),
+#                MP_EMA.value()/len(df)*1000,
+#                t*1000 / len(df),
+                current_process().name)
+        logger.info(('{}: {}/{} ({:.1f}%), chunksize {}, {}').format(*vals))
 
         return res
     return wrapper
