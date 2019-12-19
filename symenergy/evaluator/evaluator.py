@@ -20,7 +20,6 @@ from functools import partial
 import time
 from sympy.utilities.lambdify import lambdastr
 import symenergy
-from sympy import lambdify
 
 from symenergy.auxiliary.parallelization import parallelize_df
 from symenergy.auxiliary.parallelization import log_time_progress
@@ -241,37 +240,37 @@ class Evaluator():
 # =============================================================================
 # =============================================================================
 
-    def _expand_dfev(self, slct_eq):
-        ''' Returns the dfev DataFrame for a single var/mlt slct_eq. '''
-
-        MP_COUNTER.increment()
-
-        df = self.dfev
-
-        get_func = partial(self._get_func_from_idx, slct_eq=slct_eq)
-        if slct_eq != 'tc':
-            df['expr'] = df.apply(get_func, axis=1)
-        else:
-            df['expr'] = df.tc
-
-        df['func'] = slct_eq
-
-        return df[['idx', 'expr', 'func']]
-
-
-    def _call_expand_dfev(self, lst_slct_eq):
-        ''' Note: here the df argument of the parallelization.parallelize_df
-        function is a list of strings, for each of which the whole self.dfev
-        is evaluated. '''
-
-        return [self._expand_dfev(slct_eq) for slct_eq in lst_slct_eq]
-
-
-    def _wrapper_call_expand_dfev(self, lst_slct_eq):
-
-        name, ntot = 'Expand by variable/multiplier', self.nparallel
-        return log_time_progress(self._call_expand_dfev)(self, lst_slct_eq,
-                                                         name, ntot)
+#    def _expand_dfev(self, slct_eq):
+#        ''' Returns the dfev DataFrame for a single var/mlt slct_eq. '''
+#
+#        MP_COUNTER.increment()
+#
+#        df = self.dfev
+#
+#        get_func = partial(self._get_func_from_idx, slct_eq=slct_eq)
+#        if slct_eq != 'tc':
+#            df['expr'] = df.apply(get_func, axis=1)
+#        else:
+#            df['expr'] = df.tc
+#
+#        df['func'] = slct_eq
+#
+#        return df[['idx', 'expr', 'func']]
+#
+#
+#    def _call_expand_dfev(self, lst_slct_eq):
+#        ''' Note: here the df argument of the parallelization.parallelize_df
+#        function is a list of strings, for each of which the whole self.dfev
+#        is evaluated. '''
+#
+#        return [self._expand_dfev(slct_eq) for slct_eq in lst_slct_eq]
+#
+#
+#    def _wrapper_call_expand_dfev(self, lst_slct_eq):
+#
+#        name, ntot = 'Expand by variable/multiplier', self.nparallel
+#        return log_time_progress(self._call_expand_dfev)(self, lst_slct_eq,
+#                                                         name, ntot)
 
 # =============================================================================
 # =============================================================================
@@ -339,6 +338,35 @@ class Evaluator():
         return func_str_new
 
 
+    def _expand_results_df(self, df, skip_multipliers):
+        '''
+        Expands to result lists to rows.
+        * zips the variable/multiplier names and the results
+        * adds the total cost
+        * explodes the resulting tuple
+
+        Parameters
+        ----------
+        df : pandas.DataFrame
+            cols ["variabs_multips", "result", "idx", "tc"]
+        skip_multipliers : bool
+            only include supply constraint multipliers if False, skip others
+        '''
+
+        list_dep_var = self._get_list_dep_var(skip_multipliers)
+
+        df['result_sep'] = df.apply(lambda x: tuple((key, val) for key, val
+                                     in zip(x.variabs_multips, x.result)
+                                     if key in list_dep_var) + (('tc', x.tc),),
+                                    axis=1)
+        df = df[['idx', 'result_sep']].explode(column='result_sep')
+        df[['func', 'expr']] = pd.DataFrame(df.result_sep.tolist(),
+                                            index=df.index)
+        df.drop('result_sep', axis=1, inplace=True)
+
+        return df
+
+
     def _get_evaluated_lambdas_parallel(self, skip_multipliers=True,
                                         str_func=True):
         '''
@@ -360,10 +388,7 @@ class Evaluator():
         except Exception as e :
             logger.debug(e)
 
-        list_dep_var = self._get_list_dep_var(skip_multipliers)
-
-        self.nparallel = len(list_dep_var)
-        dfev_exp = parallelize_df(list_dep_var, self._wrapper_call_expand_dfev)
+        dfev_exp = self._expand_results_df(self.dfev, skip_multipliers)
 
         logger.info('Length expanded function DataFrame: %d'%len(dfev_exp))
 
