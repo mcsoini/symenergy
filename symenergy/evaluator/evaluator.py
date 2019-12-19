@@ -783,17 +783,23 @@ class Evaluator():
 
     def expand_to_x_vals_parallel(self):
 
-        # keeping pos and cap cols to sanitize zero equality constraints
-        cols_pos = self.model.constraints('col', is_positivity_constraint=True)
-        cols_cap = self.model.constraints('col', is_capacity_constraint=True)
-        keep_cols = (['func', 'lambd_func', 'idx'] + cols_pos + cols_cap)
-        self.df_lam_plot = self.df_lam_plot.reset_index()[keep_cols]
+        if self.cache_eval.file_exists:
+            self.df_exp = self.cache_eval.load()
 
-        self.df_lam_plot = self._init_constraints_active(self.df_lam_plot)
+        else:
+            # keeping pos and cap cols to sanitize zero equality constraints
+            cols_pos = self.model.constraints('col', is_positivity_constraint=True)
+            cols_cap = self.model.constraints('col', is_capacity_constraint=True)
+            keep_cols = (['func', 'lambd_func', 'idx'] + cols_pos + cols_cap)
+            self.df_lam_plot = self.df_lam_plot.reset_index()[keep_cols]
 
-        df_result = self.expander.run(self.df_lam_plot)
+            self.df_lam_plot = self._init_constraints_active(self.df_lam_plot)
 
-        self.df_exp = self.eval_analysis.run(df_result)
+            df_result = self.expander.run(self.df_lam_plot)
+
+            self.df_exp = self.eval_analysis.run(df_result)
+
+            self.cache_eval.write(self.df_exp)
 
         self._map_func_to_slot()
 
