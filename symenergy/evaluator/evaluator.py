@@ -23,6 +23,7 @@ import symenergy
 
 from symenergy.auxiliary.parallelization import parallelize_df
 from symenergy.auxiliary.parallelization import log_time_progress
+from symenergy import multiproc_params
 from symenergy.auxiliary.parallelization import get_default_nthreads
 from symenergy.auxiliary.parallelization import MP_COUNTER, MP_EMA
 from symenergy.auxiliary import parallelization
@@ -72,9 +73,13 @@ class Expander():
 
         logger.warning('_call_eval: Generating dataframe with length %d' % (
                         len(df) * len(self.df_x_vals)))
-        self.nparallel = len(df)
-        df_result = parallelize_df(df=df[['func', 'idx', 'lambd_func']],
-                                   func=self._wrapper_call_eval)
+        if not multiproc_params['nthreads'] or multiproc_params['nthreads'] == 1:
+            df_result = self._call_eval(df)
+        else:
+            self.nparallel = len(df)
+            df_result = parallelize_df(df=df[['func', 'idx', 'lambd_func']],
+                                       func=self._wrapper_call_eval)
+
         return df_result.rename(columns={0: 'lambd'}).reset_index()
 
 
@@ -127,12 +132,18 @@ class EvalAnalysis():
 
     def run(self, df):
 
-        group_params = self._get_optimum_group_params()
-        df_split = [df for _, df in (df.groupby(group_params))]
+        if not multiproc_params['nthreads'] or multiproc_params['nthreads'] == 1:
+            df_exp = self._evaluate_by_x_new(df)
 
-        self.nparallel = len(df_split)
-        df_exp = parallelize_df(df=df_split,
-                                func=self._wrapper_call_evaluate_by_x)
+        else:
+            group_params = self._get_optimum_group_params()
+            df_split = [df for _, df in (df.groupby(group_params))]
+
+            self.nparallel = len(df_split)
+            df_exp = parallelize_df(df=df_split,
+                                    func=self._wrapper_call_evaluate_by_x)
+
+
 
         return df_exp
 
@@ -145,7 +156,7 @@ class EvalAnalysis():
         combinations, since constraint combinations are to be compared.
         '''
 
-        nchunks = get_default_nthreads() * parallelization.CHUNKS_PER_THREAD
+        nchunks = get_default_nthreads() * multiproc_params['chunks_per_thread']
 
         param_combs = \
             itertools.chain.from_iterable(itertools.combinations(self.x_vals, i)

@@ -17,3 +17,7 @@ def _get_logger(name):
     return logger
 
 logger = _get_logger(__name__)
+
+
+from symenergy.auxiliary.parallelization import multiproc_params
+

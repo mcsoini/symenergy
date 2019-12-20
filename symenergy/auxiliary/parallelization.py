@@ -15,11 +15,24 @@ import time
 from symenergy import _get_logger
 from multiprocessing import current_process
 
+from symenergy.auxiliary.params import RcParams
 
 logger = _get_logger(__name__)
 
-CHUNKS_PER_THREAD = 2
-NTHREADS = 'default'
+
+class MultiprocParams(RcParams):
+    items_opts = {'nthreads':
+                    {'types': {int: '>=0'},
+                     'values': (None, False, 'default',),
+                     'cond': 'int >= 0 or one of (None, False, "default")'},
+                  'chunks_per_thread':
+                      {'types': {int: '>=0'},
+                       'values': (),
+                       'cond': 'int >= 0'}}
+    items_default = {'nthreads': 'default', 'chunks_per_thread': 2}
+
+multiproc_params = MultiprocParams()
+
 
 class Counter():
     def __init__(self):
@@ -79,22 +92,22 @@ def log_time_progress(f):
 
 def get_default_nthreads():
 
-    if NTHREADS == 'default':
+    if multiproc_params['nthreads'] == 'default':
         return multiprocessing.cpu_count() - 1
     else:
-        return NTHREADS
+        return multiproc_params['nthreads']
 
 
 def parallelize_df(df, func, *args, nthreads='default', concat=True, **kwargs):
     MP_COUNTER.reset()
     MP_EMA.reset()
 
-    logger.debug(str(('NTHREADS: ', NTHREADS)))
+    logger.debug(str(('NTHREADS: ', multiproc_params['nthreads'])))
 
     nthreads = min(get_default_nthreads(), len(df))
 
     def split(df_):
-        nchunks = min(nthreads * CHUNKS_PER_THREAD, len(df_))
+        nchunks = min(nthreads * multiproc_params['chunks_per_thread'], len(df_))
         return np.array_split(df, nchunks)
 
     if isinstance(df, (pd.DataFrame, pd.Series)):
