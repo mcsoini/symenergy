@@ -81,7 +81,7 @@ class Model:
          }
 
     def __init__(self, nthreads='default', curtailment=False,
-                 slot_weight=1, constraint_filt=None):
+                 slot_weight=1, constraint_filt=''):
 
         self.plants = {}
         self.slots = {}

@@ -95,7 +95,8 @@ class Expander():
     def _restore_columns(self, df_result, df):
 
         ind = ['func', 'idx']
-        cols = [c for c in df.columns if not c in ind]
+        excl = ['lambd_func']
+        cols = [c for c in df.columns if not c in ind + excl]
         return df_result.join(df.set_index(ind)[cols], on=ind)
 
 

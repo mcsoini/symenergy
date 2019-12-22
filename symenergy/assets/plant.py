@@ -64,8 +64,8 @@ class Plant(asset.Asset):
 
         if cap_ret:
             # needs to be initialized before _init_cstr_capacity('C')!
-            self.init_symbol_operation('C_ret')
-            self.init_cstr_positive('C_ret')
+            self._init_symbol_operation('C_ret')
+            self._init_cstr_positive('C_ret')
 
         lst_par = [('vc0', vc0), ('vc1', vc1), ('fcom', fcom), ('C', capacity)]
         for param_name, param_val in lst_par:
