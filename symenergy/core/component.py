@@ -57,8 +57,8 @@ class Component():
             else:  # self is slot
                 parname = name
 
-            if isinstance(val, Parameter):
-                newpar = val  # -> for common weight parameters of slots
+            if isinstance(val, Parameter):  # -> global slot weight parameters
+                newpar = val
             elif isinstance(val, (float, int)):
                 newpar = Parameter(parname, slot, val)
 

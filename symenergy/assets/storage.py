@@ -12,7 +12,6 @@ Contains the Storage class describing assets which charge and discharge energy.
 import wrapt
 import numpy as np
 import itertools
-from copy import copy
 from collections import Counter
 
 import symenergy.core.asset as asset
@@ -134,16 +133,20 @@ class Storage(asset.Asset):
         'All energy zero -> each discharging cannot be non-zero':
             (('pos_e', 'all', True), ('pos_pdch', 'this', False)),
 
-        'All energy non-zero':
-            (('pos_e', 'all', False),)
         }
+
+    mutually_exclusive_no_blocks_timedep_e = {
+        'All energy non-zero':
+            (('pos_e', 'all', False),)  # << this would inhibit all storage operation in the e_none case
+        }
+
 
     def __init__(self, name, eff, slots_map=None, slots=None,
                  capacity=False, energy_capacity=False, energy_cost=1e-12,
                  _slot_blocks=None, charging_to_energy_factor='sqrt'):
 
         super().__init__(name)
-#        self.name = name
+
         self.slots = slots
         self._slot_blocks = _slot_blocks
         self.charging_to_energy_factor = charging_to_energy_factor
@@ -209,8 +212,15 @@ class Storage(asset.Asset):
         attributes accordingly.
         '''
 
+        self.mutually_exclusive = self.mutually_exclusive.copy()
+
         if not self._slot_blocks:
             self.mutually_exclusive.update(self.mutually_exclusive_no_blocks)
+
+            if 'e' in self.variabs_time:
+                self.mutually_exclusive.update(
+                        self.mutually_exclusive_no_blocks_timedep_e)
+
 
 
     def _init_prev_slot(self):
@@ -247,9 +257,9 @@ class Storage(asset.Asset):
             logger.warning(('%s: Moving variable e from VARIABS_TIME '
                            'to VARIABS')%self.name)
 
-            self.variabs_time = copy(self.variabs_time)  # copy class attr
+            self.variabs_time = self.variabs_time[:]  # copy class attr
             self.variabs_time.remove('e')
-            self.variabs = copy(self.variabs) + ['e']
+            self.variabs = self.variabs[:] + ['e']
 
 
     def _get_mutually_exclusive_cstrs(self):
