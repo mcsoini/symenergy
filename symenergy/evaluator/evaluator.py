@@ -12,6 +12,7 @@ import py_compile
 import sympy as sp
 import numpy as np
 from importlib import reload
+from multiprocessing import current_process
 import pandas as pd
 import itertools
 import random
@@ -35,6 +36,10 @@ from symenergy import _get_logger
 
 logger = _get_logger(__name__)
 
+
+def log_info_mainprocess(logstr):
+    if current_process().name == 'MainProcess':
+        logger.info(logstr)
 
 def _eval(func, df_x):
     '''
@@ -88,7 +93,6 @@ class Expander():
         df_result = (df.groupby(['func', 'idx'])
                         .lambd_func
                         .apply(_eval, df_x=self.df_x_vals))
-
         return df_result
 
 
@@ -143,9 +147,6 @@ class EvalAnalysis():
             self.nparallel = len(df_split)
             df_exp = parallelize_df(df=df_split,
                                     func=self._wrapper_call_evaluate_by_x)
-
-
-
         return df_exp
 
 
@@ -195,12 +196,16 @@ class EvalAnalysis():
 
         MP_COUNTER.increment()
 
+        log_info_mainprocess('Sanitizing unexpected zeros.')
         df['map_sanitize'] = self._get_map_sanitize(df)
         df.loc[df.map_sanitize, 'lambd'] = np.nan
 
+        log_info_mainprocess('Getting mask valid solutions.')
         mask_valid = self._get_mask_valid_solutions(df)
         df = df.join(mask_valid, on=mask_valid.index.names)
         df.loc[:, 'lambd'] = df.lambd.astype(float)
+
+        log_info_mainprocess('Identify cost optimum.')
         df.loc[:, 'is_optimum'] = self.init_cost_optimum(df)
 
         if self.drop_non_optimum:
@@ -354,8 +359,8 @@ class Evaluator():
     Evaluates model results for selected
     '''
 
-    def __init__(self, model:Model, x_vals:dict, drop_non_optimum=False,
-                 tolerance=1e-9):
+    def __init__(self, model:Model, x_vals:dict,
+                 drop_non_optimum=False, tolerance=1e-9):
         '''
         Parameters
         ----------
@@ -389,10 +394,6 @@ class Evaluator():
         self.fn_temp = os.path.abspath(os.path.join(symenergy.__file__, '..',
                                       'evaluator', self.fn_temp))
 
-#        try:
-#            os.remove(self.fn_temp)
-#        except Exception as e :
-#            logger.debug(e)
 
     def _get_helpers(self, drop_non_optimum, tolerance):
 
@@ -420,7 +421,7 @@ class Evaluator():
         cols = ['variabs_multips', 'result', 'idx', 'tc']
         dfev = self.model.df_comb[cols].copy()
         dfev.variabs_multips = dfev.variabs_multips.apply(
-                                                lambda x: list(map(str, x)))
+                                            lambda x: list(map(str, x)))
 
         return dfev
 
@@ -461,8 +462,6 @@ class Evaluator():
         cache_lambd = EvaluatorCache(hash_lambd, 'cache_lambd')
         hash_eval = self._get_evaluator_hash_name(include_x_vals=True)
         cache_eval = EvaluatorCache(hash_eval, 'cache_eval')
-
-
 
         return cache_lambd, cache_eval
 
@@ -816,52 +815,52 @@ class Evaluator():
         self._map_func_to_slot()
 
 
-
-    def expand_to_x_vals_loky(self):
-
-        # keeping pos and cap cols to sanitize zero equality constraints
-        cols_pos = self.model.constraints('col', is_positivity_constraint=True)
-        cols_cap = self.model.constraints('col', is_capacity_constraint=True)
-        keep_cols = (['func', 'lambd_func', 'idx'] + cols_pos + cols_cap)
-        self.df_lam_plot = self.df_lam_plot.reset_index()[keep_cols]
-
-        self.df_lam_plot = self._init_constraints_active(self.df_lam_plot)
-
-        logger.debug('_call_eval')
-        t = time.time()
-        self.nparallel = len(self.df_lam_plot)
-        df_result = parallelize_df(df=self.df_lam_plot[['func', 'idx', 'lambd_func']],
-                                   func=self._wrapper_call_eval)
-        df_result = df_result.rename(columns={0: 'lambd'})
-        logger.debug('done _call_eval in %fs, length df_lam %d, length df_x %d'%(time.time() - t, len(self.df_lam_plot), len(self.df_x_vals)))
-
-        logger.debug('expand_to_x_vals_parallel intermediate')
-        t = time.time()
-        cols = [c for c in self.df_lam_plot.columns
-                if c.startswith('act_')] + ['is_positive']
-        ind = ['func', 'idx']
-        df_result = df_result.reset_index().join(self.df_lam_plot.set_index(ind)[cols],
-                                                 on=ind)
-
-        nchunks = get_default_nthreads() * parallelization.CHUNKS_PER_THREAD
-        group_params = self._get_optimum_group_params(nchunks=nchunks)
-
-        logger.debug('done expand_to_x_vals_parallel intermediate in %fs'%(time.time() - t))
-
-        logger.debug('_wrapper_call_evaluate_by_x_new')
-        t = time.time()
-        df_split = [df for _, df in (df_result.groupby(group_params))]
-        logger.debug('len(df_split): %d'%len(df_split))
-        self.nparallel = len(df_split)
-        self.df_exp = parallelize_df(df=df_split,
-                                     func=self._wrapper_call_evaluate_by_x_new)
-
-        logger.debug('done _wrapper_call_evaluate_by_x_new in %fs'%(time.time() - t))
-
-        logger.debug('_map_func_to_slot')
-        t = time.time()
-        self._map_func_to_slot()
-        logger.debug('done _map_func_to_slot in %fs'%(time.time() - t))
+#
+#    def expand_to_x_vals_loky(self):
+#
+#        # keeping pos and cap cols to sanitize zero equality constraints
+#        cols_pos = self.model.constraints('col', is_positivity_constraint=True)
+#        cols_cap = self.model.constraints('col', is_capacity_constraint=True)
+#        keep_cols = (['func', 'lambd_func', 'idx'] + cols_pos + cols_cap)
+#        self.df_lam_plot = self.df_lam_plot.reset_index()[keep_cols]
+#
+#        self.df_lam_plot = self._init_constraints_active(self.df_lam_plot)
+#
+#        logger.debug('_call_eval')
+#        t = time.time()
+#        self.nparallel = len(self.df_lam_plot)
+#        df_result = parallelize_df(df=self.df_lam_plot[['func', 'idx', 'lambd_func']],
+#                                   func=self._wrapper_call_eval)
+#        df_result = df_result.rename(columns={0: 'lambd'})
+#        logger.debug('done _call_eval in %fs, length df_lam %d, length df_x %d'%(time.time() - t, len(self.df_lam_plot), len(self.df_x_vals)))
+#
+#        logger.debug('expand_to_x_vals_parallel intermediate')
+#        t = time.time()
+#        cols = [c for c in self.df_lam_plot.columns
+#                if c.startswith('act_')] + ['is_positive']
+#        ind = ['func', 'idx']
+#        df_result = df_result.reset_index().join(self.df_lam_plot.set_index(ind)[cols],
+#                                                 on=ind)
+#
+#        nchunks = get_default_nthreads() * parallelization.CHUNKS_PER_THREAD
+#        group_params = self._get_optimum_group_params(nchunks=nchunks)
+#
+#        logger.debug('done expand_to_x_vals_parallel intermediate in %fs'%(time.time() - t))
+#
+#        logger.debug('_wrapper_call_evaluate_by_x_new')
+#        t = time.time()
+#        df_split = [df for _, df in (df_result.groupby(group_params))]
+#        logger.debug('len(df_split): %d'%len(df_split))
+#        self.nparallel = len(df_split)
+#        self.df_exp = parallelize_df(df=df_split,
+#                                     func=self._wrapper_call_evaluate_by_x_new)
+#
+#        logger.debug('done _wrapper_call_evaluate_by_x_new in %fs'%(time.time() - t))
+#
+#        logger.debug('_map_func_to_slot')
+#        t = time.time()
+#        self._map_func_to_slot()
+#        logger.debug('done _map_func_to_slot in %fs'%(time.time() - t))
 
 
     def _get_x_vals_combs(self):
@@ -1075,7 +1074,7 @@ class Evaluator():
 
     def _map_func_to_slot(self):
 
-        logger.debug('map_func_to_slot')
+        logger.info('Mapping model variables to time slots')
         func_list = self.df_exp.func.unique()
 
         slot_name_list = list(self.model.slots.keys())
