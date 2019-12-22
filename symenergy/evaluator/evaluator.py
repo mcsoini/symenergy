@@ -269,49 +269,49 @@ class EvalAnalysis():
     def _get_mask_valid_capacity(self, df):
         ''' Called by _get_mask_valid_solutions '''
 
-            mask_valid = pd.Series(True, index=df.index)
+        mask_valid = pd.Series(True, index=df.index)
 
-            for C, pp in (self.dict_cap if self.dict_cap else []):
+        for C, pp in (self.dict_cap if self.dict_cap else []):
 
-                slct_func = [symb.name for symb in pp]
+            slct_func = [symb.name for symb in pp]
 
-                mask_slct_func = df.func.isin(slct_func)
+            mask_slct_func = df.func.isin(slct_func)
 
-                # things are different depending on whether or not select_x
-                # is the corresponding capacity
-                if C in self.x_vals.keys():
-                    val_cap = df[C.name]
-                else:
-                    val_cap = pd.Series(C.value, index=df.index)
+            # things are different depending on whether or not select_x
+            # is the corresponding capacity
+            if C in self.x_vals.keys():
+                val_cap = df[C.name]
+            else:
+                val_cap = pd.Series(C.value, index=df.index)
 
-                # need to add retired and additional capacity
-                for addret, sign in {'add': +1, 'ret': -1}.items():
-                    func_C_addret = [variab for variab in slct_func
-                                     if 'C_%s_none'%addret in variab]
-                    func_C_addret = func_C_addret[0] if func_C_addret else None
-                    if func_C_addret:
-                        mask_addret = (df.func.str.contains(func_C_addret))
-                        df_C = df.loc[mask_addret].copy()
-                        df_C = (df_C.set_index(['idx'] + self.x_name)['lambd']
-                                    .rename('_C_%s'%addret))
-                        df = df.join(df_C, on=df_C.index.names)
+            # need to add retired and additional capacity
+            for addret, sign in {'add': +1, 'ret': -1}.items():
+                func_C_addret = [variab for variab in slct_func
+                                 if 'C_%s_none'%addret in variab]
+                func_C_addret = func_C_addret[0] if func_C_addret else None
+                if func_C_addret:
+                    mask_addret = (df.func.str.contains(func_C_addret))
+                    df_C = df.loc[mask_addret].copy()
+                    df_C = (df_C.set_index(['idx'] + self.x_name)['lambd']
+                                .rename('_C_%s'%addret))
+                    df = df.join(df_C, on=df_C.index.names)
 
-                        # doesn't apply to itself, hence -mask_addret
-                        val_cap.loc[-mask_addret] += \
-                            + sign * df.loc[-mask_addret,
-                                                     '_C_%s'%addret]
+                    # doesn't apply to itself, hence -mask_addret
+                    val_cap.loc[-mask_addret] += \
+                        + sign * df.loc[-mask_addret,
+                                                 '_C_%s'%addret]
 
-                constraint_met = pd.Series(True, index=df.index)
-                constraint_met.loc[mask_slct_func] = \
-                                    (df.loc[mask_slct_func].lambd
-                                     * (1 - self.tolerance)
-                                     <= val_cap.loc[mask_slct_func])
+            constraint_met = pd.Series(True, index=df.index)
+            constraint_met.loc[mask_slct_func] = \
+                                (df.loc[mask_slct_func].lambd
+                                 * (1 - self.tolerance)
+                                 <= val_cap.loc[mask_slct_func])
 
-                # delete temporary columns:
-                df = df[[c for c in df.columns
-                                        if not c in ['_C_ret', '_C_add']]]
+            # delete temporary columns:
+            df = df[[c for c in df.columns
+                                    if not c in ['_C_ret', '_C_add']]]
 
-                mask_valid &= constraint_met
+            mask_valid &= constraint_met
 
         return mask_valid
 
