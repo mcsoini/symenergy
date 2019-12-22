@@ -269,11 +269,9 @@ class EvalAnalysis():
     def _get_mask_valid_capacity(self, df):
         ''' Called by _get_mask_valid_solutions '''
 
-        mask_valid = pd.Series(True, index=df.index)
+            mask_valid = pd.Series(True, index=df.index)
 
-        if self.dict_cap:
-
-            for C, pp in self.dict_cap:
+            for C, pp in (self.dict_cap if self.dict_cap else []):
 
                 slct_func = [symb.name for symb in pp]
 
@@ -289,7 +287,7 @@ class EvalAnalysis():
                 # need to add retired and additional capacity
                 for addret, sign in {'add': +1, 'ret': -1}.items():
                     func_C_addret = [variab for variab in slct_func
-                                     if 'C_%s_None'%addret in variab]
+                                     if 'C_%s_none'%addret in variab]
                     func_C_addret = func_C_addret[0] if func_C_addret else None
                     if func_C_addret:
                         mask_addret = (df.func.str.contains(func_C_addret))
