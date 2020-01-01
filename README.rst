@@ -106,7 +106,7 @@ The final results are stored in the attribute ``ev.df_exp``. The dataframe ``ev.
                        values='lambd')[['n_p_t0', 'g_p_t0', 'vre_t0', 'l_t0']].plot.area())
 
 
-.. image:: _static/minimal_balance.png
+.. image:: docs/source/_static/minimal_balance.png
     :align: center
     :alt: minimal balance
 
