@@ -21,7 +21,7 @@ Installation
 Publication
 ============
 
-* M. C. Soini *et al.*, Does bulk electricity storage assist wind and solar in replacing dispatchable power production?, Energy Economics, [https://doi.org/10.1016/j.eneco.2019.104495](https://doi.org/10.1016/j.eneco.2019.104495). 
+* M. C. Soini *et al.*, Does bulk electricity storage assist wind and solar in replacing dispatchable power production?, Energy Economics, `<https://doi.org/10.1016/j.eneco.2019.104495>`_. 
 
 ===============
 Minimal example
