@@ -720,7 +720,7 @@ class Evaluator():
         return et
 
 
-    def _get_evaluated_lambdas_parallel(self, skip_multipliers=True,
+    def get_evaluated_lambdas_parallel(self, skip_multipliers=True,
                                         str_func=True):
         '''
         For each dependent variable and total cost get a lambda function
