@@ -495,7 +495,7 @@ class Evaluator():
         return list_dep_var
 
 
-    def _get_evaluated_lambdas(self, skip_multipliers=True):
+    def get_evaluated_lambdas(self, skip_multipliers=True):
         '''
         For each dependent variable and total cost get a lambda function
         evaluated by constant parameters. This subsequently evaluated
@@ -812,8 +812,9 @@ class Evaluator():
 
         self._map_func_to_slot()
 
+        self.build_supply_table()
 
-#
+
 #    def expand_to_x_vals_loky(self):
 #
 #        # keeping pos and cap cols to sanitize zero equality constraints
@@ -981,6 +982,7 @@ class Evaluator():
         self._map_func_to_slot()
         logger.debug('done _map_func_to_slot in %fs'%(time.time() - t))
 
+        self.build_supply_table()
 
 
     def build_supply_table(self, df=None):
