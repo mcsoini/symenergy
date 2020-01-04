@@ -1,0 +1,2 @@
+recursive-exclude symenergy/evaluator/* *eval_temp.py
+

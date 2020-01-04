@@ -36,6 +36,7 @@ from symenergy import _get_logger
 
 logger = _get_logger(__name__)
 
+pd.options.mode.chained_assignment = None
 
 def log_info_mainprocess(logstr):
     if current_process().name == 'MainProcess':
@@ -502,7 +503,7 @@ class Evaluator():
         for all x_pos.
 
         Generated attributes:
-            - df_lam_plot: Holds all lambda functions for each dependent
+            - df_lam_func: Holds all lambda functions for each dependent
                            variable and each constraint combination.
         '''
 
@@ -535,20 +536,20 @@ class Evaluator():
 
         idx = ['idx']
 
-        df_lam_plot = self.dfev.set_index(idx).copy()[list_dep_var]
+        df_lam_func = self.dfev.set_index(idx).copy()[list_dep_var]
 
         col_names = {'level_1': 'func',
                      0: 'lambd_func'}
-        df_lam_plot = (df_lam_plot.stack().reset_index()
+        df_lam_func = (df_lam_func.stack().reset_index()
                                   .rename(columns=col_names))
-        df_lam_plot = (df_lam_plot.reset_index(drop=True)
+        df_lam_func = (df_lam_func.reset_index(drop=True)
                                   .reset_index())
 
-        df_lam_plot = df_lam_plot.join(self.model.df_comb.set_index('idx')[self.model.constrs_cols_neq], on='idx')
-        df_lam_plot = df_lam_plot.set_index(self.model.constrs_cols_neq
+        df_lam_func = df_lam_func.join(self.model.df_comb.set_index('idx')[self.model.constrs_cols_neq], on='idx')
+        df_lam_func = df_lam_func.set_index(self.model.constrs_cols_neq
                                             + ['func', 'idx'])
 
-        self.df_lam_plot = df_lam_plot
+        self.df_lam_func = df_lam_func
 
 
     def _get_func_from_idx(self, x, slct_eq):
@@ -728,12 +729,12 @@ class Evaluator():
         for all x_pos.
 
         Generated attributes:
-            - df_lam_plot: Holds all lambda functions for each dependent
+            - df_lam_func: Holds all lambda functions for each dependent
                            variable and each constraint combination.
         '''
 
         if self.cache_lambd.file_exists:
-            self.df_lam_plot = self.cache_lambd.load()
+            self.df_lam_func = self.cache_lambd.load()
             return
 
         dfev_exp = self._expand_results_df(self.dfev, skip_multipliers)
@@ -756,9 +757,9 @@ class Evaluator():
         dfev_func_str = dfev_func_str.join(self.model.df_comb.set_index('idx')[
                                     self.model.constrs_cols_neq], on='idx')
 
-        self.df_lam_plot = dfev_func_str
+        self.df_lam_func = dfev_func_str
 
-        self.cache_lambd.write(self.df_lam_plot)
+        self.cache_lambd.write(self.df_lam_func)
 
 
     @hexdigest
@@ -800,11 +801,11 @@ class Evaluator():
             cols_pos = self.model.constraints('col', is_positivity_constraint=True)
             cols_cap = self.model.constraints('col', is_capacity_constraint=True)
             keep_cols = (['func', 'lambd_func', 'idx'] + cols_pos + cols_cap)
-            self.df_lam_plot = self.df_lam_plot.reset_index()[keep_cols]
+            self.df_lam_func = self.df_lam_func.reset_index()[keep_cols]
 
-            self.df_lam_plot = self._init_constraints_active(self.df_lam_plot)
+            self.df_lam_func = self._init_constraints_active(self.df_lam_func)
 
-            df_result = self.expander.run(self.df_lam_plot)
+            df_result = self.expander.run(self.df_lam_func)
 
             self.df_exp = self.eval_analysis.run(df_result)
 
@@ -821,24 +822,24 @@ class Evaluator():
 #        cols_pos = self.model.constraints('col', is_positivity_constraint=True)
 #        cols_cap = self.model.constraints('col', is_capacity_constraint=True)
 #        keep_cols = (['func', 'lambd_func', 'idx'] + cols_pos + cols_cap)
-#        self.df_lam_plot = self.df_lam_plot.reset_index()[keep_cols]
+#        self.df_lam_func = self.df_lam_func.reset_index()[keep_cols]
 #
-#        self.df_lam_plot = self._init_constraints_active(self.df_lam_plot)
+#        self.df_lam_func = self._init_constraints_active(self.df_lam_func)
 #
 #        logger.debug('_call_eval')
 #        t = time.time()
-#        self.nparallel = len(self.df_lam_plot)
-#        df_result = parallelize_df(df=self.df_lam_plot[['func', 'idx', 'lambd_func']],
+#        self.nparallel = len(self.df_lam_func)
+#        df_result = parallelize_df(df=self.df_lam_func[['func', 'idx', 'lambd_func']],
 #                                   func=self._wrapper_call_eval)
 #        df_result = df_result.rename(columns={0: 'lambd'})
-#        logger.debug('done _call_eval in %fs, length df_lam %d, length df_x %d'%(time.time() - t, len(self.df_lam_plot), len(self.df_x_vals)))
+#        logger.debug('done _call_eval in %fs, length df_lam %d, length df_x %d'%(time.time() - t, len(self.df_lam_func), len(self.df_x_vals)))
 #
 #        logger.debug('expand_to_x_vals_parallel intermediate')
 #        t = time.time()
-#        cols = [c for c in self.df_lam_plot.columns
+#        cols = [c for c in self.df_lam_func.columns
 #                if c.startswith('act_')] + ['is_positive']
 #        ind = ['func', 'idx']
-#        df_result = df_result.reset_index().join(self.df_lam_plot.set_index(ind)[cols],
+#        df_result = df_result.reset_index().join(self.df_lam_func.set_index(ind)[cols],
 #                                                 on=ind)
 #
 #        nchunks = get_default_nthreads() * parallelization.CHUNKS_PER_THREAD
@@ -937,12 +938,12 @@ class Evaluator():
         cols_cap = self.model.constraints('col', is_capacity_constraint=True)
 
         keep_cols = (['func', 'lambd_func', 'idx'] + cols_pos + cols_cap)
-        df_lam_plot = self.df_lam_plot.reset_index()[keep_cols]
+        df_lam_func = self.df_lam_func.reset_index()[keep_cols]
 
-        df_lam_plot = self._init_constraints_active(df_lam_plot)
+        df_lam_func = self._init_constraints_active(df_lam_func)
 
         df_x = self.df_x_vals
-        df_lam = df_lam_plot
+        df_lam = df_lam_func
 
         logger.debug('_call_eval')
         t = time.time()
@@ -951,7 +952,7 @@ class Evaluator():
                            .lambd_func
                            .apply(_eval, df_x=df_x))
         df_result = df_result.rename(columns={0: 'lambd'})
-        logger.debug('done _call_eval in %fs, length df_lam %d, length df_x %d'%(time.time() - t, len(self.df_lam_plot), len(self.df_x_vals)))
+        logger.debug('done _call_eval in %fs, length df_lam %d, length df_x %d'%(time.time() - t, len(self.df_lam_func), len(self.df_x_vals)))
 
 
         logger.debug('expand_to_x_vals_parallel intermediate')

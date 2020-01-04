@@ -1,5 +1,6 @@
 #!/bin/sh
 
+rm ./source/example_constant_files/*
 jupyter nbconvert ../examples/example_constant.ipynb --to rst 
 mv ../examples/example_constant.rst ./source/
 mv ../examples/example_constant_files ./source/

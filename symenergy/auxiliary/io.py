@@ -119,7 +119,7 @@ class Cache():
         m_name = m_name[:12].upper()
 
         fn = f'{m_name}.pickle'
-        fn = os.path.join(list(symenergy.__path__)[0], '..', self.dir_, fn)
+        fn = os.path.join(list(symenergy.__path__)[0], self.dir_, fn)
         fn = os.path.abspath(fn)
 
         return fn
