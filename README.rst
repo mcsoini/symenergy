@@ -17,7 +17,7 @@ Installation
 
 ``pip install symenergy``
 
-_label_example_minimal:
+.. _label_example_minimal:
 
 =============
 Documentation
