@@ -9,14 +9,16 @@ import sys
 
 from pathlib import Path
 import itertools
+from collections import Counter
+from orderedset import OrderedSet
 import pandas as pd
 import sympy as sp
 import wrapt
 import numpy as np
-import time
-from hashlib import md5
+import textwrap
 from sympy.tensor.array import derive_by_array
 
+from symenergy.patches.symenergy_solveset import linear_eq_to_matrix
 from symenergy.assets.plant import Plant
 from symenergy.assets.storage import Storage
 from symenergy.assets.curtailment import Curtailment
@@ -26,49 +28,65 @@ from symenergy.core.parameter import Parameter
 from symenergy.auxiliary.parallelization import parallelize_df
 from symenergy.auxiliary.parallelization import MP_COUNTER, MP_EMA
 from symenergy.auxiliary.parallelization import log_time_progress
+from symenergy.auxiliary.decorators import hexdigest
 from symenergy import _get_logger
 from symenergy.patches.sympy_linsolve import linsolve
+#from symenergy.patches.sympy_linear_coeffs import linear_coeffs
 from symenergy.auxiliary.constrcomb import filter_constraint_combinations
 from symenergy.auxiliary import io
 
+
 logger = _get_logger(__name__)
 
-logger.warning('!!! Monkey-patching sympy.linsolve !!!')
-sp.linsolve = linsolve
-
+sp.linsolve = linsolve  # Monkey-patching sympy.linsolve
 
 if __name__ == '__main__': sys.exit()
 
-
 class Model:
     '''
+    Instantiate a model object. Start from here.
+
     Parameters
     ----------
-    slot_weights -- int
-      If all time slots have the same weight, instantiate a model-wide
-      parameter singleton instead of individual parameters for each time slot.
+    slot_weights : float
+        default time slot weight (hours); this instantiates a singleton
+        parameter to avoid the definition of individual parameter for each
+        slot; it can be overwritten for individual time slots if the weight
+        parameter is provided
     constraint_filt : str
         :func:`pandas.DataFrame.query` string to filter the constraint
-        activation columns of the `df_comb` dataframe
-
+        activation columns of the `df_comb` dataframe. A list of relevant
+        column names of a model object `m` can be retrieved through
+        `m.constraints('col', is_equality_constraint=False)`
+    curtailment : bool or list of Slots, default False
+        Allow for curtailment in each time slot (True) or in a selection of
+        time slots. This generates a
+        :class:`symenergy.assets.curtailment.Curtailment` instance `curt`,
+        which defines the positive curtailment power variables `curt.p`
+        for each of the relevant time slots.
+    nthreads : int or False
+        number of workers to be used for parallel model setup and solving;
+        passed to the :class:`multiprocessing.Pool` initializer;
+        defaults to `multiprocessing.cpu_count() - 1`;
+        if False, no multiprocessing is used
     '''
 
-
-    _MUTUALLY_EXCLUSIVE = {
+    mutually_exclusive = {
         'No power production when curtailing':
                 (('pos_p', 'this', False), ('curt_pos_p', 'this', False)),
         'No discharging when curtailing':
                 (('pos_pdch', 'this', False), ('curt_pos_p', 'this', False))
          }
 
-    def __init__(self, nthreads=None, curtailment=False,
-                 slot_weight=1, constraint_filt=None):
+    def __init__(self, nthreads='default', curtailment=False,
+                 slot_weight=1, constraint_filt=''):
 
         self.plants = {}
         self.slots = {}
         self.slot_blocks = {}
         self.storages = {}
         self.comps = {}
+        self.curt = {}
 
         self.nthreads = nthreads
         self.constraint_filt = constraint_filt
@@ -88,57 +106,126 @@ class Model:
 
     @wrapt.decorator
     def _update_component_list(f, self, args, kwargs):
+        '''
+        Rebuild all derived model attributes.
+
+        This is triggered (decorator) every a relevant change is made to
+        the model through the public API.
+        '''
         f(*args, **kwargs)
 
-        self.comps = self.plants.copy()
+        self.comps = {}
+        self.comps.update(self.plants)
         self.comps.update(self.slots)
         self.comps.update(self.storages)
         self.comps.update(self.slot_blocks)
-        self._init_curtailment()
 
-        self.collect_component_constraints()
-        self.init_supply_constraints()
-        self.init_total_param_values()
-        self.get_variabs_params()
-        self.init_total_cost()
+        if not 'curt' in self.comps and self.curtailment:
+            logger.debug('Auto-adding curtailment')
+            self._add_curtailment(self.slots)
 
-        self.init_supply_constraints()
+        self.comps.update(self.curt)
+
+        # aggregate all attribute collections
+        self.parameters = sum(c.parameters._copy() for c in self.comps.values())
+        self.parameters.append(self.vre_scale)
+        self.variables = sum(c.variables._copy() for c in self.comps.values())
+        self.constraints = sum(c.constraints._copy()
+                               for c in self.comps.values())
+
+        self._init_supply_constraints()
+
+        self._init_total_cost()
 
         self.cache = io.Cache(self.get_model_hash_name())
 
-        self._assert_slot_block_validity()
+#        self._assert_slot_block_validity()
 
+        self.constrs_cols_neq = self.constraints.tolist('col',
+                                            is_equality_constraint=False)
 
     @wrapt.decorator
     def _check_component_replacement(f, self, args, kwargs):
-        assert kwargs['name'] not in {**self.comps, **self.slot_blocks}, (
+
+        if 'name' in kwargs:
+            name = kwargs['name']
+        elif args and isinstance(args[0], str):
+            name = args[0]
+        else:
+            raise AttributeError('Name required for all components.')
+
+        assert name  not in {**self.comps, **self.slot_blocks}, (
                 'A component or slot_block `%s` has already been '
-                         'defined.')%kwargs['name']
+                         'defined.')%name
 
         return f(*args, **kwargs)
 
 
-
     @_update_component_list
-    def freeze_parameters(self):
+    def freeze_parameters(self, exceptions=None):
         '''
         Switch from variable to numerical value for all model parameters.
+        This automatically updates the definition of all sympy expressions
+        (total cost, lagrange, ...)
+
+        Parameters
+        ----------
+        exceptions : list(str)
+            names of parameters to be excluded; corresponds to elements of the
+            list `Model.parameters('name')`
+
 
         Example
+        -------
+        .. code-block:: python
 
+            >>> from symenery.core import model
+            >>> m = model.Model()
+            >>> m.add_slot('s0', load=2, vre=3)
+            >>> m.add_plant('nuc', vc0=1, vc1=0.01)
+            >>> print(m.tc)
 
-        Calls the :func:`symenergy.core.component.Component.fix_all_parameters`
-        method for all parameters.
+            nuc_p_s0*w_none*(nuc_p_s0*vc1_nuc_none + 2*vc0_nuc_none)/2
+
+            >>> m.freeze_parameters()
+            >>> print(m.tc)
+
+            nuc_p_s0*(0.005*nuc_p_s0 + 1.0)
+
+        Here only the power output variable `nuc_p_s0` is left in the equation.
+        All other symbols (all parameters) have been substituted with their
+        respective numerical values.
+
+        Excluding parameters through the `exceptions` argument causes a
+        partial substitution:
+
+        .. code-block:: python
+
+            >>> m.freeze_parameters(exceptions=['vc0_nuc_none'])
+            >>> print(m.tc)
+
+            nuc_p_s0*(0.005*nuc_p_s0 + 1.0*vc0_nuc_none)
+
         '''
 
-        for comp in self.comps.values():
-            comp.freeze_all_parameters()
+        for param in self.parameters():
+            param._unfreeze_value()
 
+        exceptions = [] if not exceptions else exceptions
 
-    @_update_component_list
-    def freeze_parameter_value(self, param:Parameter):
+        list_valid = self.parameters('name')
+        list_invalid = set(exceptions) - set(list_valid)
 
-        param._freeze_value()
+        assert not list_invalid, ('Invalid names %s in exceptions parameter. '
+                                  'Valid options are %s.'
+                                  )%(', '.join(list_invalid),
+                                     ', '.join(list_valid))
+
+        param_list = [param for param, name in self.parameters(('', 'name'))
+                      if not name in exceptions]
+
+        for param in param_list:
+            param._freeze_value()
 
 
     def _assert_slot_block_validity(self):
@@ -148,39 +235,34 @@ class Model:
         '''
 
         # adding first non-slot/non-slot_block component
-        slots_done = len(self.comps) > len(self.slots) + len(self.slot_blocks)
+        slots_done = (len(self.comps) - hasattr(self, 'curt')
+                      > len(self.slots) + len(self.slot_blocks))
+
+        # check validity of time slot block definition
+        if (self.slot_blocks and (
+            len(self.slots) > 4 or (slots_done and len(self.slots) < 4))):
+
+            raise RuntimeError('Number of time slots must be equal to 4 '
+                               'if time slot blocks are used.')
+
+        if len(self.comps) > 0:  # only when other components are added
+            assert len(self.slot_blocks) in [0, 2], \
+                        'Number of slot blocks must be 0 or 2.'
 
 
-#        # check validity of time slot block definition
-#        if (self.slot_blocks and (
-#            len(self.slots) > 4 or (slots_done and len(self.slots) < 4))):
-#
-#            raise RuntimeError('Number of time slots must be equal to 4 '
-#                               'if time slot blocks are used.')
-#
-#        if len(self.comps) > 0:  # only when other components are added
-#            assert len(self.slot_blocks) in [0, 2], \
-#                        'Number of slot blocks must be 0 or 2.'
-#
-#        if self.slot_blocks and slots_done:
-#            assert all([len([slot_ref for slot_ref in self.slots.values()
-#                             if slot_ref.block == slot.block]) == 2
-#                       for slot in self.slots.values()]), \
-#                'Each slot block must be associated with exactly 2 slots.'
-
-
-    def _init_curtailment(self):
-
-        if self.curtailment:
-            self.curt = Curtailment('curt', self.slots)
-            self.comps['curt'] = self.curt
+        if self.slot_blocks and slots_done:
+            slots_per_block = Counter(s.block for s in self.slots.values())
+            assert set(slots_per_block.values()) == set((2,)), \
+                'Each slot block must be associated with exactly 2 slots.'
 
 
     @wrapt.decorator
     def _add_slots_to_kwargs(f, self, args, kwargs):
 
-        kwargs.update(dict(slots=self.slots))
+        if not 'slots' in kwargs:
+            kwargs.update(dict(slots=self.slots))
         return f(*args, **kwargs)
+
 
     @property
     def df_comb(self):
@@ -198,17 +280,27 @@ class Model:
 
     @_check_component_replacement
     def add_slot_block(self, name, repetitions):
+        '''
+        Add a time slot block to the model.
+
+        %s
+        '''
 
         self.slot_blocks.update({name: SlotBlock(name, repetitions)})
+
 
     @_update_component_list
     @_add_slots_to_kwargs
     @_check_component_replacement
     def add_storage(self, name, *args, **kwargs):
-        ''''''
-        if self.slot_blocks:
-            kwargs['_slot_blocks'] = self.slot_blocks
+        r'''
+        Add generic storage capacity to the model.
 
+        %s
+
+        '''  # Storage docstring added
+
+        kwargs['_slot_blocks'] = self.slot_blocks
         self.storages.update({name: Storage(name, **kwargs)})
 
 
@@ -216,23 +308,33 @@ class Model:
     @_add_slots_to_kwargs
     @_check_component_replacement
     def add_plant(self, name, *args, **kwargs):
+        r'''
+        Add a dispatchable power plant to the model.
+
+        %s
+        '''  # Plant docstring added
 
         self.plants.update({name: Plant(name, **kwargs)})
 
 
-    @_update_component_list
+    # note: no _update_component_list since slots alone make no model
     @_check_component_replacement
     def add_slot(self, name, *args, **kwargs):
+        '''
+        Add a time slot to the model.
 
-        if self.slot_blocks and not 'block' in kwargs:
-            raise RuntimeError(('Error in `add_slot(%s)`: If any of the slots '
-                                'are assigned to a block, all slots must be.'
-                               )%name)
+        %s
+        '''
 
         if 'block' in kwargs:
             bk = kwargs['block']
             assert bk in self.slot_blocks, 'Unknown block %s'%bk
             kwargs['block'] = self.slot_blocks[bk]
+
+        elif self.slot_blocks:
+            raise RuntimeError(('Error in `add_slot(%s)`: If any of the slots '
+                                'are assigned to a block, all slots must be.'
+                               )%name)
 
         if not 'weight' in kwargs:  # use default weight parameter
             kwargs['weight'] = self._slot_weights
@@ -240,78 +342,119 @@ class Model:
         self.slots.update({name: Slot(name, **kwargs)})
 
 
-    def init_total_param_values(self):
+    @_update_component_list
+    def add_curtailment(self, slots):
         '''
-        Generates dictionary {parameter object: parameter value}
-        for all parameters for all components.
+        Add curtailment to the model. Must specify the time slots.
+
+        This method is only used if curtailment is defined for a subset
+        of time slots. Use the model parameter `curtailment=True` to enable
+        curtailment globally.
         '''
 
-        self.param_values = {symb: val
-                             for comp in self.comps.values()
-                             for symb, val
-                             in comp.get_params_dict(('symb',
-                                                      'value')).items()}
+        if self.curtailment:
+            raise RuntimeError('Cannot manually add curtailment if model '
+                               'level curtailment is True.')
 
-        self.param_values.update({self.vre_scale.symb: self.vre_scale.value})
+        self._add_curtailment(slots)
 
 
-    def init_total_cost(self):
-
-        self.tc = sum(p.cc for p in
-                      list(self.plants.values())
-                           + list(self.storages.values()))
-        self.lagrange_0 = (self.tc
-                           + sum([cstr.expr for cstr in self.cstr_supply]))
-        self.lagrange_0 += sum([cstr.expr for cstr in self.constrs
-                                if cstr.is_equality_constraint])
+    def _add_curtailment(self, slots):
 
 
-    def init_supply_constraints(self):
+        logger.debug('_add_curtailment with slots=%s'%str(slots))
+        if not isinstance(slots, (dict)):
+            slots = {slot: self.slots[slot] for slot in slots}
+
+        self.curt.update({'curt': Curtailment('curt', slots=slots)})
+
+
+    def _init_total_cost(self):
+        '''
+        Generate total cost and base lagrange attributes.
+
+        Collects all cost components to calculate their total sum `tc`. Adds
+        the equality constraints to the model's total cost to generate the base
+        lagrange function `lagrange_0`.
+
+        Costs and constraint expression of all components are re-initialized.
+        This is important in case parameter values are frozen.
+        '''
+
+        comp_list = list(self.plants.values()) + list(self.storages.values())
+
+        for comp in comp_list:
+            comp._init_cost_component()
+            comp._reinit_all_constraints()
+
+        eq_cstrs = self.constraints.tolist('expr', is_equality_constraint=True)
+
+        self.tc = sum(p.cc for p in comp_list)
+        self.lagrange_0 = self.tc + sum(eq_cstrs)
+
+
+# =============================================================================
+# =============================================================================
+
+
+    def _supply_cstr_expr_func(self, slot):
+            '''
+            Initialize the load constraints for a given time slot.
+            Note: this accesses all plants, therefore method of the model class.
+            '''
+
+            total_chg = sum(store.pchg[slot]
+                            for store in self.storages.values()
+                            if slot in store.pchg)
+            total_dch = sum(store.pdch[slot]
+                            for store in self.storages.values()
+                            if slot in store.pdch)
+
+            equ = (slot.l.symb
+                   + total_chg
+                   - total_dch
+                   - sum(plant.p[slot] for plant in self.plants.values()))
+
+            if self.curt and slot in self.curt['curt'].p:
+                equ += self.curt['curt'].p[slot]
+
+            if hasattr(slot, 'vre'):
+                equ -= slot.vre.symb * self.vre_scale.symb
+
+            return slot.w.symb * equ
+
+
+    def _init_supply_constraints(self):
         '''
         Defines a dictionary cstr_load {slot: supply constraint}
         '''
 
-        self.cstr_supply = {}
-
         for slot in self.slots.values():
 
-            cstr_supply = Constraint('load_%s'%(slot.name),
-                                     multiplier_name='pi', slot=slot,
-                                     is_equality_constraint=True)
-            cstr_supply.expr = \
-                    self.get_supply_constraint_expr(cstr_supply)
+            cstr = Constraint('supply', expr_func=self._supply_cstr_expr_func,
+                              slot=slot, is_equality_constraint=True,
+                              expr_args=(slot,), comp_name=slot.name)
 
-            self.cstr_supply[cstr_supply] = slot
+            self.constraints.append(cstr)
 
+# =============================================================================
+# =============================================================================
 
-    def get_supply_constraint_expr(self, cstr):
-        '''
-        Initialize the load constraints for a given time slot.
-        Note: this accesses all plants, therefore method of the model class.
-        '''
-
-        slot = cstr.slot
-
-        total_chg = sum(store.pchg[slot]
-                        for store in self.storages.values()
-                        if slot in store.pchg)
-        total_dch = sum(store.pdch[slot]
-                        for store in self.storages.values()
-                        if slot in store.pdch)
-
-        equ = (slot.l.symb
-               - slot.vre.symb * self.vre_scale.symb
-               + total_chg
-               - total_dch
-               - sum(plant.p[slot] for plant
-                     in self.plants.values()))
-
-        if self.curtailment:
-            equ += self.curt.p[slot]
-
-        return equ
 
     def generate_solve(self):
+        '''
+        Initialize the constraint combinations, generate the problems, and
+        solve. This calls the following methods:
+
+            - `Model.init_constraint_combinations()`
+            - `Model.define_problems()`
+            - `Model.solve_all()`
+            - `Model.filter_invalid_solutions()`
+            - `Model.generate_total_costs()`
+            - `Model.cache.write(Model.df_comb)`
+
+        '''
+
 
         if self.cache.file_exists:
             self.df_comb = self.cache.load()
@@ -322,24 +465,6 @@ class Model:
             self.filter_invalid_solutions()
             self.generate_total_costs()
             self.cache.write(self.df_comb)
-
-
-    def collect_component_constraints(self):
-        '''
-        Note: Doesn't include supply constraints, which are a model attribute.
-        '''
-
-        self.constrs = {}
-        for comp in self.comps.values():
-            for cstr in comp.get_constraints(by_slot=True, names=False):
-                self.constrs[cstr] = comp
-
-        # dictionary {column name: constraint object}
-        self.constrs_dict = {cstr.col: cstr for cstr in self.constrs.keys()}
-
-        # list of constraint columns
-        self.constrs_cols_neq = [cstr.col for cstr in self.constrs
-                                 if not cstr.is_equality_constraint]
 
 
     def _get_model_mutually_exclusive_cols(self):
@@ -358,22 +483,19 @@ class Model:
         '''
 
         list_col_names = []
-        for mename, me in self._MUTUALLY_EXCLUSIVE.items():
 
-            # identify relevant constraints of all components
-            cstrs_all = [comp.get_constraints(False, True, True)
-                         for comp in self.comps.values()]
-            cstrs_all = dict(pair for d in cstrs_all for pair in d.items())
-            cstrs_all = {(key[0], '{}_{}'.format(key[0],
-                                        key[1].replace('cstr_', ''))): val
-                         for key, val in cstrs_all.items()}
+        dict_struct = {('comp_name', 'base_name'): {('slot',): ''}}
+        cstrs_all = self.constraints.to_dict(dict_struct=dict_struct)
 
+        for mename, me in self.mutually_exclusive.items():
             # expand to all components
             me_exp = [tuple((cstrs, name_cstr[0], me_slct[-1])
                        for name_cstr, cstrs in cstrs_all.items()
                        if name_cstr[1].endswith(me_slct[0]))
                       for me_slct in me]
+
             # all components of the combination's two constraints
+            # for example, ('n', 'g'), 'curt' --> ('n', curt), ('g', curt)
             me_exp = list(itertools.product(*me_exp))
 
             # remove double components, also: remove component names
@@ -410,7 +532,7 @@ class Model:
         2. Generates table corresponding to the full cross-product of all
            component constraint combinations.
         3. Filters constraint combinations according to the
-           :attr:`model._MUTUALLY_EXCLUSIVE` class attribute.
+           :attr:`model.mutually_exclusive` class attribute.
 
         This function initilizes the `symenergy.df_comb` attribute
 
@@ -432,7 +554,7 @@ class Model:
 
         logger.info('Length of merged df_comb: %d'%len(dfcomb))
 
-        # filter according to model _MUTUALLY_EXCLUSIVE
+        # filter according to model mutually_exclusive
         logger.info('*'*30 + 'model filtering' + '*'*30)
         model_mut_excl_cols = self._get_model_mutually_exclusive_cols()
         dfcomb = filter_constraint_combinations(dfcomb, model_mut_excl_cols)
@@ -444,29 +566,31 @@ class Model:
 
         self.ncomb = len(self.df_comb)
 
+        logger.info('Remaining df_comb rows: %d' % self.ncomb)
 
-    def get_variabs_params(self):
-        '''
-        Generate lists of parameters and variables.
-
-        Gathers all parameters and variables from its components.
-        This is needed for the definition of the linear equation system.
-        '''
-
-        self.params = {par: comp
-                       for comp in self.comps.values()
-                       for par in comp.get_params_dict()}
-
-        # add time-dependent variables
-        self.variabs = {var: comp
-                        for comp in self.comps.values()
-                        for var in comp.get_variabs()}
-
-        # parameter multips
-        self.multips = {cstr.mlt: comp for cstr, comp in self.constrs.items()}
-        # supply multips
-        self.multips.update({cstr.mlt: slot
-                             for cstr, slot in self.cstr_supply.items()})
+#
+#    def get_variabs_params(self):
+#        '''
+#        Generate lists of parameters and variables.
+#
+#        Gathers all parameters and variables from its components.
+#        This is needed for the definition of the linear equation system.
+#        '''
+#
+##        self.params = {par: comp
+##                       for comp in self.comps.values()
+##                       for par in comp.get_params_dict()}
+#
+#        # add time-dependent variables
+##        self.variabs = {var: comp
+##                        for comp in self.comps.values()
+##                        for var in comp.get_variabs()}
+#
+#        # parameter multips
+##        self.multips = {cstr.mlt: comp for cstr, comp in self.constrs.items()}
+#        # supply multips
+##        self.multips.update({cstr.mlt: slot
+##                             for slot, cstr in self.cstr_supply.items()})
 
 
 
@@ -477,18 +601,18 @@ class Model:
     def solve(self, x):
 
         # substitute variables with binding positivitiy constraints
+        cpos = self.constraints.tolist(('col', ''),
+                                       is_positivity_constraint=True)
         subs_zero = {cstr.expr_0: sp.Integer(0) for col, cstr
-                     in self.constrs_dict.items()
-                     if cstr.is_positivity_constraint
-                     and x[cstr.col]}
+                     in cpos if x[cstr.col]}
 
         mat = derive_by_array(x.lagrange, x.variabs_multips)
         mat = sp.Matrix(mat).expand()
         mat = mat.subs(subs_zero)
 
-        variabs_multips_slct = list(set(x.variabs_multips) - set(subs_zero))
+        variabs_multips_slct = list(OrderedSet(x.variabs_multips) - OrderedSet(subs_zero))
 
-        A, b = sp.linear_eq_to_matrix(mat, variabs_multips_slct)
+        A, b = linear_eq_to_matrix(mat, variabs_multips_slct)
 
         MP_COUNTER.increment()
         solution_0 = sp.linsolve((A, b), variabs_multips_slct)
@@ -500,11 +624,9 @@ class Model:
 
             # init with zeros
             solution_dict = dict.fromkeys(x.variabs_multips, sp.Integer(0))
-
             # update with solutions
             solution_dict.update(dict(zip(variabs_multips_slct,
                                           list(solution_0)[0])))
-
             solution = tuple(solution_dict.values())
 
             return solution
@@ -528,38 +650,25 @@ class Model:
 
         if __name__ == '__main__':
             x = self.df_comb.iloc[0]
-#            lagrange, variabs_multips_slct, index =
 
         if not self.nthreads:
             self.df_comb['result'] = self.call_solve_df(self.df_comb)
         else:
             func = self.wrapper_call_solve_df
-            self.df_comb['result'] = parallelize_df(self.df_comb,
-                                                    func, self.nthreads)
+            self.df_comb['result'] = parallelize_df(self.df_comb, func,
+                                                    nthreads=self.nthreads)
 
 # =============================================================================
 # =============================================================================
 
-    def generate_total_costs(self):
-        '''
-        Substitute result variable expressions into total costs
-        '''
 
-        df = list(zip(self.df_comb.result,
-                      self.df_comb.variabs_multips,
-                      self.df_comb.idx))
-
-        if not self.nthreads:
-            self.df_comb['tc'] = self.call_subs_tc(df)
-        else:
-            func = self.wrapper_call_subs_tc
-            self.df_comb['tc'] = parallelize_df(df, func, self.nthreads)
-
-    def subs_total_cost(self, res, var, idx):
+    def subs_total_cost(self, x):
         '''
         Substitutes solution into TC variables.
         This expresses the total cost as a function of the parameters.
         '''
+
+        res, var = x.result, x.variabs_multips
 
         dict_var = {var: res[ivar]
                     if not isinstance(res, sp.sets.EmptySet)
@@ -573,13 +682,32 @@ class Model:
 
     def call_subs_tc(self, df):
 
-        return [self.subs_total_cost(res, var, idx) for res, var, idx in df]
+        return df.apply(self.subs_total_cost, axis=1)
+
 
     def wrapper_call_subs_tc(self, df, *args):
 
         name = 'Substituting total cost'
         ntot = self.nress
         return log_time_progress(self.call_subs_tc)(self, df, name, ntot)
+
+
+    def generate_total_costs(self):
+        '''
+        Substitute result variable expressions into total costs
+        '''
+
+        logger.info('Generating total cost expressions...')
+
+        df = self.df_comb[['result', 'variabs_multips', 'idx']]
+
+        if not self.nthreads:
+            self.df_comb['tc'] = self.call_subs_tc(df)
+        else:
+            func = self.wrapper_call_subs_tc
+            self.df_comb['tc'] = parallelize_df(df, func,
+                                                nthreads=self.nthreads)
+
 
 # =============================================================================
 # =============================================================================
@@ -588,10 +716,11 @@ class Model:
     def construct_lagrange(self, row):
 
         lagrange = self.lagrange_0
-
         active_cstrs = row[row == 1].index.values
-        lagrange += sum(self.constrs_dict[cstr_name].expr
-                        for cstr_name in active_cstrs)
+        lagrange += sum(expr for col, expr
+                        in self.constraints.tolist(('col', 'expr'))
+                        if col in active_cstrs)
+
         MP_COUNTER.increment()
 
         return lagrange
@@ -615,7 +744,7 @@ class Model:
 # =============================================================================
 # =============================================================================
 
-    def get_variabs_multips_slct(self, lagrange):
+    def _get_variabs_multips_slct(self, lagrange):
         '''
         Returns all relevant variables and multipliers for this model.
 
@@ -634,20 +763,23 @@ class Model:
 
         lfs = lagrange.free_symbols
         MP_COUNTER.increment()
-        return [ss for ss in lfs if ss in self.variabs or ss in self.multips]
+        list_vm = [ss for ss in lfs
+                   if ss in self.variables.tolist('symb')
+                          + self.constraints.tolist('mlt')]
+        return sorted(list_vm, key=str)
 
 
-    def call_get_variabs_multips_slct(self, df):
+    def _call_get_variabs_multips_slct(self, df):
 
-        res = list(map(self.get_variabs_multips_slct, df))
+#        res = list(map(self.get_variabs_multips_slct, df))
+        return df.apply(self._get_variabs_multips_slct)
 
-        return res
 
-    def wrapper_call_get_variabs_multips_slct(self, df, *args):
+    def _wrapper_call_get_variabs_multips_slct(self, df, *args):
 
         name = 'Get variabs/multipliers'
         ntot = self.ncomb
-        func = self.call_get_variabs_multips_slct
+        func = self._call_get_variabs_multips_slct
         return log_time_progress(func)(self, df, name, ntot)
 
 # =============================================================================
@@ -686,13 +818,18 @@ class Model:
                 free_symbs = [var for var in list_var if var in res.free_symbols]
 
                 if free_symbs:
+
                     list_res_new[nres] = sp.numbers.Zero()
+                    for res in list_res_new:
+                        res.subs(dict.fromkeys(free_symbs, sp.numbers.Zero()))
+
                     collect[list_var[nres]] = ', '.join(map(str, free_symbs))
 
             if collect:
-                logger.info('idx=%d'%x.idx)
+                logger.debug('idx=%d'%x.idx)
                 for res, var in collect.items():
-                    logger.info('     Solution for %s contained variabs %s.'%(res, var))
+                    logger.debug(('     Solution for %s contained variabs '
+                                  '%s.')%(res, var))
         else:
             raise ValueError('code_lindep must be 0, 3, or 1')
 
@@ -732,7 +869,8 @@ class Model:
         else:
             func = self.wrapper_call_construct_lagrange
             nthreads = self.nthreads
-            self.df_comb['lagrange'] = parallelize_df(df, func, nthreads)
+            self.df_comb['lagrange'] = parallelize_df(df, func,
+                                                      nthreads=nthreads)
 
         logger.info('Getting selected variables/multipliers...')
         df = self.df_comb.lagrange
@@ -740,9 +878,10 @@ class Model:
             self.list_variabs_multips = self.call_get_variabs_multips_slct(df)
             self.df_comb['variabs_multips'] = self.list_variabs_multips
         else:
-            func = self.wrapper_call_get_variabs_multips_slct
+            func = self._wrapper_call_get_variabs_multips_slct
             nthreads = self.nthreads
-            self.df_comb['variabs_multips'] = parallelize_df(df, func, nthreads)
+            self.df_comb['variabs_multips'] = parallelize_df(df, func,
+                                                             nthreads=nthreads)
 
         # get index
         self.df_comb = self.df_comb[[c for c in self.df_comb.columns
@@ -784,7 +923,7 @@ class Model:
         variables which we are actually solving for. To fix this, we
         differentiate between two cases:
 
-
+        0. No dependencies
         1. All corresponding solutions belong to the same component. Overspecification
            occurs if the variables of the same component
            depend on each other but are all zero. E.g. charging,
@@ -805,83 +944,56 @@ class Model:
                 interdependency: drop solution; NaN: empty solution set
         '''
 
-#        check_vars_left = lambda x: any(var in x.result.free_symbols
-#                                        for var in x.variabs_multips)
-#        mask_lindep = self.df_comb.apply(check_vars_left, axis=1)
+        res_vars = self.df_comb[['result', 'variabs_multips', 'idx']].copy()
 
-        # get residual variables
-        if __name__ == '__main__':
-            x = self.df_comb.iloc[0]
+        # map variable/multiplier -> component
+        dict_vm_cp = {**self.variables.to_dict({('symb',): 'comp_name'}),
+                      **self.constraints.to_dict({('mlt', ): 'comp_name'})}
+        dict_vm_cp = {vm: self.comps[cp] for vm, cp in dict_vm_cp.items()}
 
-        # mask with non-empty solutions
-        not_empty = lambda x: not isinstance(x, sp.sets.EmptySet)
-        mask_valid = self.df_comb.result.apply(not_empty)
+        # map variable/multipler -> component class
+        dict_vm_cl = {vm: cp.__class__ for vm, cp in dict_vm_cp.items()}
+
+        return_series = lambda *args: pd.Series(args,
+                                               index=['ncompunq', 'nclassunq'])
 
         # for each individual solution, get residual variables/multipliers
         def get_residual_vars(x):
-            return tuple([var for var in res.free_symbols
-                                 if var in x.variabs_multips]
-                            for nres, res in enumerate(x.result))
+            if __name__ == '__main__':
+                x = res_vars.iloc[0]
 
-        res_vars = self.df_comb[['result', 'variabs_multips', 'idx']].copy()
-        res_vars.loc[mask_valid, 'res_vars'] = \
-                self.df_comb.loc[mask_valid].apply(get_residual_vars, axis=1)
+            varmlt = x.variabs_multips
+            result = x.result
 
-        if __name__ == '__main__':
-            x = res_vars.iloc[1]
+            # identify free variables/multipliers in results
+            resvars = [r.free_symbols & set(varmlt) for r in result]
+            # add the corresponding solution variable to all non-empty sets
+            resvars = [rv | {vm} for rv, vm in zip(resvars, varmlt) if rv]
+            if not resvars:
+                return return_series(0, 0)
+            # get components corresponding to symbols (unique for each result)
+            rescomps = [set(map(lambda x: dict_vm_cp[x], rv)) for rv in resvars]
+            # maximum number of distinct components
+            ncompunq = max(map(len, rescomps))
+            # get classes corresponding to symbols (unique for each result)
+            resclass = [set(map(lambda x: dict_vm_cl[x], rv)) for rv in resvars]
+            # maximum number of distinct classes
+            nclassunq = max(map(len, resclass))
 
-        # add solution variable itself to all non-empty lists
-        def add_solution_var(x):
-            return tuple(x.res_vars[nres_vars]
-                                + [x.variabs_multips[nres_vars]]
-                            if res_vars else []
-                            for nres_vars, res_vars in enumerate(x.res_vars))
+            return return_series(ncompunq, nclassunq)
 
-        res_vars.loc[mask_valid, 'res_vars'] = \
-                res_vars.loc[mask_valid].apply(add_solution_var, axis=1)
-
-        # get component corresponding to variable
-        comp_dict_varmtp = self.multips.copy()
-        comp_dict_varmtp.update(self.variabs)
-
-        def get_comps(x):
-            return tuple((list(set([comp_dict_varmtp[var]
-                                              for var in res_vars])))
-                                    for res_vars in x.res_vars
-                                    if res_vars)
-        res_vars.loc[mask_valid, 'res_comps'] = \
-                res_vars.loc[mask_valid].apply(get_comps, axis=1)
-
-        # maximum unique component number
-        def get_max_ncompunq(x):
-            nmax = 0
-            if x.res_comps:
-                nmax = max(len(set(comp_list)) for comp_list in x.res_comps)
-            return nmax
-        res_vars.loc[mask_valid, 'ncompunq'] = \
-                res_vars.loc[mask_valid].apply(get_max_ncompunq, axis=1)
-
-        # maximum unique component class number
-        def get_max_ncompclassunq(x):
-            nmax = 0
-            if x.res_comps:
-                nmax = len(set([x.__class__ for x in
-                                itertools.chain.from_iterable(x.res_comps)]))
-            return nmax
-        res_vars.loc[mask_valid, 'ncompclassesunq'] = \
-                res_vars.loc[mask_valid].apply(get_max_ncompclassunq, axis=1)
+        max_cnt = res_vars.apply(get_residual_vars, axis=1)
 
         # generate lindep codes
-        res_vars['code_lindep'] = 0
+        max_cnt['code_lindep'] = 0
+        mask_1 = (max_cnt.ncompunq < 2) & (max_cnt.ncompunq > 0)
+        max_cnt.loc[mask_1, 'code_lindep'] = 1
+        mask_2 = (max_cnt.ncompunq >= 2) & (max_cnt.nclassunq >= 2)
+        max_cnt.loc[mask_2, 'code_lindep'] = 2
+        mask_3 = (max_cnt.ncompunq >= 2) & (max_cnt.nclassunq <= 1)
+        max_cnt.loc[mask_3, 'code_lindep'] = 3
 
-
-        res_vars.loc[res_vars.ncompunq < 2, 'code_lindep'] = 1
-        res_vars.loc[(res_vars.ncompunq >= 2)
-                     & (res_vars.ncompclassesunq >= 2 ), 'code_lindep'] = 2
-        res_vars.loc[(res_vars.ncompunq >= 2)
-                     & (res_vars.ncompclassesunq < 2 ), 'code_lindep'] = 3
-
-        return res_vars.code_lindep
+        return max_cnt.code_lindep
 
 
     def filter_invalid_solutions(self):
@@ -908,14 +1020,16 @@ class Model:
         mask_lindep = self.get_mask_linear_dependencies()
 
         ncomb0 = len(self.df_comb)
-        nkey1, nkey2, nkey3 = (mask_lindep == 1).sum(), (mask_lindep == 2).sum(), (mask_lindep == 3).sum()
+        nkey1, nkey2, nkey3 = ((mask_lindep == 1).sum(),
+                               (mask_lindep == 2).sum(),
+                               (mask_lindep == 3).sum())
         logger.warning(('Number of solutions with linear dependencies: '
-                       'Key 1: {:d} ({:.1f}%), Key 2: {:d} ({:.1f}%), Key 3: {:d} ({:.1f}%)'
+          'Key 1: {:d} ({:.1f}%), Key 2: {:d} ({:.1f}%), Key 3: {:d} ({:.1f}%)'
                        ).format(nkey1, nkey1/ncomb0*100,
                                 nkey2, nkey2/ncomb0*100,
                                 nkey3, nkey3/ncomb0*100))
 
-        self.df_comb = pd.concat([self.df_comb, mask_lindep], axis=1)
+        self.df_comb['code_lindep'] = mask_lindep
         self.df_comb = self.df_comb.loc[-(self.df_comb.code_lindep == 2)]
 
         self.nress = len(self.df_comb)
@@ -927,18 +1041,56 @@ class Model:
         else:
             func = self.wrapper_call_fix_linear_dependencies
             nthreads = self.nthreads
-            self.df_comb['result'] = parallelize_df(self.df_comb, func, nthreads)
+            self.df_comb['result'] = parallelize_df(self.df_comb, func,
+                                                    nthreads=nthreads)
 
 
-    def print_results(self, df, idx):
+    def print_results(self, idx, df=None, slct_var_mlt=None, substitute=None):
+        '''
+        Print result expressions for all variables and multipliers for a
+        certain constraint combination index.
 
-        x = df.query('idx == %d'%idx).iloc[0]
+        Parameters
+        ----------
+            idx : int
+                index of the constraint combination for which the results are to
+                be printed
+            df : df
+                DataFrame containing the results and the index; defaults to
+                the model's `df_comb` table
 
-        for var, res in dict(zip(x.variabs_multips, x.result)).items():
+
+        The input DataFrame must have the following columns:
+            - `variabs_multips`: iterable of variable and multiplier symbols
+                for which the results are to be printed
+            - `result`: list of expressions corresponding for each of the
+                `variabs_multips` symbols
+
+
+        '''
+
+
+        if not isinstance(df, pd.DataFrame):
+            df = self.df_comb
+
+        x = df.reset_index().query('idx == %d'%idx).iloc[0]
+
+        if not substitute:
+            substitute = {}
+
+
+        resdict = dict(zip(map(str, x.variabs_multips), x.result))
+        if slct_var_mlt:
+            resdict = {var: res for var, res in resdict.items()
+                       if var in slct_var_mlt}
+
+        resdict = pd.DataFrame.from_dict(resdict, orient='index'
+                                         ).reset_index().sort_values('index').set_index('index').to_dict()[0]
+
+        for var, res in resdict.items():
 
             print('*'*20, var, '*'*20)
-            print((res))
-
+            print(sp.simplify(res.subs(substitute)))
 
 
     def __repr__(self):
@@ -946,21 +1098,21 @@ class Model:
         ret = str(self.__class__)
         return ret
 
-    def get_all_is_capacity_constrained(self):
-        ''' Collects capacity constrained variables of all components. '''
+#    def get_all_is_capacity_constrained(self):
+#        ''' Collects capacity constrained variables of all components. '''
+#
+#        return [var
+#                for comp in self.comps.values()
+#                for var in comp.get_is_capacity_constrained()]
 
-        return [var
-                for comp in self.comps.values()
-                for var in comp.get_is_capacity_constrained()]
-
-    def get_all_is_positive(self):
-        ''' Collects positive variables of all components. '''
-
-        is_positive_comps = [var
-                             for comp in self.comps.values()
-                             for var in comp.get_is_positive()]
-
-        return is_positive_comps
+#    def get_all_is_positive(self):
+#        ''' Collects positive variables of all components. '''
+#
+#        is_positive_comps = [var
+#                             for comp in self.comps.values()
+#                             for var in comp.get_is_positive()]
+#
+#        return is_positive_comps
 
 
     def print_mutually_exclusive_post(self, logging=False):
@@ -1025,8 +1177,32 @@ class Model:
             data = 'l={:.1f}/vre={:.1f}'.format(slotobj.l.value, slotobj.vre.value)
             print(slot, bar, data, sep=' | ', end='\n', flush=True)
 
+
+    @hexdigest
     def get_model_hash_name(self):
 
-        hash_input = ''.join(comp._get_component_hash_name()
+        hash_input = ''.join(comp._get_hash_name()
                              for comp in self.comps.values())
-        return md5(hash_input.encode('utf-8')).hexdigest()
+        hash_input += str(self.lagrange_0)
+        hash_input += self.constraint_filt
+
+        return hash_input
+
+
+# add component class docs to the component adder docstrings
+for addermethod, compclass in [(Model.add_storage, Storage),
+                               (Model.add_plant, Plant),
+                               (Model.add_slot, Slot),
+                               (Model.add_slot_block, SlotBlock)]:
+
+    doc = addermethod.__doc__
+    classdoc = textwrap.dedent(compclass.__doc__)
+    lines = doc.split('\n')
+    ind = min(len(line) - len(line.strip(' ')) for line in lines
+              if not line == '')
+    classdoc = textwrap.indent(classdoc, ' ' * ind)
+
+    addermethod.__doc__ = doc % classdoc
+
+
+# %%

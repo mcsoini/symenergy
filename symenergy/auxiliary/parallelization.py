@@ -7,20 +7,32 @@ Part of symenergy. Copyright 2018 authors listed in AUTHORS.
 """
 
 import multiprocessing
-from multiprocessing import Process, Value, Lock
-import numpy
+from multiprocessing import Value, Lock
+import numpy as np
 import pandas as pd
 import itertools
 import time
 from symenergy import _get_logger
+from multiprocessing import current_process
+
+from symenergy.auxiliary.params import RcParams
 
 logger = _get_logger(__name__)
 
-CHUNKS_PER_THREAD = 2
 
-try:
-    from pathos.multiprocessing import ProcessingPool as Pool
-except Exception as e: logger.info(e)
+class MultiprocParams(RcParams):
+    items_opts = {'nthreads':
+                    {'types': {int: '>=0'},
+                     'values': (None, False, 'default',),
+                     'cond': 'int >= 0 or one of (None, False, "default")'},
+                  'chunks_per_thread':
+                      {'types': {int: '>=0'},
+                       'values': (),
+                       'cond': 'int >= 0'}}
+    items_default = {'nthreads': 'default', 'chunks_per_thread': 2}
+
+multiproc_params = MultiprocParams()
+
 
 class Counter():
     def __init__(self):
@@ -68,43 +80,66 @@ def log_time_progress(f):
 
         vals = (name, int(MP_COUNTER.value()), ntot,
                 MP_COUNTER.value()/ntot * 100,
-                len(df), MP_EMA.value()/len(df)*1000, t*1000 / len(df))
-        logger.info(('{}: {}/{} ({:.1f}%), chunksize {}, '
-                     'tavg={:.1f}ms, tcur={:.1f}ms').format(*vals))
+                len(df),
+#                MP_EMA.value()/len(df)*1000,
+#                t*1000 / len(df),
+                current_process().name)
+        logger.info(('{}: {}/{} ({:.1f}%), chunksize {}, {}').format(*vals))
 
         return res
     return wrapper
 
 
-def parallelize_df(df, func, nthreads, *args, use_pathos=False, **kwargs):
+def get_default_nthreads():
+
+    if multiproc_params['nthreads'] == 'default':
+        return multiprocessing.cpu_count() - 1
+    else:
+        return multiproc_params['nthreads']
+
+
+def parallelize_df(df, func, *args, nthreads='default', concat=True, **kwargs):
     MP_COUNTER.reset()
     MP_EMA.reset()
 
-    nthreads = min(nthreads, len(df))
-    nchunks = min(nthreads * CHUNKS_PER_THREAD, len(df))
+    logger.debug(str(('NTHREADS: ', multiproc_params['nthreads'])))
 
-    df_split = numpy.array_split(df, nchunks)
-    if use_pathos:
-        pool = Pool(nthreads)
-        results = pool.map(func, df_split, **kwargs)
+    nthreads = min(get_default_nthreads(), len(df))
+
+    def split(df_):
+        nchunks = min(nthreads * multiproc_params['chunks_per_thread'], len(df_))
+        return np.array_split(df, nchunks)
+
+    if isinstance(df, (pd.DataFrame, pd.Series)):
+        df_split = split(df)
+    elif isinstance(df, list) and isinstance(df[0], (pd.DataFrame, pd.Series)):
+        df_split = df
+    elif isinstance(df, list):
+        df_split = split(df)
     else:
-        pool = multiprocessing.Pool(nthreads)
-        if args:
-#            print((df_split, args))
-            results = pool.starmap(func, itertools.product(df_split, args))
-        else:
-            results = pool.map(func, df_split)
+        raise ValueError('Unknown df argument type in parallelize_df')
+
+
+    pool = multiprocessing.Pool(nthreads)
+    if args:
+        raise RuntimeError('error')
+        results = pool.starmap(func, itertools.product(df_split, args))
+    else:
+        results = pool.map(func, df_split)
+
     pool.close()
     pool.join()
-    if use_pathos:
-        pool.clear()
-        pool.restart()
-    logger.info('parallelize_df: concatenating ... ')
+
     if isinstance(results[0], (list, tuple)):
-        result = list(itertools.chain.from_iterable(results))
-    else:
-        result = pd.concat(results)
+        logger.info('parallelize_df: chaining ... ')
+        results = list(itertools.chain.from_iterable(results))
+
+    if isinstance(results[0], (pd.DataFrame, pd.Series)) and concat:
+        logger.info('parallelize_df: concatenating ... ')
+        results = pd.concat(results)
+
     logger.info('done.')
-    return result
+    return results
+
 
 

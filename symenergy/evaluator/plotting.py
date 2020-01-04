@@ -1,9 +1,123 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Wed Oct  2 13:30:13 2019
+The plotting module contains various classes to generate typical SymEnergy
+output plots. Data update callbacks are implemented in JavaScript. This allows
+for interactive standalone plot arrays.
 
-@author: user
+Plots are arranged in 2D arrays. The two dimensions may correspond to any
+of the parameters specified by the
+:class:`symenergy.evaluator.evaluator.Evaluator`'s `x_vals` attribute.
+Plot objects are typically
+
+
+
+CustomPlot(Ev(df=df, x_name=category_cols),
+                      ind_axx='catx',
+                      ind_pltx='cat2',
+                      ind_plty=None,
+                      cat_column=['cat1'])
+
+All classes return Bokeh Layout objects. They can be displayed as
+
+- standalone html documents using `bokeh.io.output_file`
+- interactive plots in Jupyter notebooks using `bokeh.io.output_notebooks`
+
+
+
+
+Subclassing SymenergyPlotter
+----------------------------
+
+The :class:`symenergy.evaluator.plotting.SymenergyPlotter` class acts as a
+base class for the more targeted plots documented below. It takes care of
+most Bokeh logic, including the generation of JavaScript callbacks. Similar to
+the :class:`symenergy.evaluator.plotting.BalancePlot` class, it can easily be
+subclassed to generate customized plots.
+
+For this purpose, a class with two methods is defined:
+
+* the method `_select_data(self)` to obtain (filtered) data from the `ev`
+    ("Evaluator"). It must return a DataFrame with value and index
+    columns.
+* the method `_make_single_plot(self, fig, data, view, cols, color)` adds
+    bokeh plots to the figure `fig` provided as an argument. `data` is the
+    `ColumnDataSource` and is simply passed as `source` argument to the Bokeh
+    plot. The same holds for the `view` parameter, which corresponds to the
+    Bokeh plot `view` argument. `cols` and `color` are the data series and
+    the corresponding colors, respectively.
+
+The `SymenergyPlotter` is initialized with a
+:class:`symenergy.evaluator.evaluator.Evaluator` object. However, only the
+`df` (dataframe) and `x_name` (category column names) attributes are used by the plotting
+class. Because of this, a mock evaluator object can also serve as input,
+containing only these two attributes. Consequently, this plotting module can
+be used with any kind of input data, not necessarily originating from the
+`SymEnergy` model. This is shown in the example below.
+
+```python
+
+    from collections import namedtuple
+    import numpy as np
+
+    # generate input data
+    category_cols = ['cat1', 'cat2', 'cat3', 'catx']
+    cat1 = ['A', 'B', 'C']
+    cat2 = ['A1', 'A2']
+    cat3 = ['X', 'Y', 'Z']
+    catx = range(20)
+    df = pd.DataFrame(itertools.product(cat1, cat2, cat3, catx),
+                      columns=category_cols)
+    df['value'] = np.random.random(len(df)) * 20
+
+    Ev = namedtuple('Ev', ['df', 'x_name'])
+    ev = Ev(df=df, x_name=category_cols)
+
+    #
+    class CustomPlot(SymenergyPlotter):
+
+        val_column = 'value'
+        cols_neg = []
+
+        def _select_data(self):
+
+            df = self.ev.df
+            return df
+
+
+        def _make_single_plot(self, fig, data, view, cols, color):
+
+            for column_slct, color_slct in zip(cols, color):
+
+                fig.circle(x=self.ind_axx, y=column_slct, color=color_slct,
+                           source=data, view=view, line_color='DimGrey')
+                fig.line(x=self.ind_axx, y=column_slct, color=color_slct,
+                         source=data, view=view)
+
+
+
+    plot = CustomPlot(Ev(df=df, x_name=category_cols),
+                      ind_axx='catx',
+                      ind_pltx='cat2',
+                      ind_plty=None,
+                      cat_column=['cat1'])
+
+    show(plot._get_layout())
+
+```
+
+To generate stacked barplots the `_make_single_plot` method would be written
+as follows.
+
+```python
+    def _make_single_plot(self, fig, data, view, cols, color):
+
+        fig.vbar_stack(cols, x=self.ind_axx, width=0.9,
+                       color=color, source=data,
+                       legend=list(map(value, cols)),
+                       view=view)
+```
+
 """
 
 import itertools
@@ -18,20 +132,29 @@ from bokeh.core.properties import value
 from bokeh.palettes import brewer
 from bokeh.io import show
 
-from symenergy import _get_logger
-
-logger = _get_logger(__name__)
-
-logger.info('Disabling pandas chained_assignment warnings')
 pd.set_option('mode.chained_assignment', None)
 
 class JSCallbackCoder():
+    '''
+    Parameters
+    ----------
+    ind_slct : list(str)
+        names of the indices selected through the MultiSelect widgets
+    cols_series : list(str)
+        names of all data series
+    cols_pos : list(str)
+        names of positive datasource columns (including indices)
+    cols_neg : list(str)
+        names of negative datasource columns (including indices)
+    '''
 
-    def __init__(self, ind_slct, cols_pos, cols_neg):
+
+    def __init__(self, ind_slct, cols_series, cols_pos, cols_neg):
 
         self.ind_slct = ind_slct
         self.cols_pos = cols_pos
         self.cols_neg = cols_neg
+        self.cols_series = cols_series
 
         self._make_js_general_str()
         self._make_js_init_str()
@@ -44,6 +167,7 @@ class JSCallbackCoder():
 
         self.var_slct_str = '; '.join('var {inds} = slct_{inds}.value'.format(inds=inds)
                                       for inds in self.ind_slct) + ';'
+        self.series_slct_str = 'var dataseries = slct_dataseries.value' + ';'
         self.param_str = ', ' + ', '.join(self.ind_slct)
         self.match_str = ' && '.join('source.data[\'{inds}\'][i] == {inds}'.format(inds=inds)
                                      for inds in self.ind_slct)
@@ -51,14 +175,19 @@ class JSCallbackCoder():
 
     def _make_js_push_str(self):
 
-        get_push_str = lambda pn: ''.join(('cds_{pn}.data[\'{col}\']'
-                                           '.push(cds_all_{pn}.'
-                                           'data[\'{col}\'][i]); '
-                                           ).format(pn=pn, col=col)
-                                for col in getattr(self, 'cols_%s'%pn))
+        def get_push_str(pn):
+            for col in getattr(self, 'cols_%s'%pn):
+                tr_block = 'cds_all_{pn}.data[\'{col}\'][i]'
+                if col in self.cols_series:
+                    if_block = 'dataseries.includes(\'{col}\')'
+                    fa_block = '0'
+                    val = '({}) ? ({}) : ({})'.format(if_block, tr_block, fa_block)
+                else:
+                    val = tr_block
+                yield ('cds_{pn}.data[\'{col}\'].push(%s); \n'%val).format(pn=pn, col=col)
 
-        self.push_str_pos = get_push_str('pos')
-        self.push_str_neg = get_push_str('neg')
+        self.push_str_pos = ''.join(get_push_str('pos'))
+        self.push_str_neg = ''.join(get_push_str('neg'))
 
 
     def _make_js_init_str(self):
@@ -95,6 +224,7 @@ class JSCallbackCoder():
 
         js_code = """
             {var_slct_str}
+            {series_slct_str}
 
             {init_str}
             function checkMatch(i, source{param_str}) {{
@@ -105,6 +235,7 @@ class JSCallbackCoder():
 
             {emit_str}
             """.format(var_slct_str=self.var_slct_str,
+                       series_slct_str=self.series_slct_str,
                        param_str=self.param_str,
                        match_str=self.match_str,
                        init_str=self.init_str,
@@ -123,9 +254,10 @@ class JSCallbackCoder():
 
         return self.get_js_string()
 
+
 class SymenergyPlotter():
     '''
-    Base class
+    Base class for the
     '''
 
     cat_column = None  # defined by children
@@ -133,12 +265,17 @@ class SymenergyPlotter():
     cols_neg = []
 
     def __init__(self, ev, ind_axx, ind_pltx, ind_plty, slct_series=None,
-                 cat_column=None):
+                 cat_column=None, plot_width=400, plot_height=300,
+                 ind_axy=None):
 
         self.ev = ev
         self.ind_pltx = ind_pltx
         self.ind_plty = ind_plty
         self.ind_axx = ind_axx
+        self.ind_axy = ind_axy
+
+        self.plot_height = plot_height
+        self.plot_width = plot_width
 
         if cat_column:
             self.cat_column = cat_column
@@ -154,8 +291,8 @@ class SymenergyPlotter():
         self.ind_plt = list(filter(lambda x: x is not None,
                                    [self.ind_pltx, self.ind_plty]))
         self.ind_slct = [x for x in self.ev.x_name
-                         if not x in (self.ind_plt
-                                      + [self.ind_axx]
+                         if not x in (self.ind_plt + [self.ind_axx]
+                                      + ([self.ind_axy] if self.ind_axy else [])
                                       + self.cat_column)]
 
     @property
@@ -179,9 +316,10 @@ class SymenergyPlotter():
 
         df = self._select_data()
 
-        gpindex = self.ind_plt + self.ind_slct + [self.ind_axx]
+        gpindex = (self.ind_plt + self.ind_slct + [self.ind_axx]
+                   + ([self.ind_axy] if self.ind_axy else []))
         data = df.pivot_table(index=gpindex, columns=self.cat_column,
-                              values=self.val_column)
+                              values=self.val_column, fill_value=0)
 
         if len(self.cat_column) > 1:
             data.columns = [str(tuple(c)).replace('\'', '')
@@ -198,6 +336,12 @@ class SymenergyPlotter():
         self.all_series = data.columns.tolist()
 
         if self.slct_series:
+
+            missing = [c for c in self.slct_series if not c in self.all_series]
+            if missing:
+                raise IndexError(('Unknown data series %s; options are %s.'
+                                  )%(str(missing), str(self.all_series)))
+
             data = data[self.slct_series]
             data = data.loc[~data.isna().all(axis=1)]
 
@@ -250,14 +394,22 @@ class SymenergyPlotter():
 
         slct_def = self.initial_selection
 
-        self.cds_pos = (ColumnDataSource(self.data[self.cols_pos].xs(slct_def, level=self.ind_slct).reset_index())
-                        if self.cols_pos else None)
-        self.cds_neg = (ColumnDataSource(self.data[self.cols_neg].xs(slct_def, level=self.ind_slct).reset_index())
-                        if self.cols_neg else None)
-        self.cds_all_pos = (ColumnDataSource(self.data[self.cols_pos].reset_index())
+        df_all_pos = self.data[self.cols_pos].reset_index()
+        self.cds_all_pos = (ColumnDataSource(df_all_pos)
                             if self.cols_pos else None)
-        self.cds_all_neg = (ColumnDataSource(self.data[self.cols_neg].reset_index())
+        df_all_neg = self.data[self.cols_neg].reset_index()
+        self.cds_all_neg = (ColumnDataSource(df_all_neg)
                             if self.cols_neg else None)
+        if slct_def:
+            df_pos = self.data[self.cols_pos].xs(slct_def, level=self.ind_slct)
+            self.cds_pos = (ColumnDataSource(df_pos.reset_index())
+                            if self.cols_pos else None)
+            df_neg = self.data[self.cols_neg].xs(slct_def, level=self.ind_slct)
+            self.cds_neg = (ColumnDataSource(df_neg.reset_index())
+                            if self.cols_neg else None)
+        else:
+            self.cds_pos = self.cds_all_pos
+            self.cds_neg = self.cds_all_neg
 
 
     def _make_views(self):
@@ -292,7 +444,8 @@ class SymenergyPlotter():
     def get_js_args(self):
 
         get_datasource = lambda name: ({name: getattr(self, name)}
-                                       if hasattr(self, name) else {})
+                                       if hasattr(self, name)
+                                       and getattr(self, name) else {})
 
         js_args = [get_datasource(name) for name
                    in ['cds_pos', 'cds_neg', 'cds_all_pos', 'cds_all_neg']]
@@ -306,14 +459,31 @@ class SymenergyPlotter():
 
     def _init_callback(self):
 
-        cols_pos = self.cols_pos + self.ind_plt + [self.ind_axx, 'index']
-        cols_neg = self.cols_neg + self.ind_plt + [self.ind_axx, 'index']
+        cols_ind = (self.ind_plt + [self.ind_axx, 'index']
+                    + ([self.ind_axy] if self.ind_axy else []))
+        cols_pos = self.cols_pos + (cols_ind if self.cols_pos else [])
+        cols_neg = self.cols_neg + (cols_ind if self.cols_neg else [])
+        cols_series = self.cols_pos + self.cols_neg
         js_string = JSCallbackCoder(self.ind_slct,
+                                    cols_series,
                                     cols_pos,
                                     cols_neg)()
 
         self.callback = CustomJS(args=self.get_js_args(),
                                  code=js_string)
+
+
+    def _get_series_multiselect(self):
+
+        list_slct = self.cols_pos + self.cols_neg
+        slct = MultiSelect(size=len(list_slct),
+                           value=list_slct, options=list_slct)
+
+        self.callback.args['slct_dataseries'] = slct
+        slct.js_on_change('value', self.callback)
+
+        return slct
+
 
     def _get_multiselects(self):
 
@@ -356,6 +526,7 @@ class SymenergyPlotter():
 
         return colors_posneg
 
+
     def _get_plot_list(self):
 
         list_p = []
@@ -370,11 +541,18 @@ class SymenergyPlotter():
                                           (self.ind_plty, valy)]
                                       if ind_plt)
 
-                p = figure(plot_width=400, plot_height=300, title=title_str)
+                p = figure(plot_width=self.plot_width,
+                           plot_height=self.plot_height,
+                           title=title_str,
+                           x_axis_label=self.ind_axx,
+                           y_axis_label=(self.ind_axy if self.ind_axy
+                                         else self.val_column))
 
                 posneg_vars = zip(['pos', 'neg'],
                                   [self.cols_pos, self.cols_neg],
                                   [self.cds_pos, self.cds_neg])
+                posneg_vars = [vars_ for vars_ in posneg_vars
+                               if vars_[1]]  # skip if columns empty (e.g. no neg)
                 for posneg, cols, data in posneg_vars:
 
                     view = self.views[(valx, valy)][posneg]
@@ -382,24 +560,23 @@ class SymenergyPlotter():
                     self._make_single_plot(fig=p, color=self.colors[posneg],
                                            data=data, view=view, cols=cols)
 
-                p.legend.visible = False
+                if p.legend:
+                    p.legend.visible = False
                 list_p.append(p)
 
         return list_p
 
-    def _make_layout(self):
-
-        ''''''
 
     def _get_layout(self):
 
         list_p = self._get_plot_list()
         selects = self._get_multiselects()
+        select_ds = self._get_series_multiselect()
         ncols = len(self.slct_list_dict[self.ind_pltx]) if self.ind_pltx else 1
         p_leg = self._get_legend()
 
         controls = WidgetBox(*selects)
-        layout = column(row(controls,
+        layout = column(select_ds, row(controls,
                             p_leg
                             ), gridplot(list_p, ncols=ncols))
 
@@ -452,6 +629,16 @@ class SymenergyPlotter():
 
 
 class BalancePlot(SymenergyPlotter):
+    '''
+    Generates power balance plots from the data in a
+    :class:`symenergy.evaluator.Evaluator` object.
+
+    - only the optimum solution is shown for each set of parameters
+    - demand-like power (demand, charging, curtailment) is shown negative
+    - the energy balance sums up to zero
+    - stacked area plots are used
+
+    '''
 
     cat_column = ['func_no_slot']
     val_column = 'lambd'
@@ -524,22 +711,54 @@ class GeneralBarPlot(GeneralPlot):
 
 if __name__ == '__main__':
 
-    plot = BalancePlot(ev,
-                        ind_axx='vre_scale',
-                        ind_pltx='slot',
-                        ind_plty=None,
-                        cat_column=['func_no_slot'],
-#                        slct_series=['phs_pchg', 'phs_pdch', 'batt_pchg', 'batt_pdch']
-                        )
+    #
 
-    self = plot
+    from collections import namedtuple
+    import numpy as np
+
+    category_cols = ['cat1', 'cat2', 'cat3', 'catx']
+    cat1 = ['A', 'B', 'C']
+    cat2 = ['A1', 'A2']
+    cat3 = ['X', 'Y', 'Z']
+    catx = range(20)
+    df = pd.DataFrame(itertools.product(cat1, cat2, cat3, catx),
+                      columns=category_cols)
+    df['value'] = np.random.random(len(df)) * 20
+
+
+    Ev = namedtuple('Ev', ['df', 'x_name'])
+    ev = Ev(df=df, x_name=category_cols)
+
+
+    class CustomPlot(SymenergyPlotter):
+
+        val_column = 'value'
+        cols_neg = []
+
+        def _select_data(self):
+
+            df = self.ev.df
+            return df
+
+
+        def _make_single_plot(self, fig, data, view, cols, color):
+
+            for column_slct, color_slct in zip(cols, color):
+
+                fig.circle(x=self.ind_axx, y=column_slct, color=color_slct,
+                           source=data, view=view, line_color='DimGrey')
+                fig.line(x=self.ind_axx, y=column_slct, color=color_slct,
+                         source=data, view=view)
+
+
+
+    plot = CustomPlot(Ev(df=df, x_name=category_cols),
+                      ind_axx='catx',
+                      ind_pltx='cat2',
+                      ind_plty=None,
+                      cat_column=['cat1'])
 
     show(plot._get_layout())
-
-    print(JSCallbackCoder(self.ind_slct,
-                    self.cols_pos,
-                    self.cols_neg,
-                    self.ind_plt + [self.ind_axx])())
 
 
 

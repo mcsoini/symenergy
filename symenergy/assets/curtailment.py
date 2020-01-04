@@ -7,43 +7,28 @@ Part of symenergy. Copyright 2018 authors listed in AUTHORS.
 """
 
 import symenergy.core.asset as asset
-from symenergy.core.slot import Slot
+from symenergy.core.slot import Slot, noneslot
 
 class Curtailment(asset.Asset):
     '''    '''
 
-    PARAMS = []
-    PARAMS_TIME = []
-    VARIABS = []
-    VARIABS_TIME = ['p']
+    variabs = []
+    variabs_time = ['p']
 
-    VARIABS_POSITIVE = ['p']
-
-    MUTUALLY_EXCLUSIVE = {}
+    mutually_exclusive = {}
 
     def __init__(self, name, slots=None):
-
         '''
-        Params:
-            * name --
-            * vc0 --
-            * vc1 --
-            * fcom -- float, O&M fixed cost
-            * slots -- iterable of time slot names
-            * capacity --
-            * cap_ret -- boolean, capacity can be retired True/False
         '''
-        super(Curtailment, self).__init__(name)
-#        self.name = name
 
-        self.slots = slots if slots else {'0': Slot('0', 0, 0)}
-        self.init_symbol_operation('p')
-        self.init_cstr_positive('p')
+        super().__init__(name)
+
+        self.slots = slots if slots else noneslot
+        self._init_symbol_operation('p')
+        self._init_cstr_positive('p')
 
 
 if __name__ == '__main__':
-
-
 
     x = Curtailment('x', m.slots)
 

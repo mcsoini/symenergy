@@ -13,27 +13,34 @@ from symenergy.core.parameter import Parameter
 
 class Plant(asset.Asset):
     '''
-    Implements power plants with linear cost supply curve.
+    Parameters
+    ----------
 
-    All plants have:
-        * symbol power production p
-        * symbol costs vc_0 and vc_1
-        * cost component (vc_0 + 0.5 * vc_1 * p) * p
-        * multiplier > 0
-    Some plants have:
-        * symbol capacity C
-        * value capacity
-        * multiplier power p <= capacity C
+    name : str
+        name of the power plant
+    vc0 : float
+        Optional constant factor
+    vc1 : float
+        Optional slope of variable cost supply curve
+    fcom : float
+        O&M fixed cost
+    capacity : float
+        Optional available installed capacity; this limits the power
+        output. Power production is unconstrained if this argument is not
+        set.
+    cap_ret : bool
+        Optional: power capacity can be retired if True
+
+    The cost supply curve is determined by the `vc0` and `vc1`
+    parameters. For each time `slot`, it is determined by
+    `vc0 + p[slot] * vc1`, with the power output `p[slot]`.
+
     '''
-    PARAMS = ['vc0', 'vc1', 'C', 'fcom']
-    PARAMS_TIME = []
-    VARIABS = ['C_ret']
-    VARIABS_TIME = ['p']
-
-    VARIABS_POSITIVE = ['p', 'C_ret', 'C_add']
+    variabs = ['C_ret']
+    variabs_time = ['p']
 
     # mutually exclusive constraint combinations
-    MUTUALLY_EXCLUSIVE = {
+    mutually_exclusive = {
 # =============================================================================
 # TODO: This needs to be fixed: C_ret defined for Noneslot
 #         'Power plant retirement not simult. max end zero':
@@ -45,66 +52,53 @@ class Plant(asset.Asset):
         # C_ret max --> no output
         }
 
-    def __init__(self, name, vc0, vc1=None,
+    def __init__(self, name, vc0=None, vc1=None,
                  fcom=None, slots=None, capacity=False, cap_ret=False):
-        '''
-        Params:
-            * name --
-            * vc0 --
-            * vc1 --
-            * fcom -- float, O&M fixed cost
-            * slots -- iterable of time slot names
-            * capacity --
-            * cap_ret -- boolean, capacity can be retired True/False
-
-        TODO: Make vc1 optional.
-        '''
 
         super().__init__(name)
-#        self.name = name
 
-        self.slots = slots if slots else {'0': Slot('0', 0, 0)}
+        self.slots = slots if slots else noneslot
 
-        self.init_symbol_operation('p')
-
-        self.vc0 = Parameter('vc0_%s'%self.name, noneslot, vc0)
-        if vc1:
-            self.vc1 = Parameter('vc1_%s'%self.name, noneslot, vc1)
-
-        self.init_cstr_positive('p')
-
-        if fcom:
-            self.fcom = Parameter('fcom_%s'%self.name, noneslot, fcom)
+        self._init_symbol_operation('p')
+        self._init_cstr_positive('p')
 
         if cap_ret:
             # needs to be initialized before _init_cstr_capacity('C')!
-            self.init_symbol_operation('C_ret')
-            self.init_cstr_positive('C_ret')
+            self._init_symbol_operation('C_ret')
+            self._init_cstr_positive('C_ret')
 
-        if capacity:
-            self.C = Parameter('C_%s'%self.name, noneslot, capacity)
-            self._init_cstr_capacity('C')
+        lst_par = [('vc0', vc0), ('vc1', vc1), ('fcom', fcom), ('C', capacity)]
+        for param_name, param_val in lst_par:
+            self._add_parameter(param_name, param_val, noneslot)
 
-        self.init_cost_component()
+        self._init_cost_component()
 
 
-    def init_cost_component(self):
+    def _init_cost_component(self):
         '''
         Set constant and linear components of variable costs.
+
+        If a fixed O&M cost parameter is defined, adds the corresponding
+        fixed cost.
         '''
 
         def get_vc(slot):
-            return ((self.vc0.symb + self.vc1.symb * self.p[slot])
-                    if hasattr(self, 'vc1')
-                    else self.vc0.symb)
+            cost = 0
+            if hasattr(self, 'vc0'):
+                cost += self.vc0.symb
+            if hasattr(self, 'vc1'):
+                cost += self.vc1.symb * self.p[slot]
 
-        self.vc = {slot: get_vc(slot) * slot.repetitions * slot.w.symb
+            return cost
+
+        self.vc = {slot: get_vc(slot) * slot.w.symb
+                   * (slot.block.rp.symb if slot.block else 1)
                    for slot in self.slots.values()}
 
         self.cc = sum(sp.integrate(vc, self.p[slot])
                       for slot, vc in self.vc.items())
 
-        if 'fcom' in self.__dict__:
+        if hasattr(self, 'fcom'):
 
             cc_fcom = self.C.symb * self.fcom.symb
 
