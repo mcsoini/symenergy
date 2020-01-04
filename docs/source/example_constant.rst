@@ -9,7 +9,7 @@ This example shows the application of SymEnergy to a system with
 * two power plants
 * storage capacity
 
-Power plant cost supply curves are constant. This example was discussed in detail in `<https://doi.org/10.1016/j.eneco.2019.104495>`_
+Power plant cost supply curves are constant. A similar example was discussed in detail in `<https://doi.org/10.1016/j.eneco.2019.104495>`_
 
 On the technical side, this example demonstrates the adjustment of model parameters at various stages.
 
@@ -417,6 +417,11 @@ Simple energy balance plot with and without storage for day and night
             
     leg = ax.legend(ncol=3)
 
+
+
+.. image:: example_constant_files/example_constant_25_0.png
+
+
 Impact of storage on baseload production by constraint combination
 ==================================================================
 
@@ -453,3 +458,8 @@ Using a slightly more involved analysis the impact of storage on the production 
             
             ax.set_title('C_phs_none=%s, %s'%(eff, c_n))
             ax.set_ylabel('Storage impact')
+
+
+
+.. image:: example_constant_files/example_constant_27_0.png
+

@@ -13,21 +13,23 @@ Symbolic modelling of energy systems, based on SymPy.
 SymPy provides a framework for the structured solution of cost-optimization of energy systems using 
 the standard Lagrange multiplier approach. The result consists in the close-form
 analytical solutions to the optimization problem. For example, the energy production
-from a power plant is expressed as :math:`p=p\left(\mathbf{p}\right)`, i.e. as
-a function of the vector of parameters :math:`\mathbf{p}`. These solutions are evaluated
+from a power plant is expressed as
+a function of the vector of symbolic parameters. These solutions are evaluated
 for certain parameters in order to identify relevant constraint combinations.
 
 ============
 Installation
 ============
 
+``pip install symenergy``
 
+.. _label_example_minimal:
 
 ============
 Publication
 ============
 
-* M. C. Soini *et al.*, Does bulk electricity storage assist wind and solar in replacing dispatchable power production?, Energy Economics, [https://doi.org/10.1016/j.eneco.2019.104495](https://doi.org/10.1016/j.eneco.2019.104495). 
+  * \M. C. Soini *et al.*, Does bulk electricity storage assist wind and solar in replacing dispatchable power production?, Energy Economics, `<https://doi.org/10.1016/j.eneco.2019.104495>`_. 
 
 .. _label_example_minimal:
 

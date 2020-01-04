@@ -15,6 +15,8 @@ for certain parameters in order to identify relevant constraint combinations.
 Installation
 ============
 
+``pip install symenergy``
+
 .. _label_example_minimal:
 
 ============
@@ -22,6 +24,8 @@ Publication
 ============
 
   * \M. C. Soini *et al.*, Does bulk electricity storage assist wind and solar in replacing dispatchable power production?, Energy Economics, `<https://doi.org/10.1016/j.eneco.2019.104495>`_. 
+
+.. _label_example_minimal:
 
 ===============
 Minimal example
