@@ -13,6 +13,8 @@ Power plant cost supply curves are constant. A similar example was discussed in 
 
 On the technical side, this example demonstrates the adjustment of model parameters at various stages.
 
+Jupyter Notebook available on github: `<https://github.com/mcsoini/symenergy/blob/master/examples/example_constant.ipynb>`_
+
 .. code:: ipython3
 
     from symenergy import logger
