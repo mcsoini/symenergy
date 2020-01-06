@@ -3,6 +3,9 @@
 *.csv
 cache/*
 
+SymEnergy*
+example_*_files/
+
 config_local.*
 
 *.pickle
