@@ -85,6 +85,14 @@ class Model:
         self.comps = {}
         self.curt = {}
 
+        self.nress = None
+        self.ncomb = None
+
+        self._cache = None
+
+        self.df_comb = None
+        self.df_comb_invalid = None
+
         self.nworkers = nworkers
         self.constraint_filt = constraint_filt
 
@@ -157,6 +165,17 @@ class Model:
 
         return f(*args, **kwargs)
 
+    @property
+    def cache(self):
+        if self._cache is None:
+            raise AttributeError('Model cache not yet initialized. Please add '
+                                 'a plant or storage asset.')
+
+        return self._cache
+
+    @cache.setter
+    def cache(self, cache):
+        self._cache = cache
 
     @_update_component_list
     def freeze_parameters(self, exceptions=None):
@@ -263,11 +282,21 @@ class Model:
 
     @property
     def df_comb(self):
-        return self._df_comb
+
+        if self._df_comb is not None:
+            return self._df_comb
+        else:
+            raise AttributeError('Model attribute df_comb not yet defined. '
+                                 'Construct a valid model and call '
+                                 'Model.generate_solve() or '
+                                 'Model.init_constraint_combinations()')
 
 
     @df_comb.setter
     def df_comb(self, df_comb):
+        if df_comb is None:
+            return
+
         self._df_comb = df_comb.reset_index(drop=True)
         if self.nress:
             self.nress = len(self._df_comb)
