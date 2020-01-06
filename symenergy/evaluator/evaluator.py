@@ -355,32 +355,81 @@ class EvalAnalysis():
 
 class Evaluator():
     '''
-    Evaluates model results for selected
+    Evaluates model results for selected parameter values.
+
+
+    Parameters
+    ----------
+        model : :class:`symenergy.core.model.Model`
+            SymEnergy model instance
+        x_vals : dict
+            dictionary ``{parameter_instance_0: iterable_of_values}``
+        drop_non_optimum : bool
+            if False, also keeps constraint combinations associated with
+            non-optimal constraints
+        tolerance : float
+            absolute tolerance for constraint evaluation to allow for
+            numerical inaccuracies
+
+
+    Example
+    -------
+
+    .. code-block:: python
+
+        >>> import numpy as np
+        >>> from symenergy.core.model import Model
+        >>> from symenergy.evaluator.evaluator import Evaluator
+
+        >>> m = Model(curtailment=True)
+        >>> m.add_slot(name='day', load=4500, vre=4500)
+        >>> m.add_plant(name='n', vc0=10, vc1=1, capacity=3500)
+        >>> m.add_plant(name='g', vc0=90, vc1=10)
+        >>> m.generate_solve()
+
+        >>> x_vals = {m.vre_scale: np.linspace(0, 1, 51),
+                      m.comps['n'].C: [0, 1000, 3000]}
+        >>> ev = Evaluator(m, x_vals=x_vals)
+
+    The attribute ``ev.df_x_vals`` is a table with all parameter value
+    combinations:
+
+    .. code-block:: python
+
+        >>> ev.df_x_vals
+             vre_scale_none  C_n_none
+        0              0.00         0
+        1              0.00      1000
+        2              0.00      3000
+        3              0.02         0
+        4              0.02      1000
+        ...
+
+
+    The methods
+
+    * :func:`symenergy.evaluator.evaluator.Evaluator.get_evaluated_lambdas_parallel` and
+    * :func:`symenergy.evaluator.evaluator.Evaluator.expand_to_x_vals_parallel`
+    are used to perform the actual evaluation.
+
+    .. seealso:
+
+        :ref:`label_example_minimal`
+          minimal SymEnergy example demonstrating the
+          use of the evaluator class
+
     '''
 
     def __init__(self, model:Model, x_vals:dict,
                  drop_non_optimum=False, tolerance=1e-9):
-        '''
-        Parameters
-        ----------
-            model : :class:`symenergy.core.model.Model`
-            x_vals : dict or list
-                either dictionary `{parameter_name: list_of_value}`
-            tolerance : float
-                absolute tolerance for constraint evaluation
-        '''
 
         self.model = model
-
         self.x_vals = x_vals
-
         self.cache_lambd, self.cache_eval = self._get_caches()
-
         self.eval_analysis, self.expander = self._get_helpers(
                                                 drop_non_optimum, tolerance)
 
         self.dfev = self._get_dfev()
-
         self.dict_param_values = self._get_param_values()
 
         # attribute name must match self.df_exp columns name
@@ -724,13 +773,43 @@ class Evaluator():
     def get_evaluated_lambdas_parallel(self, skip_multipliers=True,
                                         str_func=True):
         '''
-        For each dependent variable and total cost get a lambda function
-        evaluated by constant parameters. This subsequently evaluated
-        for all x_pos.
+        For each model variable and constraint combination, generate a function
+        evaluated by all constant parameter values, but *not* by the
+        varied values of the ``x_vals`` table. This results in a DataFrame
+        attribute ``df_lam_func``, which is subsequently used
+        (:func:`symenergy.evaluator.evaluator.Evaluator.expand_to_x_vals_parallel`)
+        to generate the numerical values for variables and multipliers.
 
-        Generated attributes:
-            - df_lam_func: Holds all lambda functions for each dependent
-                           variable and each constraint combination.
+
+        Continuing the example from
+        :class:`symenergy.evaluator.evaluator.Evaluator`:
+
+        .. code-block:: python
+
+            >>> import inspect
+            >>> ev.cache_lambd.delete()
+            >>> ev.get_evaluated_lambdas_parallel()
+            >>> func = (ev.df_lam_func.set_index(['idx', 'func'])
+                                      .loc[(4, 'g_p_day')]
+                                      .lambd_func)
+            >>> print(inspect.getsource(func))
+
+            def _ef0ba06865119477ac40bc0b40038a25(vre_scale_none,C_n_none):
+                return(-C_n_none - 4500*vre_scale_none + 4500)
+
+        In the example above the generated example function thus depends on the
+        parameters with names ``vre_scale_none`` and ``C_n_none`` (the model
+        VRE scale and the power plant capacity, as specified through the
+        ``x_vals`` attribute).
+
+        **Note**: The DataFrame ``ev.df_lam_func`` is typically only used
+        internally. Instead, access the tables
+
+        * ``Model.df_comb`` to obtain the result expressions for the model
+          variables
+        * ``Evaluator.df_exp`` to obtain the fully evaluated numerical
+          solutions
+
         '''
 
         if self.cache_lambd.file_exists:
@@ -792,6 +871,53 @@ class Evaluator():
 
 
     def expand_to_x_vals_parallel(self):
+        '''
+        Generates generates a table indexed by:
+
+        * model variable/multiplier (column ``func``)
+        * constraint combination (columns ``idx``)
+        * varied parameters (columns specified by the list ``Evaluator.x_name``)
+
+        with all numerically evaluated values of functions and multipliers.
+
+        Other key columns are:
+
+        * ``lambd`` numerical value
+        * ``is_optimum``: boolean; if Evaluator was initialized with
+          ``drop_non_optimum=True``, all non-optimal rows are dropped
+        * ``mask_valid``: indicates whether the constraint combination yields
+          valid results under the corresponding parameter values; see
+          documentation section :ref:`label_theory_minimal` for explanations on
+          infeasible constraint combinations by parameter values.
+
+        Continuing the example from
+        :func:`symenergy.evaluator.evaluator.Evaluator.get_evaluated_lambdas_parallel`:
+
+        .. code-block:: python
+
+            >>> ev.expand_to_x_vals_parallel()
+            >>> (ev.df_exp.query('is_optimum')
+                   .set_index(['func', 'idx'] + ev.x_name)[
+                           ['lambd', 'is_optimum', 'mask_valid']]).head()
+
+                                                       lambd  is_optimum  mask_valid
+            func          idx vre_scale_none C_n_none
+            curt_p_day    1   1.0            0           0.0        True        True
+            g_p_day       1   1.0            0           0.0        True        True
+            n_p_day       1   1.0            0           0.0        True        True
+            pi_supply_day 1   1.0            0           0.0        True        True
+            curt_p_day    2   0.0            0           0.0        True        True
+            ...
+
+        **Note:** Under some circumstances the serial evaluation is overall
+        faster than the parallel approach. Serial evaluation is obtained by
+        setting the SymEnergy multiprocessing *nworkers* parameter to ``None``:
+
+        .. code-block:: python
+
+            >>> from symenergy.auxiliary.parallelization import multiproc_params
+            >>> multiproc_params('nworkers') = None
+        '''
 
         if self.cache_eval.file_exists:
             self.df_exp = self.cache_eval.load()

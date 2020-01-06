@@ -18,14 +18,17 @@ logger = _get_logger(__name__)
 
 class SlotBlock(component.Component):
     '''
+    SlotBlock instances can are optional to define more complex model 
+    time structures. Slot instances are assigned to SlotBlock instances.
+
     Parameters
     ----------
     name : str
         name of the slot block
     repetitions : int
         number of repetitions of the block. For example, a block with
-        `repetitions=3` and two slots `s1` and `s2` corresponds to the
-        pattern `s1, s2, s1, s2, s1, s2`
+        ``repetitions=3`` and two slots `s1` and `s2` corresponds to the
+        pattern `s1, s2, s1, s2, s1, s2` 
     '''
 
 

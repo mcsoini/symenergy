@@ -54,17 +54,14 @@ class Model:
         slot; it can be overwritten for individual time slots if the weight
         parameter is provided
     constraint_filt : str
-        :func:`pandas.DataFrame.query` string to filter the constraint
-        activation columns of the `df_comb` dataframe. A list of relevant
-        column names of a model object `m` can be retrieved through
-        `m.constraints('col', is_equality_constraint=False)`
+        see :func:`symenergy.core.model.Model.init_constraint_combinations`
     curtailment : bool or list of Slots, default False
         Allow for curtailment in each time slot (True) or in a selection of
         time slots. This generates a
         :class:`symenergy.assets.curtailment.Curtailment` instance `curt`,
         which defines the positive curtailment power variables `curt.p`
         for each of the relevant time slots.
-    nthreads : int or False
+    nworkers : int or False
         number of workers to be used for parallel model setup and solving;
         passed to the :class:`multiprocessing.Pool` initializer;
         defaults to `multiprocessing.cpu_count() - 1`;
@@ -350,6 +347,12 @@ class Model:
         This method is only used if curtailment is defined for a subset
         of time slots. Use the model parameter `curtailment=True` to enable
         curtailment globally.
+
+        Parameters
+        ----------
+        slots : list
+           list of time slot names, e.g. ``['day', 'night']``
+
         '''
 
         if self.curtailment:
@@ -536,7 +539,14 @@ class Model:
 
         This function initilizes the `symenergy.df_comb` attribute
 
-        See also: Simple example 1
+        Parameters
+        ----------
+        constraint_filt : str
+            :func:`pandas.DataFrame.query` string to filter the constraint
+            activation columns of the `df_comb` dataframe. A list of relevant
+            column names of a model object `m` can be retrieved through
+            ``m.constraints('col', is_equality_constraint=False)``
+
 
         '''
 
@@ -694,7 +704,15 @@ class Model:
 
     def generate_total_costs(self):
         '''
-        Substitute result variable expressions into total costs
+        Substitute result variable expressions into total costs.
+
+        This adds an additional total cost column ``'tc'`` to the
+        :attr:`symenergy.core.model.Model.df_comb` table. The total cost is
+        calculated by substituting the solutions for all variables into
+        the total cost expression ``Model.tc`` (for each constraint combination).
+
+        The execution is parallelized. The ``Model.nworkers`` attribute defines
+        the number of workers for multiprocessing.
         '''
 
         logger.info('Generating total cost expressions...')
@@ -858,8 +876,13 @@ class Model:
 
     def define_problems(self):
         '''
-        For each combination of constraints, get the lagrangian
-        and the variables.
+        For each combination of constraints, define
+
+        * the Lagrange functions (new column *lagrange*
+          in the ``df_comb`` table)
+        * the endogenous (dependent) variables and multipliers
+          (new column *variabs_multips* in the ``df_comb`` table)
+
         '''
 
         logger.info('Defining lagrangians...')
@@ -902,19 +925,6 @@ class Model:
         return mask_empty
 
 
-#    def combine_constraint_names(self, df):
-#
-#        constr_name = pd.DataFrame(index=df.index)
-#        for const in self.constrs_cols_neq:
-#
-#            constr_name[const] = const + '=' + df[const].astype(str)
-#
-#        join = lambda x: ', '.join(x)
-#        df['const_comb'] = constr_name.apply(join, axis=1)
-#
-#        return df
-
-
     def get_mask_linear_dependencies(self):
         '''
         Solutions of problems containing linear dependencies.
@@ -924,8 +934,8 @@ class Model:
         differentiate between two cases:
 
         0. No dependencies
-        1. All corresponding solutions belong to the same component. Overspecification
-           occurs if the variables of the same component
+        1. All corresponding solutions belong to the same component.
+           Overspecification occurs if the variables of the same component
            depend on each other but are all zero. E.g. charging,
            discharging, and stored energy in the case of storage.
            They are set to zero.
@@ -938,10 +948,11 @@ class Model:
            storage plants are present, their mulitpliers show linear
            dependencies.
 
-        Returns:
-            * Series mask with values: 0 -> no variables in solutions; 1 ->
-                single variable in solution: set to zero; > 1 -> mixed
-                interdependency: drop solution; NaN: empty solution set
+        Returns
+        -------
+        code_lindep : pandas.Series
+           Series with same length as ``df_comb`` with linear dependency codes
+           as defined above
         '''
 
         res_vars = self.df_comb[['result', 'variabs_multips', 'idx']].copy()
@@ -998,8 +1009,18 @@ class Model:
 
     def filter_invalid_solutions(self):
         '''
-        '''
+        Analyzes the model result expressions to filter invalid rows.
 
+        This method modifies and shortens the ``Model.df_comb`` table.
+
+        * Identify empty solutions as returned by the linsolve method
+        * Remove empty solutions from ``Model.df_comb``. Invalid solutions
+          are kept in the ``Model.df_comb_invalid`` dataframe.
+        * Analyze and classify remaining solutions with respect to linear
+          dependencies of solutions
+          (:func:`symenergy.core.model.Model.get_mask_linear_dependencies`).
+        * Fix results with fixable linear dependencies.
+        '''
 
         mask_empty = self.get_mask_empty_solution()
 
@@ -1058,17 +1079,18 @@ class Model:
             df : df
                 DataFrame containing the results and the index; defaults to
                 the model's `df_comb` table
-
+            substitute : dict
+                substitutions to be performed prior to expression simplification
+                and printing; main use case: setting the energy cost parameter
+                ``ec`` of the storage class to zero.
 
         The input DataFrame must have the following columns:
-            - `variabs_multips`: iterable of variable and multiplier symbols
-                for which the results are to be printed
-            - `result`: list of expressions corresponding for each of the
-                `variabs_multips` symbols
 
-
+        * `variabs_multips`: iterable of variable and multiplier symbols
+          for which the results are to be printed
+        * `result`: list of expressions corresponding for each of the
+          `variabs_multips` symbols
         '''
-
 
         if not isinstance(df, pd.DataFrame):
             df = self.df_comb
@@ -1077,7 +1099,6 @@ class Model:
 
         if not substitute:
             substitute = {}
-
 
         resdict = dict(zip(map(str, x.variabs_multips), x.result))
         if slct_var_mlt:
@@ -1205,4 +1226,3 @@ for addermethod, compclass in [(Model.add_storage, Storage),
     addermethod.__doc__ = doc % classdoc
 
 
-# %%

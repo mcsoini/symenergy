@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
+r"""
 The plotting module contains various classes to generate typical SymEnergy
 output plots. Data update callbacks are implemented in JavaScript. This allows
-for interactive standalone plot arrays.
+for interactive standalone plots, suited for Jupyter Notebooks.
 
 Plots are arranged in 2D arrays. The two dimensions may correspond to any
 of the parameters specified by the
-:class:`symenergy.evaluator.evaluator.Evaluator`'s `x_vals` attribute.
+:class:`symenergy.evaluator.evaluator.Evaluator`'s `df_exp` table.
 Plot objects are typically
 
+.. code-block:: python
 
-
-CustomPlot(Ev(df=df, x_name=category_cols),
-                      ind_axx='catx',
-                      ind_pltx='cat2',
-                      ind_plty=None,
-                      cat_column=['cat1'])
+    CustomPlot(Ev(df=df, x_name=category_cols),
+                  ind_axx='catx',
+                  ind_pltx='cat2',
+                  ind_plty=None,
+                  cat_column=['cat1'])
 
 All classes return Bokeh Layout objects. They can be displayed as
 
@@ -38,14 +38,13 @@ subclassed to generate customized plots.
 For this purpose, a class with two methods is defined:
 
 * the method `_select_data(self)` to obtain (filtered) data from the `ev`
-    ("Evaluator"). It must return a DataFrame with value and index
-    columns.
+  ("Evaluator"). It must return a DataFrame with value and index columns.
 * the method `_make_single_plot(self, fig, data, view, cols, color)` adds
-    bokeh plots to the figure `fig` provided as an argument. `data` is the
-    `ColumnDataSource` and is simply passed as `source` argument to the Bokeh
-    plot. The same holds for the `view` parameter, which corresponds to the
-    Bokeh plot `view` argument. `cols` and `color` are the data series and
-    the corresponding colors, respectively.
+  bokeh plots to the figure `fig` provided as an argument. `data` is the
+  `ColumnDataSource` and is simply passed as `source` argument to the Bokeh
+  plot. The same holds for the `view` parameter, which corresponds to the
+  Bokeh plot `view` argument. `cols` and `color` are the data series and
+  the corresponding colors, respectively.
 
 The `SymenergyPlotter` is initialized with a
 :class:`symenergy.evaluator.evaluator.Evaluator` object. However, only the
@@ -55,7 +54,7 @@ containing only these two attributes. Consequently, this plotting module can
 be used with any kind of input data, not necessarily originating from the
 `SymEnergy` model. This is shown in the example below.
 
-```python
+.. code-block:: python
 
     from collections import namedtuple
     import numpy as np
@@ -637,6 +636,28 @@ class BalancePlot(SymenergyPlotter):
     - demand-like power (demand, charging, curtailment) is shown negative
     - the energy balance sums up to zero
     - stacked area plots are used
+
+    Continuing the example from
+    :func:`symenergy.evaluator.evaluator.Evaluator.expand_to_x_vals_parallel`:
+
+    .. code-block:: python
+        >>> from bokeh.io import show
+        >>> from bokeh.plotting import output_notebook, output_file
+        >>> import symenergy.evaluator.plotting as plotting
+
+        >>> output_notebook()
+        >>> output_file('example.html')
+        >>> balplot = plotting.BalancePlot(ev=ev, ind_axx='vre_scale_none',
+                                           ind_pltx='slot', ind_plty=None)
+        >>> show(balplot._get_layout())
+
+    ---------------------------------------------------------------------------
+
+    .. image:: _static/example_balanceplot.png
+        :align: center
+        :alt: figure example balanceplot
+
+    ---------------------------------------------------------------------------
 
     '''
 

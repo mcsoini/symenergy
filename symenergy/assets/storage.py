@@ -1,12 +1,7 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
-
 Part of symenergy. Copyright 2018 authors listed in AUTHORS.
 
 Contains the Storage class describing assets which charge and discharge energy.
-
-
 """
 
 import wrapt
@@ -29,7 +24,13 @@ logger = _get_logger(__name__)
 
 
 class Storage(asset.Asset):
+
     r'''
+
+    The class :class:`symenergy.assets.storage.Storage` is not initialized
+    directly but exclusively through the :func:`symenergy.core.model.Model.add_storage`
+    method.
+
     Parameters
     ----------
     name : str
@@ -38,39 +39,58 @@ class Storage(asset.Asset):
         storage round-trip efficiency
     slots_map : dict
         optional specification during which time slots storage can
-        charge/discharge
+        charge/discharge; see below
+    slots : dict
+        Model slots. This attribute is passed automatically by the
+        :func:`symenergy.core.model.Model.add_storage` method.
     capacity : float
         Optional storage power capacity; this limits the charging and
         discharging power. Power is unconstrained if this
         argument is not set.
     energy_capacity : float
         Optional storage energy capacity; this limits the stored energy
-        content. Power is unconstrained if this argument is not set.
+        content. Energy is unconstrained if this argument is not set.
+    energy_cost : float
+        cost of energy content; technical parameter to break solution
+        symmetries; see below
     charging_to_energy_factor : str
         options:
 
-        * `'sqrt'` -- :math:`\mathrm{e} = \sqrt{\eta} p_\mathrm{chg} - 1/\sqrt{\eta} p_\mathrm{dch}`
-        * `'eta'` -- :math:`\mathrm{e} = \eta p_\mathrm{chg} - p_\mathrm{dch}`
-        * `'1'` -- :math:`\mathrm{e} = p_\mathrm{chg} - 1/\eta * p_\mathrm{dch}`
-
-    The time slot order follows from the order in which they are added to the
-    model instance (:func:`symenergy.core.model.Model.add_slot`).
+        * ``'sqrt'`` (defaultl): :math:`\mathrm{e} = \sqrt{\eta} p_\mathrm{chg} - 1/\sqrt{\eta} p_\mathrm{dch}`
+        * ``'eta'``: :math:`\mathrm{e} = \eta p_\mathrm{chg} - p_\mathrm{dch}`
+        * ``'1'``: :math:`\mathrm{e} = p_\mathrm{chg} - 1/\eta * p_\mathrm{dch}`
 
 
-    The `slots_map` parameters defines during which time slots
-    storage can charge or discharge. This allows for significant
-    model simplifications. For example, the dictionary
+    * The time slot order follows from the order in which they are added to the
+      model instance (:func:`symenergy.core.model.Model.add_slot`).
+    * The `slots_map` parameters defines during which time slots
+      storage can charge or discharge. This allows for significant
+      model simplifications. For example, the dictionary
 
+      .. code-block:: python
 
-    .. code-block:: python
+           `{'chg': ['slot_1', 'slot_2'],
+             'dch': ['slot_2']}
 
-         `{'chg': ['slot_1', 'slot_2'],
-           'dch': ['slot_2']}
+      allows for charging for slots `['slot_1', 'slot_2']` but limits
+      discharging to `'slot_2'`.
+    * The `energy_cost` value defines a specific cost parameter :math:`\mathrm{ec}`
+      applied to the storage energy content during all time slots:
+      :math:`\sum_{t} e_t \mathrm{ec}`. This serves two purposes:
 
+      - If storage operation is not energy-constrained, an infinite number of solutions
+        with identical total cost exists, corresponding to varying levels of
+        arbitrary storage energy contents (but identical *changes* in energy content).
+        The `energy_cost` parameter isolates a single
+        minimum cost solution which corresponds to the case where storage is empty
+        during at least one of the time slots.
+      - If two or more storage types are included in the model, the temporal distribution
+        of their operation can be ill-defined. In this case, the relative energy cost
+        values allow to express a preference for shorter time frame operation of one of
+        the storage types.
 
-    allows for charging for slots `['slot_1', 'slot_2']` but limits
-    discharging to `'slot_2'`.
-
+      The energy cost value should be small enough not to interfere with the other system
+      costs. It defaults to 1e-12.
 
     '''
 

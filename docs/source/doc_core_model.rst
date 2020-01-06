@@ -1,16 +1,16 @@
 .. include:: <isonum.txt>
-.. sectnum::
+
+.. _label_doc_core_model:
 
 ===========================================
 The model class (symenergy.core.model)
 ===========================================
 
-* :ref:`sect_init`
-* :ref:`sect_comps`
-* :ref:`sect_simps`
-* :ref:`sect_run`
-* :ref:`sect_analysis`
+.. toctree::
+    :name: Table of Contents
+    :maxdepth: 3
 
+    doc_core_model
 
 .. _sect_init:
 
@@ -25,8 +25,9 @@ Initialize model
 Add model components
 ================================
 
-.. automethod:: symenergy.core.model.Model.add_slot_block
+
 .. automethod:: symenergy.core.model.Model.add_slot
+.. automethod:: symenergy.core.model.Model.add_slot_block
 .. automethod:: symenergy.core.model.Model.add_plant
 .. automethod:: symenergy.core.model.Model.add_storage
 .. automethod:: symenergy.core.model.Model.add_curtailment
@@ -45,7 +46,16 @@ Methods which allow for simplifications on the model level.
 Define constraint combinations and solve model 
 ==============================================
 
+In order to obtain all solution of the model, it is sufficient to call the method ``symenergy.core.model.Model.generate_solve``. This reads the cached solutions from the corresponding pickle file, if applicable. For more fine-grained control over the solution steps, the individual methods listed below can be called.
+
 .. automethod:: symenergy.core.model.Model.generate_solve
+.. automethod:: symenergy.core.model.Model.init_constraint_combinations
+.. automethod:: symenergy.core.model.Model.define_problems
+.. automethod:: symenergy.core.model.Model.solve_all
+.. automethod:: symenergy.core.model.Model.filter_invalid_solutions
+.. automethod:: symenergy.core.model.Model.generate_total_costs
+
+
 
 .. _sect_analysis:
 
@@ -53,4 +63,13 @@ Results analysis
 ================
 
 .. automethod:: symenergy.core.model.Model.print_results
+
+Other methods
+================
+
+Other important methods which are not directly called but referred to by others.
+
+.. automethod:: symenergy.core.model.Model.get_mask_linear_dependencies
+
+
 

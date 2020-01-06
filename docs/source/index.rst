@@ -23,13 +23,32 @@ Installation
 
 ``pip install symenergy``
 
-.. _label_example_minimal:
 
 ============
 Publication
 ============
 
   * \M. C. Soini *et al.*, Does bulk electricity storage assist wind and solar in replacing dispatchable power production?, Energy Economics, `<https://doi.org/10.1016/j.eneco.2019.104495>`_. 
+
+===============
+Content
+===============
+
+* :ref:`label_example_minimal`
+* :ref:`label_theory_solution`
+* :ref:`label_theory_components` 
+* :ref:`label_theory_minimal`
+
+.. toctree::
+   :name: Table of Contents
+   :maxdepth: 3
+
+   Minimal example :ref:`label_example_minimal`
+
+   example_constant
+   doc_core_model
+   doc_evaluator_plotting
+
 
 .. _label_example_minimal:
 
@@ -148,6 +167,9 @@ Additional analyses can be performed using the ``ev.df_exp`` table, which contai
    Section :ref:`label_theory_minimal`
       Theoretical description of the minimal example's solution process
 
+
+.. _label_theory_solution:
+
 ===============================================
 Theoretical description of the solution process
 ===============================================
@@ -159,7 +181,13 @@ The figure below provides an overview of the solution process:
     :alt: flowchart
 
 * The model components are defined (time slots, power plants, storage, ...)
-* The optimal operation of these components (power production, charging, capacity
+* The optimal operation of these components (powe1.1 Initialize model
+
+class symenergy.core.model.Model(nworkers='default', curtailment=False, slot_weight=1, constraint_filt='')[source]
+
+    Instantiate a model object. Start from here.
+
+    Parametersr production, charging, capacity
   retirements) is limited by certain constraints (power capacity of power plants
   and storage, energy capacity of storage, energy balance constraint for the whole system, etc.).
 * Some of these constraints are equality constraints (e.g. energy balance, must hold in all cases);
@@ -179,10 +207,6 @@ The figure below provides an overview of the solution process:
   with the inequality constraint  :math:`\Lambda_{j,\mathrm{CC}}(\mathbf{p}, \mathbf{v})`, the equality constraints :math:`\Pi_i(\mathbf{p}, \mathbf{v})`, and the total system cost  :math:`c_\mathrm{Total}(\mathbf{p},\mathbf{v})`. :math:`\mathbf{v}` and :math:`\mathbf{p}` are the vectors of all variables and parameters, respectively. 
 
 * Due to the linear power plant cost (see :ref:`label_theory_components_plants`), the total cost function :math:`c_\mathrm{Total}` is quadratic. Therefore, the Karush-Kuhn-Tucker (KKT) conditions :math:`\nabla_{\mathbf{v},\mathbf{\pi},\mathbf{\lambda}}\mathcal{L}_\mathrm{CC} = 0` form a system of linear equations, whose closed-form analytical solutions :math:`\mathrm{v}(\mathbf{p})`, :math:`\mathrm{\pi}(\mathbf{p})`, and :math:`\mathbf{\lambda}(\mathbf{p})` can be calculated using the corresponding SymPy function.
-
-.. seealso::
-    
-    :ref: 
 
 .. _label_theory_components:
 
@@ -237,6 +261,10 @@ For each :math:`t`, the demand equality constraint is defined as
 This describes the energy balance, i.e. all power consumption (load, curtailment, charging) must equal all power production (power plant production, storage discharging). 
 
 
+.. seealso::
+
+    :ref:`sect_comps`
+      API documentation on adding components to a model instance
 
 .. _label_theory_minimal:
 
@@ -327,20 +355,7 @@ In the figure above, b-d, the solutions of all constraint combinations are evalu
        This example is included in the publication *Does bulk electricity storage assist wind and solar in replacing dispatchable power production?*, Energy Economics, Volume **85**, January 2020, 104495
 
 
-===========================
 
-.. toctree::
-   :name: Table of Contents
-   :maxdepth: 3
-   :caption: Contents:
-
-   example_constant
-   symenergy_doc_cookbook
-   doc_core_model
-   doc_core_component
-   doc_core_collections
-   doc_auxiliary_io
-   doc_evaluator_plotting
 
 
 Indices and tables

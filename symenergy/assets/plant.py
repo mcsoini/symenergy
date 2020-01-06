@@ -19,11 +19,11 @@ class Plant(asset.Asset):
     name : str
         name of the power plant
     vc0 : float
-        Optional constant factor
+        Optional constant coefficient of the linear variable cost supply curve
     vc1 : float
         Optional slope of variable cost supply curve
     fcom : float
-        O&M fixed cost
+        Optional O&M fixed cost; only relevant if ``cap_ret`` is ``True``
     capacity : float
         Optional available installed capacity; this limits the power
         output. Power production is unconstrained if this argument is not
@@ -31,9 +31,33 @@ class Plant(asset.Asset):
     cap_ret : bool
         Optional: power capacity can be retired if True
 
-    The cost supply curve is determined by the `vc0` and `vc1`
-    parameters. For each time `slot`, it is determined by
-    `vc0 + p[slot] * vc1`, with the power output `p[slot]`.
+
+    **Example:**
+
+    .. code-block:: python
+
+        >>> from symenery.core import model
+        >>> m = model.Model()
+        >>> m.add_slot('t0', load=10)
+        >>> m.add_slot('t1', load=10)
+        >>> m.add_plant('n', vc0=1, vc1=2)
+
+    The cost supply curve is determined by a linear function of the power production
+    with the cost coefficients ``vc0` and `vc1``. For each time slot, 
+    it's expression is given by
+
+    .. code-block:: python
+
+        >>> m.plants['n'].vc
+        {Slot `t0`: w_none*(n_p_t0*vc1_n_none + vc0_n_none),
+         Slot `t1`: w_none*(n_p_t1*vc1_n_none + vc0_n_none)}
+
+    Consequently, the power plant cost component is quadratic:
+
+    .. code-block:: python
+
+        >>> m.plants['n'].cc
+        w_none*(n_p_t0**2*vc1_n_none + 2*n_p_t0*vc0_n_none + n_p_t1**2*vc1_n_none + 2*n_p_t1*vc0_n_none)/2
 
     '''
     variabs = ['C_ret']

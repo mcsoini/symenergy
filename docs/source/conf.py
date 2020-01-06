@@ -16,7 +16,15 @@
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
 
+import sys
+import os
+symenergy_path = os.path.abspath('../../')
+sys.path.append(symenergy_path)
 
+import symenergy
+
+print('appended symenergy path', symenergy_path)
+print('import symenergy path', symenergy.__path__)
 # -- Project information -----------------------------------------------------
 
 project = 'SymEnergy'

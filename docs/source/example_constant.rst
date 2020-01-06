@@ -19,8 +19,8 @@ On the technical side, this example demonstrates the adjustment of model paramet
     logger.setLevel('ERROR')
     import symenergy.core.model as model
 
-Initialize model
-----------------
+Model initialization
+====================
 
 * The model structure is initialized. See the documentation section :ref:`sect_comps` for further details on their parameters and initialization.
 * Parameter *values* (``load``, ``vre``, ``vc0``, ``capacity`` etc.) are insignificant at this stage as long as they are ``!=None``. They represent default values and define the model structure.
@@ -184,17 +184,16 @@ Similarly, constraints and their expressions are stored in instances of the ``Va
 
 
 
-**********
 Evaluation
-**********
+==========
 
 The closed-form analytical solutions are evaluated for selected combinations of parameter values. This allows to
 
 * plot the results
 * identify relevant constraint combinations
 
-Adjust model parameters
-=======================
+Adjustment of model parameters
+------------------------------
 
 Model parameters can be freely adjusted prior to the :class:`symenergy.evaluator.Evaluator` initialization. Here we set the *total* VRE production to 100% of the total load. This fixed VRE production profile is scaled below using the internal ``vre_scale`` model parameter.
 
@@ -207,8 +206,8 @@ Model parameters can be freely adjusted prior to the :class:`symenergy.evaluator
     m.slots['day'].vre.value = vre_day / (vre_day + vre_night) * tot_l
     m.slots['night'].vre.value = vre_night / (vre_day + vre_night) * tot_l
 
-Initialize evaluator instance, set model parameters and parameter sweep values
-==============================================================================
+Initialize evaluator instance and define model parameter values
+---------------------------------------------------------------
 
 The ``x_vals`` argument defines for which parameter values the solutions are evaluated. For each value combination the optimal constraint combination is identified.
 
@@ -245,8 +244,8 @@ The ``ev.get_evaluated_lambdas_parallel()`` call generates a DataFrame ``df_lam_
     
 
 
-Adjust values for model evaluation
-==================================
+Definition of interdependent parameter values
+---------------------------------------------
 
 The ``ev.df_x_vals`` attribute corresponds to the table constructed from all combinations of parameter values defined in the `x_vals` attribute:
 
@@ -375,7 +374,7 @@ The functions in the ``ev.df_lam_func`` table are evaluated for each of these ta
 
 
 Evaluate results for all entries of the `Evaluator.df_x_vals table`
-===================================================================
+-------------------------------------------------------------------
 
 .. code:: ipython3
 
@@ -423,7 +422,7 @@ Simple energy balance plot with and without storage for day and night
 
 
 Impact of storage on baseload production by constraint combination
-==================================================================
+------------------------------------------------------------------
 
 Using a slightly more involved analysis the impact of storage on the production from baseload plants can be plotted. The data series correspond to the least-cost constraint combinations which are active for certain parameters.
 
