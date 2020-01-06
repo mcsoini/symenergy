@@ -25,7 +25,7 @@ import symenergy
 from symenergy.auxiliary.parallelization import parallelize_df
 from symenergy.auxiliary.parallelization import log_time_progress
 from symenergy import multiproc_params
-from symenergy.auxiliary.parallelization import get_default_nthreads
+from symenergy.auxiliary.parallelization import get_default_nworkers
 from symenergy.auxiliary.parallelization import MP_COUNTER, MP_EMA
 from symenergy.auxiliary import parallelization
 from symenergy.auxiliary.decorators import hexdigest
@@ -79,7 +79,7 @@ class Expander():
 
         logger.warning('_call_eval: Generating dataframe with length %d' % (
                         len(df) * len(self.df_x_vals)))
-        if not multiproc_params['nthreads'] or multiproc_params['nthreads'] == 1:
+        if not multiproc_params['nworkers'] or multiproc_params['nworkers'] == 1:
             df_result = self._call_eval(df)
         else:
             self.nparallel = len(df)
@@ -138,7 +138,7 @@ class EvalAnalysis():
 
     def run(self, df):
 
-        if not multiproc_params['nthreads'] or multiproc_params['nthreads'] == 1:
+        if not multiproc_params['nworkers'] or multiproc_params['nworkers'] == 1:
             df_exp = self._evaluate_by_x_new(df)
 
         else:
@@ -159,7 +159,7 @@ class EvalAnalysis():
         combinations, since constraint combinations are to be compared.
         '''
 
-        nchunks = get_default_nthreads() * multiproc_params['chunks_per_thread']
+        nchunks = get_default_nworkers() * multiproc_params['chunks_per_worker']
 
         param_combs = \
             itertools.chain.from_iterable(itertools.combinations(self.x_vals, i)

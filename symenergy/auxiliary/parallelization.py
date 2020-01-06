@@ -21,15 +21,15 @@ logger = _get_logger(__name__)
 
 
 class MultiprocParams(RcParams):
-    items_opts = {'nthreads':
+    items_opts = {'nworkers':
                     {'types': {int: '>=0'},
                      'values': (None, False, 'default',),
                      'cond': 'int >= 0 or one of (None, False, "default")'},
-                  'chunks_per_thread':
+                  'chunks_per_worker':
                       {'types': {int: '>=0'},
                        'values': (),
                        'cond': 'int >= 0'}}
-    items_default = {'nthreads': 'default', 'chunks_per_thread': 2}
+    items_default = {'nworkers': 'default', 'chunks_per_worker': 2}
 
 multiproc_params = MultiprocParams()
 
@@ -90,24 +90,24 @@ def log_time_progress(f):
     return wrapper
 
 
-def get_default_nthreads():
+def get_default_nworkers():
 
-    if multiproc_params['nthreads'] == 'default':
+    if multiproc_params['nworkers'] == 'default':
         return multiprocessing.cpu_count() - 1
     else:
-        return multiproc_params['nthreads']
+        return multiproc_params['nworkers']
 
 
-def parallelize_df(df, func, *args, nthreads='default', concat=True, **kwargs):
+def parallelize_df(df, func, *args, nworkers='default', concat=True, **kwargs):
     MP_COUNTER.reset()
     MP_EMA.reset()
 
-    logger.debug(str(('NTHREADS: ', multiproc_params['nthreads'])))
+    logger.debug(str(('NWORKERS: ', multiproc_params['nworkers'])))
 
-    nthreads = min(get_default_nthreads(), len(df))
+    nworkers = min(get_default_nworkers(), len(df))
 
     def split(df_):
-        nchunks = min(nthreads * multiproc_params['chunks_per_thread'], len(df_))
+        nchunks = min(nworkers * multiproc_params['chunks_per_worker'], len(df_))
         return np.array_split(df, nchunks)
 
     if isinstance(df, (pd.DataFrame, pd.Series)):
@@ -120,7 +120,7 @@ def parallelize_df(df, func, *args, nthreads='default', concat=True, **kwargs):
         raise ValueError('Unknown df argument type in parallelize_df')
 
 
-    pool = multiprocessing.Pool(nthreads)
+    pool = multiprocessing.Pool(nworkers)
     if args:
         raise RuntimeError('error')
         results = pool.starmap(func, itertools.product(df_split, args))

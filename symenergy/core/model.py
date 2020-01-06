@@ -75,7 +75,7 @@ class Model:
                 (('pos_pdch', 'this', False), ('curt_pos_p', 'this', False))
          }
 
-    def __init__(self, nthreads='default', curtailment=False,
+    def __init__(self, nworkers='default', curtailment=False,
                  slot_weight=1, constraint_filt=''):
 
         self.plants = {}
@@ -85,7 +85,7 @@ class Model:
         self.comps = {}
         self.curt = {}
 
-        self.nthreads = nthreads
+        self.nworkers = nworkers
         self.constraint_filt = constraint_filt
 
         self._slot_weights = Parameter('w', noneslot, slot_weight)
@@ -661,18 +661,18 @@ class Model:
         if __name__ == '__main__':
             x = self.df_comb.iloc[0]
 
-        if not self.nthreads:
+        if not self.nworkers:
             self.df_comb['result'] = self.call_solve_df(self.df_comb)
         else:
             func = self.wrapper_call_solve_df
             self.df_comb['result'] = parallelize_df(self.df_comb, func,
-                                                    nthreads=self.nthreads)
+                                                    nworkers=self.nworkers)
 
 # =============================================================================
 # =============================================================================
 
 
-    def subs_total_cost(self, x):
+    def _subs_total_cost(self, x):
         '''
         Substitutes solution into TC variables.
         This expresses the total cost as a function of the parameters.
@@ -692,7 +692,7 @@ class Model:
 
     def call_subs_tc(self, df):
 
-        return df.apply(self.subs_total_cost, axis=1)
+        return df.apply(self._subs_total_cost, axis=1)
 
 
     def wrapper_call_subs_tc(self, df, *args):
@@ -719,12 +719,12 @@ class Model:
 
         df = self.df_comb[['result', 'variabs_multips', 'idx']]
 
-        if not self.nthreads:
+        if not self.nworkers:
             self.df_comb['tc'] = self.call_subs_tc(df)
         else:
             func = self.wrapper_call_subs_tc
             self.df_comb['tc'] = parallelize_df(df, func,
-                                                nthreads=self.nthreads)
+                                                nworkers=self.nworkers)
 
 
 # =============================================================================
@@ -887,24 +887,24 @@ class Model:
 
         logger.info('Defining lagrangians...')
         df = self.df_comb[self.constrs_cols_neq]
-        if not self.nthreads:
+        if not self.nworkers:
             self.df_comb['lagrange'] = self.call_construct_lagrange(df)
         else:
             func = self.wrapper_call_construct_lagrange
-            nthreads = self.nthreads
+            nworkers = self.nworkers
             self.df_comb['lagrange'] = parallelize_df(df, func,
-                                                      nthreads=nthreads)
+                                                      nworkers=nworkers)
 
         logger.info('Getting selected variables/multipliers...')
         df = self.df_comb.lagrange
-        if not self.nthreads:
+        if not self.nworkers:
             self.list_variabs_multips = self.call_get_variabs_multips_slct(df)
             self.df_comb['variabs_multips'] = self.list_variabs_multips
         else:
             func = self._wrapper_call_get_variabs_multips_slct
-            nthreads = self.nthreads
+            nworkers = self.nworkers
             self.df_comb['variabs_multips'] = parallelize_df(df, func,
-                                                             nthreads=nthreads)
+                                                             nworkers=nworkers)
 
         # get index
         self.df_comb = self.df_comb[[c for c in self.df_comb.columns
@@ -1056,14 +1056,14 @@ class Model:
         self.nress = len(self.df_comb)
 
         # adjust results for single-component linear dependencies
-        if not self.nthreads:
+        if not self.nworkers:
             self.df_comb['result'] = \
                     self.call_fix_linear_dependencies(self.df_comb)
         else:
             func = self.wrapper_call_fix_linear_dependencies
-            nthreads = self.nthreads
+            nworkers = self.nworkers
             self.df_comb['result'] = parallelize_df(self.df_comb, func,
-                                                    nthreads=nthreads)
+                                                    nworkers=nworkers)
 
 
     def print_results(self, idx, df=None, slct_var_mlt=None, substitute=None):
