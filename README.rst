@@ -23,7 +23,7 @@ Installation
 Documentation
 =============
 
-`<https://grimsel.readthedocs.io/>`_
+`<https://symenergy.readthedocs.io/>`_
 
 ============
 Publication
