@@ -420,7 +420,7 @@ Simple energy balance plot with and without storage for day and night
 
 
 
-.. image:: example_constant_files/example_constant_25_0.png
+.. image:: _static/example_constant_25_0.png
 
 
 Impact of storage on baseload production by constraint combination
@@ -462,5 +462,5 @@ Using a slightly more involved analysis the impact of storage on the production 
 
 
 
-.. image:: example_constant_files/example_constant_27_0.png
+.. image:: _static/example_constant_27_0.png
 

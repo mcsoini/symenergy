@@ -23,6 +23,11 @@ Installation
 
 ``pip install symenergy``
 
+==========
+Repository
+==========
+
+`<https://github.com/mcsoini/symenergy>`_
 
 ============
 Publication
