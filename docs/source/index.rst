@@ -48,8 +48,6 @@ Content
    :name: Table of Contents
    :maxdepth: 3
 
-   Minimal example :ref:`label_example_minimal`
-
    example_constant
    doc_core_model
    doc_evaluator_plotting
@@ -185,14 +183,9 @@ The figure below provides an overview of the solution process:
     :align: center
     :alt: flowchart
 
+
 * The model components are defined (time slots, power plants, storage, ...)
-* The optimal operation of these components (powe1.1 Initialize model
-
-class symenergy.core.model.Model(nworkers='default', curtailment=False, slot_weight=1, constraint_filt='')[source]
-
-    Instantiate a model object. Start from here.
-
-    Parametersr production, charging, capacity
+* The optimal operation of these components (power production, charging, capacity
   retirements) is limited by certain constraints (power capacity of power plants
   and storage, energy capacity of storage, energy balance constraint for the whole system, etc.).
 * Some of these constraints are equality constraints (e.g. energy balance, must hold in all cases);
