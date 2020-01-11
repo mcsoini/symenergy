@@ -1,6 +1,4 @@
 
-Jupyter Notebook: `<https://github.com/mcsoini/symenergy/blob/master/examples/example_constant.ipynb>`_
-
 =============================================
 Example 1: Two plants, constant supply curves
 =============================================
