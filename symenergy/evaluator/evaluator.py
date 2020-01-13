@@ -497,8 +497,6 @@ class Evaluator():
         self.x_name_str = '(%s)'%','.join(self.x_name)
         self.df_x_vals = self._get_x_vals_combs()
 
-        self.cache_lambd, self.cache_eval = self._get_caches()
-
         if hasattr(self, 'eval_analysis'):
             self.eval_analysis.x_vals = self._x_vals
 
@@ -520,6 +518,10 @@ class Evaluator():
     @df_x_vals.setter
     def df_x_vals(self, df_x_vals):
         self._df_x_vals = df_x_vals.reset_index(drop=True)
+
+        # updates must happen due to changes to both x_vals and df_vals
+        self.cache_lambd, self.cache_eval = self._get_caches()
+
         if hasattr(self, 'expander'):
             self.expander.df_x_vals = self._df_x_vals
 
