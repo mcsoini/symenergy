@@ -847,7 +847,9 @@ class Evaluator():
     @hexdigest
     def _get_evaluator_hash_name(self, include_x_vals=False):
 
-        hash_input = str(self.x_vals if include_x_vals else self.x_name)
+        hash_input = str(self.x_name)
+        if include_x_vals:
+            hash_input += (str(hash(self.df_x_vals.values.tostring())))
         hash_input += str(self.model.get_model_hash_name())
 
         return hash_input
