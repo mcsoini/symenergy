@@ -670,7 +670,10 @@ class Evaluator():
     def _make_hash(self, func_str):
         ''' Generate function hash from function string. The idea is to avoid
         multiple definitions of identical functions which return e.g. constant
-        zero.'''
+        zero.
+
+        Not using @digest decorator due to leading "_"
+        '''
 
 #        salt = str(random.randint(0, 1e12))
         return '_' + md5((func_str).encode('utf-8')).hexdigest()
