@@ -21,3 +21,5 @@ logger = _get_logger(__name__)
 from symenergy.auxiliary.parallelization import multiproc_params
 from symenergy.core.model import Model
 from symenergy.evaluator.evaluator import Evaluator
+
+from symenergy.auxiliary.io import cache_params

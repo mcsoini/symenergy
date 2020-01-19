@@ -436,11 +436,21 @@ class Evaluator():
         self.is_positive = \
             self.model.constraints('expr_0', is_positivity_constraint=True)
 
-        self.fn_temp = (os.path.basename(self.cache_lambd.fn)
-                               .replace('.pickle', '_eval_temp.py'))
 
-        self.fn_temp = os.path.abspath(os.path.join(symenergy.__file__, '..',
-                                      'evaluator', self.fn_temp))
+    @property
+    def fn_temp_module(self):
+
+        fn = self.cache_lambd.fn.replace('.pickle', '_eval_temp.py')
+        return fn
+
+
+    @fn_temp_module.setter
+    def fn_temp_module(self, _):
+
+        raise AttributeError("Attempt to change evaluator temp path. Modify "
+                             "the symenergy.cache_params['path'] value "
+                             "instead, prior to initializing the "
+                             "Evaluator class.")
 
 
     def _get_helpers(self, drop_non_optimum, tolerance):
@@ -764,13 +774,19 @@ class Evaluator():
         module_str = '\n'.join(list_func)
         module_str = f'from numpy import sqrt\n\n{module_str}'
 
+        if not os.path.isdir(os.path.dirname(fn)):
+            os.mkdir(os.path.dirname(fn))
+
         with open(fn , "w") as f:
             f.write(module_str)
 
         py_compile.compile(fn)
 
+        sys.path.append(os.path.dirname(fn))
         et = __import__(os.path.basename(fn).replace('.py', ''),
-                        level=1, globals={"__name__": __name__})
+                        level=0, globals={"__name__": __name__})
+
+        logger.info(f'Imported temporary module from file {et.__file__}')
 
         return et
 
@@ -832,7 +848,8 @@ class Evaluator():
         logger.info('Number unique function strings: %d'%len(list_func))
 
         # write to and read from module
-        et = self._write_import_function_module(self.fn_temp, list_func)
+        et = self._write_import_function_module(self.fn_temp_module,
+                                                list_func)
 
         # retrieve eval_temp functions based on hash name
         dfev_func_str['lambd_func'] = (

@@ -43,6 +43,8 @@ class RcParams(UserDict):
                     f'be %s; received {item}')
             if  cond == '>=0':
                 assert item >= 0, mssg % cond
+            elif cond == 'none':  # no value check
+                pass
 
 
             self.data[key] = item
