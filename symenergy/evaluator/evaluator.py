@@ -782,7 +782,6 @@ class Evaluator():
 
         py_compile.compile(fn)
 
-        sys.path.append(os.path.dirname(fn))
         et = __import__(os.path.basename(fn).replace('.py', ''),
                         level=0, globals={"__name__": __name__})
 
@@ -832,6 +831,8 @@ class Evaluator():
           solutions
 
         '''
+
+        sys.path.append(os.path.dirname(self.fn_temp_module))
 
         if self.cache_lambd.file_exists:
             self.df_lam_func = self.cache_lambd.load()
