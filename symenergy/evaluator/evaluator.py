@@ -869,8 +869,11 @@ class Evaluator():
 
         hash_input = str(self.x_name)
         if include_x_vals:
-            hash_input += (str(hash(self.df_x_vals.values.tostring())))
+            hash_input += str(pd.util.hash_pandas_object(self.df_x_vals.T,
+                                                         index=False).values)
         hash_input += str(self.model.get_model_hash_name())
+
+        logger.debug(f'hash_input for include_x_vals={include_x_vals}: {hash_input}')
 
         return hash_input
 
@@ -945,9 +948,15 @@ class Evaluator():
         '''
 
         if self.cache_eval.file_exists:
+            logger.debug('expand_to_x_vals_parallel: file '
+                         f'{self.cache_eval.fn} found.')
+
             self.df_exp = self.cache_eval.load()
 
         else:
+            logger.debug('expand_to_x_vals_parallel: NOT FOUND file '
+                         f'{self.cache_eval.fn}.')
+
             # keeping pos and cap cols to sanitize zero equality constraints
             cols_pos = self.model.constraints('col', is_positivity_constraint=True)
             cols_cap = self.model.constraints('col', is_capacity_constraint=True)
