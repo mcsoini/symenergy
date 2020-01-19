@@ -871,6 +871,7 @@ class Evaluator():
         if include_x_vals:
             hash_input += str(pd.util.hash_pandas_object(self.df_x_vals.T,
                                                          index=False).values)
+            hash_input += str(self.eval_analysis.drop_non_optimum)
         hash_input += str(self.model.get_model_hash_name())
 
         logger.debug(f'hash_input for include_x_vals={include_x_vals}: {hash_input}')
