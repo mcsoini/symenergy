@@ -19,6 +19,8 @@ Installation
 
 .. _label_example_minimal:
 
+`<https://pypi.org/project/SymEnergy/>`_
+
 =============
 Documentation
 =============
