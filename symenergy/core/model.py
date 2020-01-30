@@ -1095,23 +1095,33 @@ class Model:
                                                     nworkers=nworkers)
 
 
-    def print_results(self, idx, df=None, slct_var_mlt=None, substitute=None):
+    def get_results_dict(self, idx, df=None, slct_var_mlt=None,
+                         substitute=None, diff=None, diff_then_subs=True):
         '''
-        Print result expressions for all variables and multipliers for a
-        certain constraint combination index.
+        Get dictionary with `{variable_name: result_expression}`.
+
+        Apply substitutions or derivatives with respect to a parameter.
 
         Parameters
         ----------
-            idx : int
-                index of the constraint combination for which the results are to
-                be printed
-            df : df
-                DataFrame containing the results and the index; defaults to
-                the model's `df_comb` table
-            substitute : dict
-                substitutions to be performed prior to expression simplification
-                and printing; main use case: setting the energy cost parameter
-                ``ec`` of the storage class to zero.
+        idx : int
+            index of the constraint combination for which the results are
+            to be returned
+        df : df
+            DataFrame containing the results and the index; defaults to
+            the model's `df_comb` table
+        substitute : dict
+            substitutions to be performed prior to expression
+            simplification; main use case: setting the energy cost
+            parameter ``ec`` of the storage class to zero.
+        slct_var_mlt : list of str
+            list of variable or multiplier names; must be a subset of
+            `set(m.variables('name')) | set(map(str, m.constraints('mlt')))`
+        diff : name or sympy.symbol.Symbol
+            parameter name or symbol for differentiation
+        diff_then_subs : bool
+            If True, first differentiate expressions, then substitute values;
+            defaults to True
 
         The input DataFrame must have the following columns:
 
@@ -1119,28 +1129,76 @@ class Model:
           for which the results are to be printed
         * `result`: list of expressions corresponding for each of the
           `variabs_multips` symbols
-        '''
+       '''
+
+        name_to_symb = self.parameters.to_dict({'name': 'symb'})
+
+        if diff:
+            assert isinstance(diff, (sp.symbol.Symbol, str)), \
+                f'diff must be SymPy symbol or string, got {type(diff)}'
+
+            if isinstance(diff, str):
+                assert diff in name_to_symb, f'Unknown parameter name "{diff}"'
+                diff = name_to_symb[diff]
 
         if not isinstance(df, pd.DataFrame):
             df = self.df_comb
 
-        x = df.reset_index().query('idx == %d'%idx).iloc[0]
+        assert idx in df.reset_index().idx, \
+            f'get_results_dict: idx={idx} not found in df'
 
         if not substitute:
             substitute = {}
 
-        resdict = dict(zip(map(str, x.variabs_multips), x.result))
+        def sanitize_subs(par):
+            if isinstance(par, str):
+                assert par in name_to_symb,\
+                    f'Unknown parameter name "{par}"'
+                return name_to_symb[par]
+            else:
+                assert par in name_to_symb.values(),\
+                    f'Unknown parameter symbol "{par}"'
+                return par
+        substitute = {sanitize_subs(par): val for par, val in
+                      substitute.items()}
+
+        x = df.reset_index().loc[lambda x: x.idx == idx].iloc[0]
+
+        resdict = dict(sorted(zip(map(str, x.variabs_multips), x.result)))
+
         if slct_var_mlt:
             resdict = {var: res for var, res in resdict.items()
                        if var in slct_var_mlt}
 
-        resdict = pd.DataFrame.from_dict(resdict, orient='index'
-                                         ).reset_index().sort_values('index').set_index('index').to_dict()[0]
+        def finalize(diff, diff_then_subs, substitute):
+            if diff and not diff_then_subs:
+                fin = lambda res: sp.diff(res.subs(substitute), diff)
+            elif diff and diff_then_subs:
+                fin = lambda res: sp.diff(res, diff).subs(substitute)
+            else:
+                fin = lambda res: res.subs(substitute)
+
+            return lambda res: sp.simplify(fin(res))
+
+        return {var: finalize(diff, diff_then_subs, substitute)(res)
+                for var, res in resdict.items()}
+
+
+    def print_results(self, *args, **kwargs):
+        '''
+        Print result expressions for all variables and multipliers for a
+        certain constraint combination index.
+
+        Parameters are passed to
+        :func:`symenergy.core.model.Model.get_results_dict`
+
+        '''
+        resdict = self.get_results_dict(*args, **kwargs)
 
         for var, res in resdict.items():
 
             print('*'*20, var, '*'*20)
-            print(sp.simplify(res.subs(substitute)))
+            print(res)
 
 
     def __repr__(self):
