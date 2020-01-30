@@ -85,9 +85,6 @@ class Model:
         self.comps = {}
         self.curt = {}
 
-        self.nress = None
-        self.ncomb = None
-
         self._cache = None
 
         self.df_comb = None
@@ -105,8 +102,8 @@ class Model:
 
         self.curtailment = curtailment
 
-        self.ncomb = None  # determined through construction of self.df_comb
-        self.nress = None  # number of valid results
+        self._ncomb = None  # determined through construction of self.df_comb
+        self._nress = None  # number of valid results
 
 
     @wrapt.decorator
@@ -298,10 +295,10 @@ class Model:
             return
 
         self._df_comb = df_comb.reset_index(drop=True)
-        if self.nress:
-            self.nress = len(self._df_comb)
+        if self._nress:
+            self._nress = len(self._df_comb)
         else:
-            self.ncomb = len(self._df_comb)
+            self._ncomb = len(self._df_comb)
 
 
     @_check_component_replacement
@@ -407,7 +404,7 @@ class Model:
 
         Collects all cost components to calculate their total sum `tc`. Adds
         the equality constraints to the model's total cost to generate the base
-        lagrange function `lagrange_0`.
+        lagrange function `_lagrange_0`.
 
         Costs and constraint expression of all components are re-initialized.
         This is important in case parameter values are frozen.
@@ -422,7 +419,7 @@ class Model:
         eq_cstrs = self.constraints.tolist('expr', is_equality_constraint=True)
 
         self.tc = sum(p.cc for p in comp_list)
-        self.lagrange_0 = self.tc + sum(eq_cstrs)
+        self._lagrange_0 = self.tc + sum(eq_cstrs)
 
 
 # =============================================================================
@@ -603,9 +600,9 @@ class Model:
         if constraint_filt:
             self.df_comb = self.df_comb.query(constraint_filt)
 
-        self.ncomb = len(self.df_comb)
+        self._ncomb = len(self.df_comb)
 
-        logger.info('Remaining df_comb rows: %d' % self.ncomb)
+        logger.info('Remaining df_comb rows: %d' % self._ncomb)
 
 #
 #    def get_variabs_params(self):
@@ -637,7 +634,7 @@ class Model:
 #     Various solver-related methods
 # =============================================================================
 
-    def solve(self, x):
+    def _solve(self, x):
 
         # substitute variables with binding positivitiy constraints
         cpos = self.constraints.tolist(('col', ''),
@@ -671,16 +668,16 @@ class Model:
             return solution
 
 
-    def wrapper_call_solve_df(self, df, *args):
+    def _wrapper_call_solve_df(self, df, *args):
 
-        name, ntot = 'Solve', self.ncomb
-        return log_time_progress(self.call_solve_df)(self, df, name, ntot)
+        name, ntot = 'Solve', self._ncomb
+        return log_time_progress(self._call_solve_df)(self, df, name, ntot)
 
 
-    def call_solve_df(self, df):
+    def _call_solve_df(self, df):
         ''' Applies to dataframe. '''
 
-        return df.apply(self.solve, axis=1).tolist()
+        return df.apply(self._solve, axis=1).tolist()
 
 
     def solve_all(self):
@@ -691,9 +688,9 @@ class Model:
             x = self.df_comb.iloc[0]
 
         if not self.nworkers:
-            self.df_comb['result'] = self.call_solve_df(self.df_comb)
+            self.df_comb['result'] = self._call_solve_df(self.df_comb)
         else:
-            func = self.wrapper_call_solve_df
+            func = self._wrapper_call_solve_df
             self.df_comb['result'] = parallelize_df(self.df_comb, func,
                                                     nworkers=self.nworkers)
 
@@ -719,16 +716,16 @@ class Model:
         return self.tc.copy().subs(dict_var)
 
 
-    def call_subs_tc(self, df):
+    def _call_subs_tc(self, df):
 
         return df.apply(self._subs_total_cost, axis=1)
 
 
-    def wrapper_call_subs_tc(self, df, *args):
+    def _wrapper_call_subs_tc(self, df, *args):
 
         name = 'Substituting total cost'
-        ntot = self.nress
-        return log_time_progress(self.call_subs_tc)(self, df, name, ntot)
+        ntot = self._nress
+        return log_time_progress(self._call_subs_tc)(self, df, name, ntot)
 
 
     def generate_total_costs(self):
@@ -749,9 +746,9 @@ class Model:
         df = self.df_comb[['result', 'variabs_multips', 'idx']]
 
         if not self.nworkers:
-            self.df_comb['tc'] = self.call_subs_tc(df)
+            self.df_comb['tc'] = self._call_subs_tc(df)
         else:
-            func = self.wrapper_call_subs_tc
+            func = self._wrapper_call_subs_tc
             self.df_comb['tc'] = parallelize_df(df, func,
                                                 nworkers=self.nworkers)
 
@@ -760,9 +757,9 @@ class Model:
 # =============================================================================
 
 
-    def construct_lagrange(self, row):
+    def _construct_lagrange(self, row):
 
-        lagrange = self.lagrange_0
+        lagrange = self._lagrange_0
         active_cstrs = row[row == 1].index.values
         lagrange += sum(expr for col, expr
                         in self.constraints.tolist(('col', 'expr'))
@@ -773,18 +770,18 @@ class Model:
         return lagrange
 
 
-    def call_construct_lagrange(self, df):
+    def _call__construct_lagrange(self, df):
         '''
-        Top-level method for parallelization of construct_lagrange.
+        Top-level method for parallelization of _construct_lagrange.
         '''
 
-        return df.apply(self.construct_lagrange, axis=1).tolist()
+        return df.apply(self._construct_lagrange, axis=1).tolist()
 
-    def wrapper_call_construct_lagrange(self, df, *args):
+    def _wrapper_call__construct_lagrange(self, df, *args):
 
         name = 'Construct lagrange'
-        ntot = self.ncomb
-        return log_time_progress(self.call_construct_lagrange
+        ntot = self._ncomb
+        return log_time_progress(self._call__construct_lagrange
                                  )(self, df, name, ntot)
 
 
@@ -825,7 +822,7 @@ class Model:
     def _wrapper_call_get_variabs_multips_slct(self, df, *args):
 
         name = 'Get variabs/multipliers'
-        ntot = self.ncomb
+        ntot = self._ncomb
         func = self._call_get_variabs_multips_slct
         return log_time_progress(func)(self, df, name, ntot)
 
@@ -837,7 +834,7 @@ class Model:
     def fix_linear_dependencies(self, x):
         '''
         All solutions showing linear dependencies are set to zero. See doc
-        of symenergy.core.model.Model.get_mask_linear_dependencies
+        of symenergy.core.model.Model._get_mask_linear_dependencies
         '''
 
         MP_COUNTER.increment()
@@ -883,16 +880,16 @@ class Model:
         return list_res_new
 
 
-    def call_fix_linear_dependencies(self, df):
+    def _call_fix_linear_dependencies(self, df):
 
         return df.apply(self.fix_linear_dependencies, axis=1)
 
 
-    def wrapper_call_fix_linear_dependencies(self, df, *args):
+    def _wrapper_call_fix_linear_dependencies(self, df, *args):
 
         name = 'Fix linear dependencies'
-        ntot = self.nress
-        func = self.call_fix_linear_dependencies
+        ntot = self._nress
+        func = self._call_fix_linear_dependencies
         return log_time_progress(func)(self, df, name, ntot)
 
 
@@ -917,9 +914,9 @@ class Model:
         logger.info('Defining lagrangians...')
         df = self.df_comb[self.constrs_cols_neq]
         if not self.nworkers:
-            self.df_comb['lagrange'] = self.call_construct_lagrange(df)
+            self.df_comb['lagrange'] = self._call__construct_lagrange(df)
         else:
-            func = self.wrapper_call_construct_lagrange
+            func = self._wrapper_call__construct_lagrange
             nworkers = self.nworkers
             self.df_comb['lagrange'] = parallelize_df(df, func,
                                                       nworkers=nworkers)
@@ -927,7 +924,7 @@ class Model:
         logger.info('Getting selected variables/multipliers...')
         df = self.df_comb.lagrange
         if not self.nworkers:
-            self.list_variabs_multips = self.call_get_variabs_multips_slct(df)
+            self.list_variabs_multips = self._call_get_variabs_multips_slct(df)
             self.df_comb['variabs_multips'] = self.list_variabs_multips
         else:
             func = self._wrapper_call_get_variabs_multips_slct
@@ -940,11 +937,8 @@ class Model:
                                      if not c == 'idx']].reset_index()
         self.df_comb = self.df_comb.rename(columns={'index': 'idx'})
 
-        # get length for reporting
-        self.n_comb = self.df_comb.iloc[:, 0].size
 
-
-    def get_mask_empty_solution(self):
+    def _get_mask_empty_solution(self):
         '''
         Infeasible solutions are empty.
         '''
@@ -954,7 +948,7 @@ class Model:
         return mask_empty
 
 
-    def get_mask_linear_dependencies(self):
+    def _get_mask_linear_dependencies(self):
         '''
         Solutions of problems containing linear dependencies.
 
@@ -1047,11 +1041,11 @@ class Model:
           are kept in the ``Model.df_comb_invalid`` dataframe.
         * Analyze and classify remaining solutions with respect to linear
           dependencies of solutions
-          (:func:`symenergy.core.model.Model.get_mask_linear_dependencies`).
+          (:func:`symenergy.core.model.Model._get_mask_linear_dependencies`).
         * Fix results with fixable linear dependencies.
         '''
 
-        mask_empty = self.get_mask_empty_solution()
+        mask_empty = self._get_mask_empty_solution()
 
         ncomb0 = len(self.df_comb)
         nempty = mask_empty.sum()
@@ -1067,7 +1061,7 @@ class Model:
         self.df_comb = self.df_comb.loc[-mask_empty]
 
         # get info on linear combinations
-        mask_lindep = self.get_mask_linear_dependencies()
+        mask_lindep = self._get_mask_linear_dependencies()
 
         ncomb0 = len(self.df_comb)
         nkey1, nkey2, nkey3 = ((mask_lindep == 1).sum(),
@@ -1082,14 +1076,14 @@ class Model:
         self.df_comb['code_lindep'] = mask_lindep
         self.df_comb = self.df_comb.loc[-(self.df_comb.code_lindep == 2)]
 
-        self.nress = len(self.df_comb)
+        self._nress = len(self.df_comb)
 
         # adjust results for single-component linear dependencies
         if not self.nworkers:
             self.df_comb['result'] = \
-                    self.call_fix_linear_dependencies(self.df_comb)
+                    self._call_fix_linear_dependencies(self.df_comb)
         else:
-            func = self.wrapper_call_fix_linear_dependencies
+            func = self._wrapper_call_fix_linear_dependencies
             nworkers = self.nworkers
             self.df_comb['result'] = parallelize_df(self.df_comb, func,
                                                     nworkers=nworkers)
@@ -1206,22 +1200,6 @@ class Model:
         ret = str(self.__class__)
         return ret
 
-#    def get_all_is_capacity_constrained(self):
-#        ''' Collects capacity constrained variables of all components. '''
-#
-#        return [var
-#                for comp in self.comps.values()
-#                for var in comp.get_is_capacity_constrained()]
-
-#    def get_all_is_positive(self):
-#        ''' Collects positive variables of all components. '''
-#
-#        is_positive_comps = [var
-#                             for comp in self.comps.values()
-#                             for var in comp.get_is_positive()]
-#
-#        return is_positive_comps
-
 
     def print_mutually_exclusive_post(self, logging=False):
 
@@ -1291,7 +1269,7 @@ class Model:
 
         hash_input = ''.join(comp._get_hash_name()
                              for comp in self.comps.values())
-        hash_input += str(self.lagrange_0)
+        hash_input += str(self._lagrange_0)
         hash_input += self.constraint_filt
 
         return hash_input
