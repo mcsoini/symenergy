@@ -63,13 +63,15 @@ Results analysis
 ================
 
 .. automethod:: symenergy.core.model.Model.print_results
+.. automethod:: symenergy.core.model.Model.get_results_dict
+
 
 Other methods
 ================
 
 Other important methods which are not directly called but referred to by others.
 
-.. automethod:: symenergy.core.model.Model.get_mask_linear_dependencies
+.. automethod:: symenergy.core.model.Model._get_mask_linear_dependencies
 
 
 
