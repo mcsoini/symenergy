@@ -595,7 +595,7 @@ class SymenergyPlotter():
         get_leg_areas = lambda cols, pn, cds: \
             p_leg.varea_stack(x=self.ind_axx, stackers=cols,
                               color=self.colors[pn],
-                              legend=list(map(value, cols)), source=cds)
+                              legend_label=cols, source=cds)
 
         areas_pos = (get_leg_areas(self.cols_pos, 'pos', self.cds_pos)
                                    if hasattr(self, 'cds_pos') else [])
@@ -682,7 +682,7 @@ class BalancePlot(SymenergyPlotter):
     def _make_single_plot(self, fig, data, view, cols, color):
 
         fig.varea_stack(x=self.ind_axx, stackers=cols, color=color,
-                        legend=list(map(value, cols)),
+                        legend_label=cols,
                         source=data, view=view)
 
 class GeneralPlot(SymenergyPlotter):
@@ -715,7 +715,7 @@ class GeneralAreaPlot(GeneralPlot):
     def _make_single_plot(self, fig, data, view, cols, color):
 
         fig.varea_stack(x=self.ind_axx, stackers=cols, color=color,
-                        legend=list(map(value, cols)),
+                        legend_label=cols,
                         source=data, view=view)
 
 class GeneralBarPlot(GeneralPlot):
@@ -725,7 +725,7 @@ class GeneralBarPlot(GeneralPlot):
 
         fig.vbar_stack(cols, x=self.ind_axx, width=0.9,
                        color=color, source=data,
-                       legend=list(map(value, cols)),
+                       legend_label=cols,
                        view=view)
 
 
