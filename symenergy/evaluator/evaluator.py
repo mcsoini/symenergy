@@ -791,8 +791,7 @@ class Evaluator():
         return et
 
 
-    def get_evaluated_lambdas_parallel(self, skip_multipliers=True,
-                                        str_func=True):
+    def get_evaluated_lambdas_parallel(self, skip_multipliers=True):
         '''
         For each model variable and constraint combination, generate a function
         evaluated by all constant parameter values, but *not* by the
@@ -952,7 +951,6 @@ class Evaluator():
         if self.cache_eval.file_exists:
             logger.debug('expand_to_x_vals_parallel: file '
                          f'{self.cache_eval.fn} found.')
-
             self.df_exp = self.cache_eval.load()
 
         else:
@@ -978,53 +976,6 @@ class Evaluator():
         self.build_supply_table()
 
 
-#    def expand_to_x_vals_loky(self):
-#
-#        # keeping pos and cap cols to sanitize zero equality constraints
-#        cols_pos = self.model.constraints('col', is_positivity_constraint=True)
-#        cols_cap = self.model.constraints('col', is_capacity_constraint=True)
-#        keep_cols = (['func', 'lambd_func', 'idx'] + cols_pos + cols_cap)
-#        self.df_lam_func = self.df_lam_func.reset_index()[keep_cols]
-#
-#        self.df_lam_func = self._init_constraints_active(self.df_lam_func)
-#
-#        logger.debug('_call_eval')
-#        t = time.time()
-#        self.nparallel = len(self.df_lam_func)
-#        df_result = parallelize_df(df=self.df_lam_func[['func', 'idx', 'lambd_func']],
-#                                   func=self._wrapper_call_eval)
-#        df_result = df_result.rename(columns={0: 'lambd'})
-#        logger.debug('done _call_eval in %fs, length df_lam %d, length df_x %d'%(time.time() - t, len(self.df_lam_func), len(self.df_x_vals)))
-#
-#        logger.debug('expand_to_x_vals_parallel intermediate')
-#        t = time.time()
-#        cols = [c for c in self.df_lam_func.columns
-#                if c.startswith('act_')] + ['is_positive']
-#        ind = ['func', 'idx']
-#        df_result = df_result.reset_index().join(self.df_lam_func.set_index(ind)[cols],
-#                                                 on=ind)
-#
-#        nchunks = get_default_nthreads() * parallelization.CHUNKS_PER_THREAD
-#        group_params = self._get_optimum_group_params(nchunks=nchunks)
-#
-#        logger.debug('done expand_to_x_vals_parallel intermediate in %fs'%(time.time() - t))
-#
-#        logger.debug('_wrapper_call_evaluate_by_x_new')
-#        t = time.time()
-#        df_split = [df for _, df in (df_result.groupby(group_params))]
-#        logger.debug('len(df_split): %d'%len(df_split))
-#        self.nparallel = len(df_split)
-#        self.df_exp = parallelize_df(df=df_split,
-#                                     func=self._wrapper_call_evaluate_by_x_new)
-#
-#        logger.debug('done _wrapper_call_evaluate_by_x_new in %fs'%(time.time() - t))
-#
-#        logger.debug('_map_func_to_slot')
-#        t = time.time()
-#        self._map_func_to_slot()
-#        logger.debug('done _map_func_to_slot in %fs'%(time.time() - t))
-
-
     def _get_x_vals_combs(self):
         '''
         Generates dataframe with all combinations of x_vals.
@@ -1042,13 +993,10 @@ class Evaluator():
         ''' Initialize dict attribute defining fixed parameter values, i.e. of
         all parameters not in `self.x_vals`. '''
 
-        model = self.model
-        x_vals = self.x_vals
-
-        dict_param_values = model.parameters.to_dict({'symb': 'value'})
+        dict_param_values = self.model.parameters.to_dict({'symb': 'value'})
 
         dict_param_values = {kk: vv for kk, vv in dict_param_values.items()
-                             if not kk in [x.symb for x in x_vals]}
+                             if not kk in [x.symb for x in self.x_vals]}
 
         return dict_param_values
 
