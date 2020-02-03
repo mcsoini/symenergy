@@ -856,10 +856,8 @@ class Evaluator():
         dfev_func_str['lambd_func'] = (
             dfev_func_str.func_hash.apply(lambda x: getattr(et, x)))
 
-        dfev_func_str = dfev_func_str.join(self.model.df_comb.set_index('idx')[
-                                    self.model.constrs_cols_neq], on='idx')
-
-        self.df_lam_func = dfev_func_str
+        self.df_lam_func = (dfev_func_str[['func', 'lambd_func', 'idx']]
+                                        .reset_index(drop=True))
 
         self.cache_lambd.write(self.df_lam_func)
 
@@ -957,11 +955,11 @@ class Evaluator():
             logger.debug('expand_to_x_vals_parallel: NOT FOUND file '
                          f'{self.cache_eval.fn}.')
 
-            # keeping pos and cap cols to sanitize zero equality constraints
-            cols_pos = self.model.constraints('col', is_positivity_constraint=True)
-            cols_cap = self.model.constraints('col', is_capacity_constraint=True)
-            keep_cols = (['func', 'lambd_func', 'idx'] + cols_pos + cols_cap)
-            self.df_lam_func = self.df_lam_func.reset_index()[keep_cols]
+            cpos = self.model.constraints('col', is_positivity_constraint=True)
+            ccap = self.model.constraints('col', is_capacity_constraint=True)
+            self.df_lam_func = (self.df_lam_func
+                                    .join(self.model.df_comb.set_index('idx')[
+                                          cpos + ccap], on='idx'))
 
             self.df_lam_func = self._init_constraints_active(self.df_lam_func)
 
