@@ -124,7 +124,7 @@ class EvalAnalysis():
     Identifies optimal and infeasible solutions.
     '''
 
-    def __init__(self, x_vals, map_col_func, dict_cap,
+    def __init__(self, x_vals, map_col_func, dict_cap, dict_constrs,
                  tolerance, drop_non_optimum):
 
         self.x_vals = x_vals
@@ -132,6 +132,7 @@ class EvalAnalysis():
         self.tolerance = tolerance
         self.drop_non_optimum = drop_non_optimum
         self.dict_cap = dict_cap
+        self.dict_constrs = dict_constrs
 
         self.x_name = list(map(lambda x: x.name, self.x_vals))
 
@@ -186,7 +187,7 @@ class EvalAnalysis():
 
         for col, func in self.map_col_func:
             map_new = ((df.func == func)
-                       & (df[col] != 1)
+                       & df.idx.isin(self.dict_constrs[col])
                        & (df['lambd'] == 0))
             map_ &= map_new
 
@@ -464,8 +465,15 @@ class Evaluator():
                     if not comp in self.model.slots.values()  # exclude slots
                     for cap, val in comp.get_constrained_variabs()]
 
+        dict_constrs = (pd.melt(self.model.df_comb,
+                                id_vars=['idx'], var_name='act_col',
+                                value_vars=self.model.constrs_cols_neq,
+                                value_name='active'
+                                ).loc[lambda x: x.active]
+                            .groupby('act_col').idx.apply(set).to_dict())
+
         eval_analysis = EvalAnalysis(self.x_vals, map_col_func_pos, dict_cap,
-                                     tolerance=tolerance,
+                                     dict_constrs, tolerance=tolerance,
                                      drop_non_optimum=drop_non_optimum)
 
         expander = Expander(self.df_x_vals)
