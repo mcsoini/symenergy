@@ -71,9 +71,9 @@ def log_time_progress(f):
     Using explicit wrappers for each method instead.
     '''
 
-    def wrapper(self, df, name, ntot, *args):
+    def wrapper(self, df, name, ntot, *args, **kwargs):
         t = time.time()
-        res = f(df, *args)
+        res = f(df, *args, **kwargs)
         t = (time.time() - t)  / len(df)
 
         MP_EMA.update_ema(t)
@@ -103,6 +103,7 @@ def parallelize_df(df, func, *args, nworkers='default', concat=True, **kwargs):
     MP_EMA.reset()
 
     logger.debug(str(('NWORKERS: ', multiproc_params['nworkers'])))
+    logger.debug(f'args {args}, kwargs {kwargs}')
 
     nworkers = min(get_default_nworkers(), len(df))
 
@@ -121,9 +122,9 @@ def parallelize_df(df, func, *args, nworkers='default', concat=True, **kwargs):
 
 
     pool = multiprocessing.Pool(nworkers)
-    if args:
-        raise RuntimeError('error')
-        results = pool.starmap(func, itertools.product(df_split, args))
+    if args or kwargs:
+        args = itertools.product(df_split, list(args) + list(kwargs.values()))
+        results = pool.starmap(func, args)
     else:
         results = pool.map(func, df_split)
 
