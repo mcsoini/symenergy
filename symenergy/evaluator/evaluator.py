@@ -468,8 +468,10 @@ class Evaluator():
                                 id_vars=['idx'], var_name='act_col',
                                 value_vars=self.model.constrs_cols_neq,
                                 value_name='active'
-                                ).loc[lambda x: x.active]
-                            .groupby('act_col').idx.apply(set).to_dict())
+                                )
+                            .groupby('act_col')
+                            .apply(lambda x: set(x.loc[x.active].idx))
+                            .to_dict())
 
         eval_analysis = EvalAnalysis(self.x_vals, map_col_func_pos, dict_cap,
                                      dict_constrs, tolerance=tolerance,
