@@ -44,6 +44,7 @@ class Cache():
     the model solution process.
     '''
 
+    prefix = None
     cache_name = 'cache'
 
     def __init__(self, m_name):
@@ -163,11 +164,19 @@ class Cache():
            SymEnergy model instance
         '''
 
-        prefix_dict = {'cache': 'm', 'cache_eval': 'e', 'cache_lambd': 'l'}
+        if not self.prefix:
+            try:
+                prefix_dict = {'cache': 'm', 'cache_eval': 'e', 'cache_lambd': 'l'}
+                prefix = prefix_dict[self.cache_name]
+            except KeyError as e:
+                raise KeyError(str(e) + '. Please define "prefix" class '
+                               'attribute in subclassed symenergy cache.')
+        else:
+                prefix = self.prefix
 
         m_name = self._m_name[:12].upper()
 
-        fn = f'{prefix_dict[self.cache_name]}{m_name}.pickle'
+        fn = f'{prefix}{m_name}.pickle'
         fn = os.path.join(_dir, fn)
         fn = os.path.abspath(fn)
 
