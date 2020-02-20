@@ -38,6 +38,8 @@ logger = _get_logger(__name__)
 
 pd.options.mode.chained_assignment = None
 
+THRESHOLD_UNEXPECTED_ZEROS = 1e-9
+
 def log_info_mainprocess(logstr):
     if current_process().name == 'MainProcess':
         logger.info(logstr)
@@ -187,7 +189,7 @@ class EvalAnalysis():
         for col, func in self.map_col_func:
             map_new = ((df.func == func)
                        & df.idx.isin(self.dict_constrs[col])
-                       & (df['lambd'] == 0))
+                       & (df['lambd'].abs() < THRESHOLD_UNEXPECTED_ZEROS))
             map_ &= map_new
 
         return map_
