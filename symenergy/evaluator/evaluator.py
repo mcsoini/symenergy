@@ -184,13 +184,13 @@ class EvalAnalysis():
         Identify zero values with non-binding zero constraints.
         '''
 
-        map_ = pd.Series([True] * len(df), index=df.index)
+        map_ = pd.Series([False] * len(df), index=df.index)
 
         for col, func in self.map_col_func:
             map_new = ((df.func == func)
                        & df.idx.isin(self.dict_constrs[col])
                        & (df['lambd'].abs() <= THRESHOLD_UNEXPECTED_ZEROS))
-            map_ &= map_new
+            map_ |= map_new
 
         return map_
 
@@ -459,24 +459,25 @@ class Evaluator():
     def _get_helpers(self, drop_non_optimum, tolerance):
 
         map_col_func_pos = \
-            self.model.constraints(('col', 'base_name'),
+            self.model.constraints(('col', 'var_name'),
                                    is_positivity_constraint=True)
 
         dict_cap = [(cap, val) for comp in self.model.comps.values()
                     if not comp in self.model.slots.values()  # exclude slots
                     for cap, val in comp.get_constrained_variabs()]
 
-        dict_constrs = (pd.melt(self.model.df_comb,
+        dict_constrs_inactive = (pd.melt(self.model.df_comb,
                                 id_vars=['idx'], var_name='act_col',
                                 value_vars=self.model.constrs_cols_neq,
                                 value_name='active'
-                                )
+                                ).assign(inactive=lambda x: ~x.active)
                             .groupby('act_col')
-                            .apply(lambda x: set(x.loc[x.active].idx))
+                            .apply(lambda x: set(x.loc[x.inactive].idx))
                             .to_dict())
 
         eval_analysis = EvalAnalysis(self.x_vals, map_col_func_pos, dict_cap,
-                                     dict_constrs, tolerance=tolerance,
+                                     dict_constrs_inactive,
+                                     tolerance=tolerance,
                                      drop_non_optimum=drop_non_optimum)
 
         expander = Expander(self.df_x_vals)
