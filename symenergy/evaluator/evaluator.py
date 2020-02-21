@@ -189,7 +189,7 @@ class EvalAnalysis():
         for col, func in self.map_col_func:
             map_new = ((df.func == func)
                        & df.idx.isin(self.dict_constrs[col])
-                       & (df['lambd'].abs() < THRESHOLD_UNEXPECTED_ZEROS))
+                       & (df['lambd'].abs() <= THRESHOLD_UNEXPECTED_ZEROS))
             map_ &= map_new
 
         return map_
