@@ -10,7 +10,7 @@ SymEnergy
 
 Symbolic modelling of energy systems, based on SymPy.
 
-SymPy provides a framework for the structured solution of cost-optimization of energy systems using 
+SymEnergy provides a framework for the structured solution of cost-optimization of energy systems using 
 the standard Lagrange multiplier approach. The result consists in the close-form
 analytical solutions to the optimization problem. For example, the energy production
 from a power plant is expressed as
