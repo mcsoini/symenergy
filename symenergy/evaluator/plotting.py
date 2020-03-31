@@ -127,7 +127,6 @@ from bokeh.models import Legend, CDSView, GroupFilter
 from bokeh.models.widgets import MultiSelect
 from bokeh.plotting import figure
 from bokeh.models.glyphs import MultiLine
-from bokeh.core.properties import value
 from bokeh.palettes import brewer
 from bokeh.io import show
 
