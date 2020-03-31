@@ -604,6 +604,12 @@ class Model:
 
         logger.info('Remaining df_comb rows: %d' % self._ncomb)
 
+        # get index
+        self.df_comb = self.df_comb[[c for c in self.df_comb.columns
+                                     if not c == 'idx']].reset_index()
+        self.df_comb = self.df_comb.rename(columns={'index': 'idx'})
+
+
 #
 #    def get_variabs_params(self):
 #        '''
@@ -932,10 +938,6 @@ class Model:
             self.df_comb['variabs_multips'] = parallelize_df(df, func,
                                                              nworkers=nworkers)
 
-        # get index
-        self.df_comb = self.df_comb[[c for c in self.df_comb.columns
-                                     if not c == 'idx']].reset_index()
-        self.df_comb = self.df_comb.rename(columns={'index': 'idx'})
 
 
     def _get_mask_empty_solution(self):
