@@ -265,7 +265,7 @@ class SymenergyPlotter():
 
     def __init__(self, ev, ind_axx, ind_pltx, ind_plty, slct_series=None,
                  cat_column=None, plot_width=400, plot_height=300,
-                 ind_axy=None):
+                 ind_axy=None, initial_selection=None):
 
         self.ev = ev
         self.ind_pltx = ind_pltx
@@ -281,8 +281,11 @@ class SymenergyPlotter():
 
         self.slct_series = slct_series
 
+        self.initial_selection = initial_selection
+
         self._init_ind_lists()
         self._make_table()
+
 
 
     def _init_ind_lists(self):
@@ -306,6 +309,8 @@ class SymenergyPlotter():
         self._make_cols_lists()
         self.colors = self._get_color_list()
         self._make_index_lists()
+        self._initial_selection, self._initial_selection_index = \
+                        self._get_initial_selection(self.initial_selection)
         self._make_cds()
         self._make_views()
         self._init_callback()
@@ -372,26 +377,33 @@ class SymenergyPlotter():
         self.xy_combs = list(itertools.product(self._get_xy_list(self.ind_pltx),
                                                self._get_xy_list(self.ind_plty)
                                                ))
-    @property
-    def initial_selection(self):
+
+    def _get_initial_selection(self, initial_selection):
+        ''' Performs checks on input parameter and returns appropriate tuple.
         '''
-        Initial data selection (MultiSelect widgets) defaults to first data row
-        '''
 
-        return getattr(self, '_initial_selection',
-                       tuple(self.data.reset_index()[self.ind_slct].iloc[0]))
+        if not initial_selection:
+            slct_values = tuple(self.data.reset_index()[self.ind_slct].iloc[0])
+            slct_indices = (0, 0)
 
-    @initial_selection.setter
-    def initial_selection(self, val):
+        elif (isinstance(initial_selection, dict)
+                and sorted(initial_selection.keys()) == sorted(self.ind_slct)):
 
-        self._initial_selection = val
-        self._make_cds()
+            slct_values = tuple(initial_selection[key] for key in self.ind_slct)
+            slct_indices = tuple(self.slct_list_dict[key].index(val)
+                                 for key, val in zip(self.ind_slct, slct_values))
+
+        else:
+            raise ValueError(f'`initial_selection` value {initial_selection} '
+                             'not valid. Must be dictionary with keys '
+                             + str(self.ind_slct))
+
+        return slct_values, slct_indices
+
 
     def _make_cds(self):
 
-        # initial selection
-
-        slct_def = self.initial_selection
+        slct_def = self._initial_selection
 
         df_all_pos = self.data[self.cols_pos].reset_index()
         self.cds_all_pos = (ColumnDataSource(df_all_pos)
@@ -488,10 +500,9 @@ class SymenergyPlotter():
 
         selects = []
         for nind, ind in enumerate(self.ind_slct):
-
             list_slct = list(map(str, self.slct_list_dict[ind]))
-            slct = MultiSelect(size=1,
-                               value=[str(self.initial_selection[nind])],
+            value = [list_slct[self._initial_selection_index[nind]]]
+            slct = MultiSelect(size=1, value=value,
                                options=list_slct, title=ind)
             self.callback.args['slct_%s'%ind] = slct
             slct.js_on_change('value', self.callback)
