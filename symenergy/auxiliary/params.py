@@ -52,3 +52,8 @@ class RcParams(UserDict):
 
         raise ValueError(f'RcParams: Invalid value "{item}" for parameter '
                          f'{key}; must be ' + self.items_opts[key]['cond'])
+
+    def __repr__(self):
+
+        return f'Parameter collection {self.data}'
+
