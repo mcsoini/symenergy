@@ -1,3 +1,6 @@
+Changes after 1.06
+..................
+
 Changes after 1.05
 ..................
 * fixed plotting initial_values
