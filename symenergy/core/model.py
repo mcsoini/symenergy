@@ -48,7 +48,7 @@ class Model:
 
     Parameters
     ----------
-    slot_weights : float
+    slot_weight : float
         default time slot weight (hours); this instantiates a singleton
         parameter to avoid the definition of individual parameter for each
         slot; it can be overwritten for individual time slots if the weight
@@ -111,7 +111,7 @@ class Model:
         '''
         Rebuild all derived model attributes.
 
-        This is triggered (decorator) every a relevant change is made to
+        This is triggered every time a relevant change is made to
         the model through the public API.
         '''
         f(*args, **kwargs)
