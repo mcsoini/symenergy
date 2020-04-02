@@ -1,6 +1,9 @@
-Changes after 1.05
+Changes after 1.06
 ..................
 
+Changes after 1.05
+..................
+* fixed plotting initial_values
 * handling of cache files (problem solved: user control of location for large files from bigger models):
 
   * not strictly limited to *symenergy.cache* any longer
