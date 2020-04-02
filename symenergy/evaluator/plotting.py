@@ -383,7 +383,7 @@ class SymenergyPlotter():
 
         if not initial_selection:
             slct_values = tuple(self.data.reset_index()[self.ind_slct].iloc[0])
-            slct_indices = (0, 0)
+            slct_indices = (0,) * len(self.ind_slct)
 
         elif (isinstance(initial_selection, dict)
                 and sorted(initial_selection.keys()) == sorted(self.ind_slct)):
