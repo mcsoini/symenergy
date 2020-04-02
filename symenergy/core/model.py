@@ -1140,7 +1140,7 @@ class Model:
         if not isinstance(df, pd.DataFrame):
             df = self.df_comb
 
-        assert idx in df.reset_index().idx, \
+        assert idx in set(df.idx), \
             f'get_results_dict: idx={idx} not found in df'
 
         if not substitute:
@@ -1158,7 +1158,7 @@ class Model:
         substitute = {sanitize_subs(par): val for par, val in
                       substitute.items()}
 
-        x = df.reset_index().loc[lambda x: x.idx == idx].iloc[0]
+        x = df.loc[lambda x: x.idx == idx].iloc[0]
 
         resdict = dict(sorted(zip(map(str, x.variabs_multips), x.result)))
 
