@@ -9,7 +9,7 @@ setup(
     name="SymEnergy",
     version="1.0.5",
     author="SymEnergy contributors listed in AUTHORS",
-    author_email="m.c.soini@posteo.de",
+    author_email="mcsoini_dev@posteo.org",
     description=("Lagrange multiplier based energy market toy "
                  "modeling framework"),
     long_description=long_description,
