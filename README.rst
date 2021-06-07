@@ -32,6 +32,7 @@ Publication
 ============
 
   * \M. C. Soini *et al.*, Does bulk electricity storage assist wind and solar in replacing dispatchable power production?, Energy Economics, `<https://doi.org/10.1016/j.eneco.2019.104495>`_. 
+  * \M. C. Soini, On the displacement of incumbent grid-connected storage with more efficient storage, PhD Thesis "Systemic Interactions of Storage in the Power System", chapter 6, `<https://doi.org/10.13097/archive-ouverte/unige:146422>`_. 
 
 .. _label_example_minimal:
 
