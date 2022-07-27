@@ -29,11 +29,13 @@ Repository
 
 `<https://github.com/mcsoini/symenergy>`_
 
-============
-Publication
-============
+=============
+Publications
+=============
 
   * \M. C. Soini *et al.*, Does bulk electricity storage assist wind and solar in replacing dispatchable power production?, Energy Economics, `<https://doi.org/10.1016/j.eneco.2019.104495>`_. 
+  * \M. C. Soini *et al.*, On the displacement of incumbent electricity storage by more efficient storage in a stylized market model,  Journal of Energy Storage, `<https://doi.org/ 10.1016/j.est.2022.105322>`_. 
+  * \M. C. Soini, Systemic Interactions of Storage in the Power System, PhD Thesis, `<https://doi.org/10.13097/archive-ouverte/unige:146422>`_. 
 
 ===============
 Content
